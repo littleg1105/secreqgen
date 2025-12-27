@@ -1,0 +1,66 @@
+# System Context Template for SecReqGen
+# Fill in details about your target system architecture
+
+system:
+  name: "Example Application"
+  description: "Brief description of the system"
+  version: "1.0.0"
+
+architecture:
+  type: "web_application"  # web_application, mobile_app, api_service, microservices, etc.
+  deployment: "cloud"  # cloud, on_premise, hybrid
+  cloud_provider: "aws"  # aws, azure, gcp, none
+
+  components:
+    - name: "frontend"
+      type: "spa"
+      technology: "React"
+
+    - name: "backend"
+      type: "api"
+      technology: "Python/FastAPI"
+
+    - name: "database"
+      type: "relational"
+      technology: "PostgreSQL"
+
+security:
+  authentication:
+    method: "oauth2"  # basic, oauth2, saml, api_key, jwt
+    mfa_enabled: true
+
+  authorization:
+    model: "rbac"  # rbac, abac, acl
+
+  data_classification:
+    - category: "pii"
+      sensitivity: "high"
+
+    - category: "financial"
+      sensitivity: "high"
+
+    - category: "operational"
+      sensitivity: "medium"
+
+compliance:
+  frameworks:
+    - "OWASP ASVS"
+    - "ISO 27001"
+
+  regulations:
+    - "GDPR"
+
+threat_model:
+  assets:
+    - "User credentials"
+    - "Personal data"
+    - "Financial transactions"
+
+  threat_agents:
+    - category: "external_attacker"
+      capability: "advanced"
+      motivation: "financial_gain"
+
+    - category: "insider_threat"
+      capability: "intermediate"
+      motivation: "various"

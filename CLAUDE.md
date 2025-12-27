@@ -11,10 +11,22 @@ RAG-enhanced security requirements generator for Master's thesis. Compares RAG v
 4. **COMMIT OFTEN**: Atomic commits after each logical unit
 
 ## Tech Stack
-- Python 3.11+, Poetry, Typer (CLI)
+- Python 3.11-3.13 (3.14 not supported), Poetry, Typer (CLI)
 - LangChain, ChromaDB, sentence-transformers
 - Ollama (Llama 3 8B / Mistral 7B)
 - Pydantic 2.0 for schemas
+
+## Development Environment
+Use a Python venv for dependency isolation:
+```bash
+# Create venv with Python 3.13 (or 3.11/3.12)
+python3.13 -m venv .venv
+source .venv/bin/activate
+
+# Install Poetry and dependencies
+pip install poetry
+poetry install
+```
 
 ## Project Structure
 ```
@@ -32,9 +44,10 @@ src/secreqgen/
 Check `docs/log.md` for current implementation status.
 
 ## Commands
-- Load phase details: `/docs/phases/phase-N.md`
+- Load phase details: `/phase N` (custom slash command)
 - Document step: Update `docs/log.md`
-- Run tests: `poetry run pytest tests/ -v`
+- Run tests: `source .venv/bin/activate && poetry run pytest tests/ -v`
+- Run CLI: `source .venv/bin/activate && poetry run secreqgen <command>`
 
 ## Key Design Decisions
 - **Embeddings**: all-mpnet-base-v2 (better semantic nuance)
