@@ -1,0 +1,1 @@
+Check project status: read docs/log.md, check test status, report current step.
