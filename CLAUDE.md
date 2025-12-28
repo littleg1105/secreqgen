@@ -46,8 +46,20 @@ Check `docs/log.md` for current implementation status.
 ## Commands
 - Load phase details: `/phase N` (custom slash command)
 - Document step: Update `docs/log.md`
-- Run tests: `source .venv/bin/activate && poetry run pytest tests/ -v`
-- Run CLI: `source .venv/bin/activate && poetry run secreqgen <command>`
+- Run tests: `.venv/bin/python -m pytest tests/ -v`
+- Run CLI: `.venv/bin/python -m secreqgen <command>`
+
+## Troubleshooting
+
+### "ModuleNotFoundError: No module named 'secreqgen'"
+The package must be installed in editable mode for imports to work. Run:
+```bash
+.venv/bin/pip install -e .
+```
+This happens after:
+- Recreating the venv
+- Running `poetry install` (should do it automatically, but sometimes fails)
+- Any corruption of the venv's site-packages
 
 ## Key Design Decisions
 - **Embeddings**: all-mpnet-base-v2 (better semantic nuance)

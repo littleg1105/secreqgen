@@ -14,6 +14,13 @@ from secreqgen.ingestion.loader import (
     PDFLoader,
     YAMLLoader,
 )
+from secreqgen.ingestion.metadata import (
+    ComplianceFramework,
+    DocumentMetadata,
+    DocumentType,
+    MetadataExtractor,
+    SecurityDomain,
+)
 
 __all__ = [
     # Chunker
@@ -28,4 +35,10 @@ __all__ = [
     "MarkdownLoader",
     "PDFLoader",
     "YAMLLoader",
+    # Metadata
+    "ComplianceFramework",
+    "DocumentMetadata",
+    "DocumentType",
+    "MetadataExtractor",
+    "SecurityDomain",
 ]

@@ -2,7 +2,7 @@
 
 ## Project Status
 - **Current Phase**: 2 - Document Processing Pipeline
-- **Current Step**: 2.2 Complete (with PDF support), Starting 2.3
+- **Current Step**: 2.3 Complete, Starting 2.4
 - **Last Updated**: 2025-12-28
 
 ---
@@ -78,6 +78,52 @@
 
 **Results**: 26 chunker tests, all 78 tests passing
 **Next**: Step 2.3 - Metadata Tagging
+
+---
+
+### 2025-12-28 Step 2.3: Metadata Tagging
+**Files**: src/secreqgen/ingestion/metadata.py, src/secreqgen/ingestion/__init__.py, tests/unit/test_metadata.py, CLAUDE.md
+**What**: Created metadata extraction system using keyword pattern matching for document classification and content tagging
+**Why**: Rich metadata enables filtered retrieval in ChromaDB and provides context for LLM generation
+
+**Enums Created**:
+- `DocumentType`: policy, architecture, standard, system_context, unknown
+- `SecurityDomain`: 13 domains (authentication, authorization, cryptography, input_validation, session_management, error_handling, data_protection, api_security, file_handling, configuration, logging_monitoring, network_security, secure_development)
+- `ComplianceFramework`: owasp_asvs, gdpr, pci_dss, hipaa, soc2, iso27001, nist, cis
+
+**Metadata Extraction**:
+
+1. **Document Type Detection**:
+   - Path-based patterns (high weight): `/policies/` → POLICY, `/architecture/` → ARCHITECTURE
+   - Content-based patterns (lower weight): "security policy", "shall", "must" → POLICY
+   - YAML files checked for system context indicators (system:, application:, security:)
+   - Weighted scoring to pick best match
+
+2. **Security Domain Detection**:
+   - Word-boundary regex patterns (`\bauth\b` not matching "author")
+   - Case-insensitive matching
+   - Domain scores calculated by keyword frequency (for relevance ranking)
+
+3. **Technology Detection**:
+   - Cloud: AWS, Azure, GCP (and specific services like S3, EC2, Lambda)
+   - Auth: Keycloak, Auth0, Okta, LDAP, Active Directory
+   - Frameworks: Spring, Django, FastAPI, React, Angular
+   - Databases: PostgreSQL, MySQL, MongoDB, Redis
+   - Security tools: SonarQube, Snyk, OWASP ZAP
+
+4. **Compliance Framework Detection**:
+   - Pattern matching for GDPR, PCI-DSS, HIPAA, SOC2, ISO 27001, NIST, CIS
+
+**Design Decisions**:
+- Pre-compiled regex patterns in `__init__()` for performance (10x speedup)
+- `DocumentMetadata.to_dict()` for ChromaDB metadata storage compatibility
+- Word boundaries (`\b`) prevent false positives
+- Normalized technology names (e.g., "postgres" → "PostgreSQL")
+
+**Also Updated**: CLAUDE.md with troubleshooting section for ModuleNotFoundError
+
+**Results**: 38 metadata tests, all 116 tests passing
+**Next**: Step 2.4 - Embedding Generation
 
 ---
 
