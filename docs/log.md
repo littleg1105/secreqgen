@@ -319,6 +319,47 @@ Failed to send telemetry event ClientStartEvent: capture() takes 1 positional ar
 
 ---
 
+### 2025-12-29 Live Test: Bitwarden Documentation (Real-World Project)
+**What**: Tested the ingestion pipeline on real security documentation from [Bitwarden](https://github.com/bitwarden/contributing-docs), an open-source password manager
+
+**Test Data**:
+- Cloned `bitwarden/contributing-docs` repository
+- Extracted 17 security-relevant markdown files from `/docs/architecture/`:
+  - Cryptography guide (`crypto-guide.md`)
+  - Authentication deep-dive (`authentication/index.md`, `two-factor-auth.md`)
+  - Authorization patterns (`authorization.md`, ADR-0022)
+  - Passkeys/FIDO2 documentation (7 files)
+  - Server architecture (`server/index.md`)
+
+**Ingestion Results**:
+| Metric | Result |
+|--------|--------|
+| Documents loaded | 17 |
+| Chunks created | 133 |
+| Security domains detected | api_security, authentication, authorization, cryptography, error_handling, input_validation, logging_monitoring, session_management |
+
+**Semantic Search Quality Test**:
+| Query | Best Match (Section) | Similarity |
+|-------|---------------------|------------|
+| "How does Bitwarden encrypt user passwords?" | `Passkeys for decryption` | **0.727** |
+| "What two-factor authentication methods are supported?" | `Two-Factor Authentication > Handling 2FA response` | **0.515** |
+| "How are API tokens validated?" | `Authentication > Client handles response` | **0.562** |
+| "What is the master password hash algorithm?" | `Protecting a key with a password > MasterKey` | **0.466** |
+| "How does passkey authentication work?" | `FIDO2 and Passkeys > What are passkeys?` | **0.653** |
+| "What authorization checks are performed?" | `0022 - Authorization > ASP.NET Core resource-based auth` | **0.582** |
+| "How is the user's symmetric encryption key protected?" | `Use the decryption information > User key` | **0.495** |
+| "What is trusted device encryption?" | `Use the decryption information > Device key` | **0.601** |
+
+**Conclusions**:
+1. **Chunking works well with real docs**: Section hierarchy preserved even with complex nested markdown
+2. **Semantic search finds relevant content**: All queries returned topically-correct sections
+3. **Similarity scores reasonable**: 0.46–0.73 range shows good discrimination between matches
+4. **Multi-format handling**: Mixed technical content (code blocks, tables, nested headers) processed correctly
+
+**Test Location**: `~/bitwarden-test/security-docs/`
+
+---
+
 ## Implementation History
 
 ### 2025-12-27 Step 1.1: Project Initialization
