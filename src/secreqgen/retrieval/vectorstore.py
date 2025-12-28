@@ -4,13 +4,22 @@ Provides multi-collection storage organized by document type,
 enabling efficient semantic search with metadata filtering.
 """
 
+import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+# Disable ChromaDB's third-party telemetry (sent to PostHog analytics service)
+os.environ["CHROMA_TELEMETRY_ENABLED"] = "false"
+
+# Suppress noisy telemetry error logs from ChromaDB/PostHog version mismatch
+logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
+
 import chromadb
 import numpy as np
 from chromadb.api.models.Collection import Collection
+from chromadb.config import Settings
 
 from secreqgen.exceptions import VectorStoreError
 from secreqgen.ingestion.chunker import DocumentChunk
@@ -76,13 +85,18 @@ class SecReqGenVectorStore:
         self.collection_prefix = collection_prefix
         self.persist_directory = persist_directory
 
-        # Initialize ChromaDB client
+        # Initialize ChromaDB client with telemetry disabled
+        settings = Settings(anonymized_telemetry=False)
+
         if persist_directory:
             persist_directory.mkdir(parents=True, exist_ok=True)
-            self._client = chromadb.PersistentClient(path=str(persist_directory))
+            self._client = chromadb.PersistentClient(
+                path=str(persist_directory),
+                settings=settings,
+            )
         else:
             # In-memory client for tests
-            self._client = chromadb.Client()
+            self._client = chromadb.Client(settings=settings)
 
         # Cache for collection objects
         self._collections: dict[DocumentType, Collection] = {}
