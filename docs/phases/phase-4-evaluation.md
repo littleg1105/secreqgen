@@ -1,4 +1,13 @@
-# Phase 4: Evaluation Framework (Steps 4.1-4.4)
+# Phase 4: Evaluation Framework (Steps 4.1-4.5)
+
+## Purpose
+
+This phase answers the core thesis question: **Does RAG improve security requirements generation?**
+
+The evaluation framework enables:
+1. Quantitative comparison (Precision, Recall, F1)
+2. Qualitative analysis (reviewing generated requirements)
+3. Data-driven decisions about optimization (→ Phase 5)
 
 ## Step 4.1: Semantic Similarity Matcher
 **Create `src/secreqgen/evaluation/semantic_matcher.py`**
@@ -139,3 +148,39 @@ Update `cli.py`:
 - [ ] CLI evaluate commands functional
 - [ ] Test with sample data
 - [ ] docs/log.md updated
+
+---
+
+## Interpreting Results & Next Steps
+
+After running evaluation, use this decision tree:
+
+```
+                    RAG F1 vs Zero-shot F1?
+                           /          \
+                  RAG wins by         RAG wins by
+                   ≥20%                <20% or loses
+                    /                       \
+           ┌───────┴───────┐         ┌──────┴──────┐
+           │ THESIS SUCCESS │         │ INVESTIGATE │
+           │               │         │             │
+           │ Document the  │         │ Is retrieval │
+           │ improvement.  │         │ finding      │
+           │ Phase 5 is    │         │ relevant     │
+           │ optional bonus│         │ context?     │
+           └───────────────┘         └──────┬──────┘
+                                           /    \
+                                        YES      NO
+                                        /          \
+                                   Generator    → Phase 5:
+                                   issue        Retrieval
+                                   (debug       Optimization
+                                   prompts)
+```
+
+**Key metrics to analyze:**
+- **Precision**: Are generated requirements valid? (Low = hallucinations)
+- **Recall**: Are we finding all needed requirements? (Low = missing requirements)
+- **Retrieval quality**: Were the right documents retrieved? (Check `retrieved_context` in results)
+
+See **Phase 5: Retrieval Optimization (Optional)** if retrieval quality is the bottleneck.

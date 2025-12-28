@@ -1,4 +1,4 @@
-# Phase 2: Document Processing Pipeline (Steps 2.1-2.5)
+# Phase 2: Document Processing Pipeline (Steps 2.1-2.6)
 
 ## Step 2.1: Document Loader
 **Create `src/secreqgen/ingestion/loader.py`**
@@ -129,11 +129,22 @@ Update `cli.py` to connect:
 ---
 
 ## Completion Checklist
-- [ ] All loaders working (test with sample files)
-- [ ] Chunking respects structure
-- [ ] Metadata extraction finding domains/techs
-- [ ] Embeddings generating correctly
-- [ ] ChromaDB persisting and querying
-- [ ] CLI ingest commands functional
-- [ ] Integration test: ingest → query round-trip
-- [ ] docs/log.md updated
+- [x] All loaders working (test with sample files)
+- [x] Chunking respects structure
+- [x] Metadata extraction finding domains/techs
+- [x] Embeddings generating correctly
+- [x] ChromaDB persisting and querying
+- [x] CLI ingest commands functional
+- [x] Integration test: ingest → query round-trip
+- [x] docs/log.md updated
+
+---
+
+**STATUS: COMPLETE** (2025-12-28)
+
+**Test Results:**
+- 180 tests passing
+- Validated with real Bitwarden documentation (17 docs, 133 chunks)
+- Semantic search quality confirmed
+
+See `docs/log.md` for implementation details, live testing results, and decisions made.
