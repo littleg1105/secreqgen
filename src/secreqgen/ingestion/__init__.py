@@ -5,6 +5,10 @@ from secreqgen.ingestion.chunker import (
     DocumentChunk,
     Section,
 )
+from secreqgen.ingestion.embedder import (
+    DocumentEmbedder,
+    EmbeddedChunk,
+)
 from secreqgen.ingestion.loader import (
     BaseLoader,
     DocxLoader,
@@ -27,6 +31,9 @@ __all__ = [
     "ArchitectureAwareChunker",
     "DocumentChunk",
     "Section",
+    # Embedder
+    "DocumentEmbedder",
+    "EmbeddedChunk",
     # Loader
     "BaseLoader",
     "DocxLoader",

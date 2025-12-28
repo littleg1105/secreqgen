@@ -2,7 +2,7 @@
 
 ## Project Status
 - **Current Phase**: 2 - Document Processing Pipeline
-- **Current Step**: 2.3 Complete, Starting 2.4
+- **Current Step**: 2.4 Complete, Starting 2.5
 - **Last Updated**: 2025-12-28
 
 ---
@@ -124,6 +124,48 @@
 
 **Results**: 38 metadata tests, all 116 tests passing
 **Next**: Step 2.4 - Embedding Generation
+
+---
+
+### 2025-12-28 Step 2.4: Embedding Generation
+**Files**: src/secreqgen/ingestion/embedder.py, src/secreqgen/ingestion/__init__.py, tests/unit/test_embedder.py
+**What**: Created document embedding system using sentence-transformers to generate dense vector representations for semantic search
+
+**Why**: Vector embeddings enable semantic similarity search in the RAG pipeline. The embeddings capture the meaning of text chunks, allowing retrieval of contextually relevant documents even when exact keywords don't match.
+
+**Key Classes**:
+
+1. **DocumentEmbedder**:
+   - Uses `all-mpnet-base-v2` model by default (768-dimensional embeddings)
+   - Lazy model loading to defer expensive initialization until first use
+   - Batch processing with configurable batch size (default 32) for efficiency
+   - Normalized embeddings (L2 norm = 1) for cosine similarity via dot product
+   - Handles empty/whitespace text gracefully with zero vectors
+
+2. **EmbeddedChunk**:
+   - Dataclass pairing a `DocumentChunk` with its `np.ndarray` embedding
+   - Type validation to ensure embedding is numpy array
+
+**API Methods**:
+- `embed_text(text: str) -> np.ndarray` - Single text embedding
+- `embed_texts(texts: list[str]) -> list[np.ndarray]` - Batch embedding
+- `embed_chunk(chunk: DocumentChunk) -> EmbeddedChunk` - Single chunk
+- `embed_chunks(chunks: list[DocumentChunk]) -> list[EmbeddedChunk]` - Batch chunks
+- `embed_chunks_with_arrays(chunks) -> list[tuple[DocumentChunk, np.ndarray]]` - Tuple format for spec compatibility
+
+**Design Decisions**:
+- **No preprocessing needed**: Chunks already include section hierarchy prefix from chunker (e.g., `"Section: Security > Auth\n\n..."`) - we embed content as-is
+- **Lazy loading**: Model not loaded until first embedding call to reduce startup time
+- **Normalization**: All embeddings normalized to unit length, enabling cosine similarity via simple dot product
+- **Empty handling**: Empty/whitespace texts return zero vectors (same dimension) to maintain consistent array shapes
+
+**Integration Notes**:
+- Works with existing chunker output - no modifications needed to chunker
+- EmbeddingConfig in config.py already had model_name, device, batch_size settings
+- Ready for ChromaDB integration in Step 2.5
+
+**Results**: 25 embedder tests, all 141 tests passing
+**Next**: Step 2.5 - ChromaDB Vector Store
 
 ---
 
