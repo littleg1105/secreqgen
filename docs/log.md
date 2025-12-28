@@ -2,7 +2,7 @@
 
 ## Project Status
 - **Current Phase**: 2 - Document Processing Pipeline
-- **Current Step**: 2.4 Complete, Starting 2.5
+- **Current Step**: 2.5 Complete, Starting 2.6
 - **Last Updated**: 2025-12-28
 
 ---
@@ -166,6 +166,50 @@
 
 **Results**: 25 embedder tests, all 141 tests passing
 **Next**: Step 2.5 - ChromaDB Vector Store
+
+---
+
+### 2025-12-28 Step 2.5: ChromaDB Vector Store
+**Files**: src/secreqgen/retrieval/vectorstore.py, src/secreqgen/retrieval/__init__.py, tests/unit/test_vectorstore.py
+**What**: Created multi-collection vector store using ChromaDB for semantic search with document type filtering
+
+**Why**: The vector store is the persistence layer for the RAG pipeline. It stores document chunks with their embeddings and enables efficient semantic similarity search with metadata filtering.
+
+**Key Classes**:
+
+1. **SecReqGenVectorStore**:
+   - Multi-collection architecture with one collection per DocumentType
+   - Collection mapping: POLICY→policies, ARCHITECTURE→architecture, STANDARD→standards, SYSTEM_CONTEXT→system_context
+   - Uses `chromadb.PersistentClient` for disk persistence (or in-memory for tests)
+   - Configurable collection prefix (default: "secreqgen")
+
+2. **QueryResult**:
+   - Dataclass for query results with chunk_id, content, source_document, section_hierarchy, distance, metadata
+   - `similarity` property converts L2 distance to [0,1] similarity score
+
+**API Methods**:
+- `add_chunks(chunks, embeddings, doc_type)` - Upserts chunks with embeddings to appropriate collection
+- `query(query_embedding, doc_types, n_results, where)` - Semantic search across collections with optional filtering
+- `get_stats()` - Returns collection statistics (total chunks, per-collection counts)
+- `get_chunk_by_id(chunk_id, doc_type)` - Direct retrieval by ID
+- `delete_collection(doc_type)` / `clear()` - Collection management
+
+**Design Decisions**:
+- **Multi-collection**: Separate collections by DocumentType enables efficient filtered queries without scanning irrelevant data
+- **L2 distance with normalized vectors**: Using L2 distance (hnsw:space = "l2") with normalized embeddings gives equivalent ranking to cosine similarity
+- **Metadata storage**: Section hierarchy stored as " > " joined string (ChromaDB metadata must be primitives), chunk metadata flattened for filterability
+- **Upsert behavior**: `add_chunks` uses upsert to handle re-indexing gracefully
+- **In-memory option**: `persist_directory=None` creates ephemeral store for testing (proper isolation via `clear()` in test fixtures)
+
+**ChromaDB Specifics**:
+- Uses `get_or_create_collection` for lazy collection initialization
+- `where` clauses support metadata filtering (e.g., `{"security_domains": {"$contains": "authentication"}}`)
+- Query results include distances (L2), converted to similarity via `1 - (distance/2)`
+
+**Test Isolation Issue**: ChromaDB's in-memory client shares state across instances. Solved by calling `store.clear()` in test fixtures to ensure fresh state per test.
+
+**Results**: 29 vectorstore tests, all 170 tests passing
+**Next**: Step 2.6 - Wire Ingestion CLI
 
 ---
 
