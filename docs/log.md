@@ -1,8 +1,8 @@
 # SecReqGen Implementation Log
 
 ## Project Status
-- **Current Phase**: 2 - Document Processing Pipeline
-- **Current Step**: 2.5 Complete, Starting 2.6
+- **Current Phase**: 2 - Document Processing Pipeline (COMPLETE)
+- **Current Step**: Phase 2 Complete
 - **Last Updated**: 2025-12-28
 
 ---
@@ -210,6 +210,67 @@
 
 **Results**: 29 vectorstore tests, all 170 tests passing
 **Next**: Step 2.6 - Wire Ingestion CLI
+
+---
+
+### 2025-12-28 Step 2.6: Wire Ingestion CLI
+**Files**: src/secreqgen/cli.py, tests/unit/test_cli.py
+**What**: Connected all ingestion components into functional CLI commands
+
+**Why**: The CLI is the user-facing interface for the RAG pipeline. Wiring the components together makes the system usable for ingesting security documents.
+
+**CLI Commands Implemented**:
+
+1. **`secreqgen ingest documents <directory> [--type TYPE]`**:
+   - Full pipeline: load → chunk → tag → embed → store
+   - Validates directory exists
+   - Maps CLI type (policies/architecture/standards) to DocumentType enum
+   - Shows Rich progress bars for each step
+   - Reports detected security domains
+   - Displays final statistics
+
+2. **`secreqgen ingest system-context <file.yaml>`**:
+   - Loads YAML system context file
+   - Validates file is YAML format
+   - Stores in SYSTEM_CONTEXT collection
+   - YAML becomes single chunk (stays intact)
+
+3. **`secreqgen ingest stats`**:
+   - Shows vector store statistics in Rich table
+   - Displays chunk counts per collection
+   - Shows total chunks and store path
+
+4. **`secreqgen ingest clear [--force]`**:
+   - Clears all data from vector store
+   - Requires confirmation unless --force flag used
+
+**Design Decisions**:
+- **Lazy imports**: Heavy imports (sentence-transformers, chromadb) done inside commands to keep CLI startup fast
+- **Environment variable override**: Tests use `SECREQGEN_VECTORSTORE_PERSIST_DIRECTORY` env var to isolate test data
+- **Progress feedback**: Rich spinners and progress bars for user feedback during slow operations
+- **Graceful error handling**: Catches IngestionError and VectorStoreError with user-friendly messages
+- **Doc type mapping**: Flexible mapping (e.g., "policies", "policy" both map to POLICY)
+
+**Test Updates**:
+- Updated existing CLI tests for new functionality
+- Added 10 new tests for ingest commands
+- Tests use temp directories for isolation
+
+**Results**: 18 CLI tests, all 180 tests passing
+
+---
+
+## Phase 2 Completion Checklist
+- [x] All loaders working (test with sample files)
+- [x] Chunking respects structure
+- [x] Metadata extraction finding domains/techs
+- [x] Embeddings generating correctly
+- [x] ChromaDB persisting and querying
+- [x] CLI ingest commands functional
+- [x] Integration test: ingest → query round-trip
+- [x] docs/log.md updated
+
+**Phase 2 Complete!** Ready for Phase 3: RAG Retrieval Pipeline
 
 ---
 
