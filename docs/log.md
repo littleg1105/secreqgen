@@ -1,9 +1,31 @@
 # SecReqGen Implementation Log
 
 ## Project Status
-- **Current Phase**: 1 - Foundation
-- **Current Step**: COMPLETE
-- **Last Updated**: 2025-12-27
+- **Current Phase**: 2 - Document Processing Pipeline
+- **Current Step**: 2.1 Complete, Starting 2.2
+- **Last Updated**: 2025-12-28
+
+---
+
+## Phase 2: Document Processing Pipeline
+
+### 2025-12-28 Step 2.1: Document Loader
+**Files**: src/secreqgen/ingestion/loader.py, src/secreqgen/ingestion/__init__.py, tests/unit/test_loader.py, tests/conftest.py
+**What**: Created document loaders for multiple file formats (.md, .pdf, .docx, .yaml/.yml) with a registry pattern for extensibility
+**Why**: The RAG pipeline needs to ingest documents from various sources; a unified loader interface simplifies the ingestion process
+**Decisions**:
+- Registry pattern for loader selection (open/closed principle, easy extension)
+- `LoadedDocument` dataclass as standardized container with metadata
+- Abstract `BaseLoader` class enforces consistent interface
+- PDFLoader adds `[Page X]` markers for citation context
+- DocxLoader converts Word heading styles to markdown format
+- YAMLLoader auto-detects system context files by checking for 'system', 'application', 'project', 'context' keys
+- Comprehensive error handling with `IngestionError` exceptions
+**Issues**:
+- venv Python executables were missing (recreated venv with Python 3.13)
+- Reinstalled all dependencies via poetry
+**Results**: 24 new tests, all 52 tests passing
+**Next**: Step 2.2 - Architecture-Aware Chunking
 
 ---
 

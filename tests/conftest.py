@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from secreqgen.config import SecReqGenConfig
 from secreqgen.generation.schemas import (
@@ -154,5 +155,61 @@ def sample_documents_dir(tmp_path: Path) -> Path:
 - PII must be handled according to GDPR requirements
 """
     )
+
+    return docs_dir
+
+
+# ============================================================================
+# Document Loader Fixtures (Phase 2)
+# ============================================================================
+
+
+@pytest.fixture
+def sample_markdown_file(tmp_path: Path) -> Path:
+    """Create a sample markdown file for testing."""
+    md_file = tmp_path / "sample.md"
+    md_file.write_text(
+        """# Security Policy
+
+## Authentication
+All users must authenticate using strong credentials.
+
+### Password Requirements
+- Minimum 12 characters
+- Must include uppercase and lowercase
+- Must include numbers and symbols
+
+## Authorization
+Access control based on RBAC model.
+"""
+    )
+    return md_file
+
+
+@pytest.fixture
+def sample_yaml_file(tmp_path: Path, sample_system_context: dict) -> Path:
+    """Create a sample YAML system context file for testing."""
+    yaml_file = tmp_path / "system_context.yaml"
+    yaml_file.write_text(yaml.dump(sample_system_context, default_flow_style=False))
+    return yaml_file
+
+
+@pytest.fixture
+def sample_documents_mixed(tmp_path: Path, sample_system_context: dict) -> Path:
+    """Create a directory with mixed document types for testing."""
+    docs_dir = tmp_path / "mixed_docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Markdown file
+    md_file = docs_dir / "policy.md"
+    md_file.write_text("# Security Policy\n\nThis is a security policy document.")
+
+    # YAML file
+    yaml_file = docs_dir / "context.yaml"
+    yaml_file.write_text(yaml.dump(sample_system_context, default_flow_style=False))
+
+    # Unsupported file (should be skipped)
+    txt_file = docs_dir / "readme.txt"
+    txt_file.write_text("This is a plain text file.")
 
     return docs_dir
