@@ -274,6 +274,51 @@
 
 ---
 
+### 2025-12-29 Live Test: End-to-End Ingestion Pipeline
+**What**: Tested the complete ingestion pipeline with real security documents
+
+**Test Data Created**:
+- `~/secreqgen-test/policies/auth-policy.md` - Authentication policy (password, MFA, session, lockout)
+- `~/secreqgen-test/policies/data-protection.md` - Data protection policy (classification, encryption, PII, API security)
+- `~/secreqgen-test/context/system.yaml` - System context (SecureApp, microservices, AWS, Keycloak)
+
+**Ingestion Results**:
+| Metric | Result |
+|--------|--------|
+| Documents loaded | 2 |
+| Chunks created | 9 |
+| System context | 1 chunk |
+| Total in store | 10 chunks |
+| Security domains detected | api_security, authentication, cryptography, data_protection, input_validation, session_management |
+
+**Semantic Search Quality Test**:
+| Query | Best Match | Similarity |
+|-------|-----------|------------|
+| "What are the password requirements?" | `Authentication Policy > Password Requirements` | **0.722** |
+| "How should data be encrypted?" | `Data Protection Policy > Encryption Requirements > Data at Rest` | **0.505** |
+| "What MFA methods are supported?" | `Authentication Policy > Multi-Factor Authentication` | **0.641** |
+
+**Conclusion**: Semantic search correctly retrieves the most relevant document sections for each query. Section hierarchy is preserved for context.
+
+---
+
+### 2025-12-29 Bugfix: Disable ChromaDB Third-Party Telemetry
+**Files**: src/secreqgen/__main__.py (new), src/secreqgen/retrieval/vectorstore.py
+**What**: Disabled ChromaDB's telemetry and suppressed noisy error logs
+
+**Problem**: ChromaDB 0.4.24 sends anonymous usage analytics to PostHog (third-party analytics service). A version mismatch between ChromaDB and PostHog 7.4.2 caused noisy error logs:
+```
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+```
+
+**Solution**:
+1. Set `CHROMA_TELEMETRY_ENABLED=false` environment variable before importing chromadb
+2. Silence the `chromadb.telemetry.product.posthog` logger to suppress any remaining errors
+
+**Also Added**: `__main__.py` entry point to support `python -m secreqgen` invocation
+
+---
+
 ## Implementation History
 
 ### 2025-12-27 Step 1.1: Project Initialization
