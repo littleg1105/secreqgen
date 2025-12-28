@@ -2,7 +2,7 @@
 
 ## Project Status
 - **Current Phase**: 2 - Document Processing Pipeline
-- **Current Step**: 2.1 Complete, Starting 2.2
+- **Current Step**: 2.2 Complete (with PDF support), Starting 2.3
 - **Last Updated**: 2025-12-28
 
 ---
@@ -26,6 +26,58 @@
 - Reinstalled all dependencies via poetry
 **Results**: 24 new tests, all 52 tests passing
 **Next**: Step 2.2 - Architecture-Aware Chunking
+
+---
+
+### 2025-12-28 Step 2.2: Architecture-Aware Chunker
+**Files**: src/secreqgen/ingestion/chunker.py, src/secreqgen/ingestion/__init__.py, tests/unit/test_chunker.py
+**What**: Created intelligent document chunker with format-specific strategies for all supported document types
+**Why**: RAG retrieval quality depends on chunks that maintain semantic coherence; different formats have different structure indicators that must be respected
+
+**Format-Specific Chunking Strategies**:
+
+1. **Markdown (.md)**:
+   - Parses `#`/`##`/`###` headers to extract document structure
+   - Builds section hierarchy (e.g., `["Security Policy", "Authentication", "MFA"]`)
+   - Prepends hierarchy prefix to chunk content: `"Section: Security Policy > Authentication > MFA\n\n"`
+   - Respects section boundaries - never splits mid-section if content fits
+   - Large sections split at paragraph boundaries with token overlap
+   - Preamble content before first header captured in separate chunk
+
+2. **DOCX (.docx)**:
+   - Routes to markdown chunker since DocxLoader converts Word heading styles to markdown format
+   - `Heading 1` → `#`, `Heading 2` → `##`, etc.
+   - Preserves full document hierarchy through converted headers
+   - Same paragraph-boundary splitting as markdown
+
+3. **PDF (.pdf)**:
+   - Uses page-based chunking via `[Page X]` markers from PDFLoader
+   - Each page becomes one or more chunks depending on size
+   - Page number stored in section_hierarchy: `["Page 3"]`
+   - Chunk content prefixed with `"Section: Page 3\n\n"` for embedding context
+   - PDF metadata preserved: `page_number`, `total_pages`, `format`
+   - Large pages split at paragraph boundaries with overlap
+   - Empty pages automatically skipped
+   - Fallback to markdown chunking if no page markers found
+
+4. **YAML (.yaml/.yml)**:
+   - Treated as single chunk (system context must stay intact)
+   - Marked with `is_complete_document: True` in metadata
+   - No splitting regardless of size
+
+**Core Design Decisions**:
+- `DocumentChunk` dataclass with section_hierarchy for context preservation
+- tiktoken with cl100k_base encoding for accurate token counting (GPT-4 compatible)
+- Default 512 max tokens per chunk, 50 token overlap between chunks
+- Deterministic chunk IDs via SHA256 hash of source_path + index
+- Large paragraphs split at sentence boundaries, then word boundaries if needed
+
+**Issues**:
+- Initial implementation had bug where large paragraphs weren't properly split across chunks
+- Fixed by flattening all parts first, then iterating with proper boundary checks
+
+**Results**: 26 chunker tests, all 78 tests passing
+**Next**: Step 2.3 - Metadata Tagging
 
 ---
 
