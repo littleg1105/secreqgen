@@ -61,6 +61,32 @@ This happens after:
 - Running `poetry install` (should do it automatically, but sometimes fails)
 - Any corruption of the venv's site-packages
 
+### macOS: Imports fail even after `pip install -e .`
+**Symptom:** Python shows `ModuleNotFoundError` even though `.pth` file exists in site-packages.
+
+**Root Cause:** macOS Sequoia's APFS compression sets the BSD `hidden` flag on files created by pip. Python 3.13 correctly skips hidden `.pth` files, breaking editable installs.
+
+**Diagnosis:**
+```bash
+# Check if .pth files have hidden flag
+ls -lO .venv/lib/python3.13/site-packages/*.pth
+# Look for "hidden" in the flags column
+
+# Or check with verbose Python startup
+.venv/bin/python -v -c "import site" 2>&1 | grep "Skipping hidden"
+```
+
+**Fix:**
+```bash
+# Remove hidden flag from all .pth files
+chflags nohidden .venv/lib/python3.13/site-packages/*.pth
+
+# Or use the convenience script
+./scripts/fix-pth-hidden.sh
+```
+
+**Prevention:** The `pyproject.toml` includes `pythonpath = ["src"]` for pytest, which bypasses this issue for tests. For direct Python usage, run the fix script after pip install if needed.
+
 ## Key Design Decisions
 - **Embeddings**: all-mpnet-base-v2 (better semantic nuance)
 - **Similarity threshold**: 0.85 for matches, 0.70-0.85 for review

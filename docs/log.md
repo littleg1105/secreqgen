@@ -2,12 +2,81 @@
 
 ## Project Status
 - **Current Phase**: 4 - Evaluation Framework (IN PROGRESS)
-- **Current Step**: Step 4.3 Complete, continuing with 4.4
-- **Last Updated**: 2025-12-30
+- **Current Step**: Step 4.4 Complete, ready for 4.5 (CLI integration)
+- **Last Updated**: 2025-12-31
 
 ---
 
 ## Phase 4: Evaluation Framework
+
+### 2025-12-30 Step 4.4: Evaluation Pipeline
+**Files**: src/secreqgen/evaluation/pipeline.py, src/secreqgen/evaluation/report.py, src/secreqgen/evaluation/__init__.py, tests/unit/test_evaluation_pipeline.py, pyproject.toml
+
+**What**: Created end-to-end evaluation pipeline and report generator for RAG vs baseline comparison
+
+**Why**: The pipeline orchestrates all evaluation components (Steps 4.1-4.3) into a single workflow that answers the core thesis question: Does RAG improve security requirements generation?
+
+**Key Components**:
+
+1. **StoryEvaluationResult Dataclass**: Per-story evaluation data
+   - Links story to ground truth, generation results, matches, and metrics
+   - Properties for requirement counts from both modes
+   - Captures baseline and RAG results side-by-side
+
+2. **EvaluationPipelineResult Dataclass**: Complete evaluation output
+   - Per-story results list
+   - Aggregate metrics for baseline and RAG
+   - ComparisonResult with deltas and improvement percentages
+   - `meets_thesis_target` property for 20% F1 threshold
+   - `get_partial_matches()` for manual review flagging
+   - `summary()` for console output
+
+3. **EvaluationPipeline Class**: Main orchestration
+   - `run(stories_path, ground_truth_path)` → Full file-based pipeline
+   - `run_from_data(stories, ground_truth_map)` → Pre-loaded data pipeline
+   - Phase-based execution: Load → Generate → Match → Calculate → Compare
+   - Progress callback support for CLI integration
+   - Configurable thresholds (match: 0.85, partial: 0.70, improvement: 1.20)
+
+4. **EvaluationReportGenerator Class**: Report output
+   - `generate_full_report()` → Markdown + JSON files
+   - Markdown report: tables, per-story breakdown, partial matches, config
+   - JSON report: full structured data for analysis
+   - Timestamped filenames for versioning
+
+5. **create_evaluation_pipeline()**: Factory function
+   - Convenience setup with vectorstore path
+   - Lazy imports for fast module loading
+
+**File Formats**:
+- **User stories** (input): `{"user_stories": [{"id", "title", "story", "acceptance_criteria"}]}`
+- **Ground truth** (input): `{"ground_truth": [{"story_id", "requirements": [{"id", "title", "description", "asvs_category"}]}]}`
+- **Report** (output): Markdown with tables + JSON for data analysis
+
+**Design Decisions**:
+- Pipeline is a Facade over BaselineRunner, SemanticMatcher, and MetricsCalculator
+- Per-story evaluation enables granular debugging and analysis
+- Partial matches (0.70-0.85 similarity) flagged for human review
+- Both modes evaluated against same ground truth for fair comparison
+- Cache cleared between stories to avoid cross-contamination
+- Progress callbacks enable Rich progress bars in CLI
+
+**Test Infrastructure Fixes**:
+1. Added `pythonpath = ["src"]` to `[tool.pytest.ini_options]` in pyproject.toml
+   - This ensures pytest can find the module regardless of .pth file issues
+
+2. **macOS Sequoia Hidden Flag Issue** (Critical Discovery):
+   - macOS Sequoia's APFS compression sets BSD `hidden` flag on pip-created files
+   - Python 3.13 correctly skips hidden `.pth` files, breaking editable installs
+   - Diagnosis: `ls -lO .venv/lib/python3.13/site-packages/*.pth` shows "hidden" flag
+   - Created `scripts/fix-pth-hidden.sh` to fix: `chflags nohidden .../*.pth`
+   - Documented in CLAUDE.md troubleshooting section
+
+**Results**: 26 new tests, total 460 tests passing
+
+**Next**: Step 4.5 - Wire Evaluation CLI commands
+
+---
 
 ### 2025-12-30 Step 4.3: Baseline Runner
 **Files**: src/secreqgen/evaluation/baseline.py, tests/unit/test_baseline_runner.py, src/secreqgen/evaluation/__init__.py

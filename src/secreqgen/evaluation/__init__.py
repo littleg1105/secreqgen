@@ -10,6 +10,16 @@ from secreqgen.evaluation.metrics import (
     MetricsBreakdown,
     MetricsCalculator,
 )
+from secreqgen.evaluation.pipeline import (
+    EvaluationPipeline,
+    EvaluationPipelineResult,
+    StoryEvaluationResult,
+    create_evaluation_pipeline,
+)
+from secreqgen.evaluation.report import (
+    EvaluationReportGenerator,
+    write_evaluation_report,
+)
 from secreqgen.evaluation.semantic_matcher import (
     GroundTruthRequirement,
     MatchResult,
@@ -33,4 +43,12 @@ __all__ = [
     "BaselineRunner",
     "ComparativeResults",
     "create_baseline_runner",
+    # Evaluation pipeline
+    "EvaluationPipeline",
+    "EvaluationPipelineResult",
+    "StoryEvaluationResult",
+    "create_evaluation_pipeline",
+    # Report generation
+    "EvaluationReportGenerator",
+    "write_evaluation_report",
 ]
