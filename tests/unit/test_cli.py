@@ -232,21 +232,35 @@ class TestIngestClear:
 
 
 class TestGenerateRequirements:
-    """Tests for generate requirements command (not yet implemented)."""
+    """Tests for generate requirements command."""
 
-    def test_generate_requirements_not_implemented(self) -> None:
-        """Test generate requirements command shows not implemented."""
-        result = runner.invoke(app, ["generate", "requirements", "/tmp/stories.yaml"])
-        assert result.exit_code == 0
-        assert "Not yet implemented" in result.stdout
+    def test_generate_requirements_file_not_found(self) -> None:
+        """Test generate requirements errors on missing file."""
+        result = runner.invoke(app, ["generate", "requirements", "/nonexistent/stories.yaml"])
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
 
-    def test_generate_requirements_baseline_flag(self) -> None:
-        """Test generate requirements with --baseline flag."""
-        result = runner.invoke(
-            app, ["generate", "requirements", "/tmp/stories.yaml", "--baseline"]
-        )
+    def test_generate_requirements_invalid_format(self) -> None:
+        """Test generate requirements errors on invalid format."""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write('{"user_stories": []}')
+            f.flush()
+            result = runner.invoke(
+                app, ["generate", "requirements", f.name, "--format", "invalid"]
+            )
+        assert result.exit_code == 1
+        assert "invalid format" in result.stdout.lower()
+
+    def test_generate_requirements_empty_stories(self) -> None:
+        """Test generate requirements handles empty user stories."""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write('{"user_stories": []}')
+            f.flush()
+            result = runner.invoke(app, ["generate", "requirements", f.name])
         assert result.exit_code == 0
-        assert "baseline" in result.stdout.lower() or "zero-shot" in result.stdout.lower()
+        assert "no user stories" in result.stdout.lower()
 
 
 class TestEvaluateCompare:
