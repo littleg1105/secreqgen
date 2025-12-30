@@ -1,9 +1,79 @@
 # SecReqGen Implementation Log
 
 ## Project Status
-- **Current Phase**: 2 - Document Processing Pipeline (COMPLETE)
-- **Current Step**: Phase 2 Complete
-- **Last Updated**: 2025-12-28
+- **Current Phase**: 3 - RAG Pipeline & Generation (IN PROGRESS)
+- **Current Step**: Step 3.2 - Prompt Templates
+- **Last Updated**: 2025-12-30
+
+---
+
+## Phase 3: RAG Pipeline & Generation
+
+### 2025-12-30 Step 3.1: Ollama LLM Client
+**Files**: src/secreqgen/generation/llm_client.py, src/secreqgen/generation/__init__.py, tests/unit/test_llm_client.py, tests/integration/test_llm_client_integration.py
+
+**What**: Created synchronous HTTP client for Ollama LLM API with metrics tracking
+
+**Why**: The generation pipeline needs to communicate with Ollama for LLM inference. A dedicated client provides clean abstraction, proper error handling, and metrics collection for thesis analysis.
+
+**Key Features**:
+- `OllamaClient` class using httpx for HTTP communication
+- `LLMResponse` dataclass capturing content, token counts, and latency
+- `check_health()` method to verify Ollama availability and model presence
+- `generate()` for simple prompt completion
+- `generate_with_messages()` for chat-style multi-turn conversations
+- JSON mode support via `format="json"` parameter
+- Configurable timeout (default 120s for slow generation)
+
+**API Design**:
+```python
+client = OllamaClient(model_name="llama3:8b", temperature=0.1)
+if client.check_health():
+    response = client.generate(prompt, system_prompt, format="json")
+    # response.content, response.prompt_tokens, response.latency_ms
+```
+
+**Error Handling**:
+- `LLMConnectionError` for connection failures ("Is Ollama running?")
+- `GenerationError` for timeouts and API errors
+- Clear error messages with actionable guidance
+
+**Decisions**:
+- Used httpx directly (already a dependency) instead of ollama Python package for full control
+- Track both prompt_tokens and completion_tokens from Ollama's eval counts
+- Support both `/api/generate` and `/api/chat` endpoints
+
+**Results**: 23 unit tests + 8 integration tests, all 203 tests passing
+
+---
+
+### 2025-12-30 Step 3.2: Prompt Templates (In Progress)
+**Files**: src/secreqgen/generation/prompts.py
+
+**What**: Created prompt template system for RAG and zero-shot generation modes
+
+**Why**: Consistent prompt engineering is critical for LLM output quality. Separating templates allows A/B testing and customization without code changes.
+
+**Key Components**:
+- `PromptTemplate` dataclass with variable substitution
+- `SecurityRequirementsPromptBuilder` class for building generation prompts
+- System prompt defining the security expert persona
+- RAG prompt template (includes retrieved context)
+- Zero-shot prompt template (baseline, no retrieval)
+- JSON schema specification for structured output
+
+**Template Structure**:
+1. System prompt: Security expert role, ASVS knowledge, guidelines
+2. User prompt: System context + user story + (optional) retrieved docs + JSON schema
+3. `format_retrieved_context()` helper for formatting chunks
+
+**Decisions**:
+- Python string templates with `$variable` substitution (simple, no extra dependencies)
+- Optional external file loading for template customization
+- Explicit JSON schema in prompt to guide LLM output format
+- Same schema for both RAG and zero-shot modes (fair comparison)
+
+**Next**: Write tests for prompts.py, then continue to Step 3.3 (Simple Retriever)
 
 ---
 

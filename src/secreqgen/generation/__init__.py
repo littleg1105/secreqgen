@@ -1,5 +1,6 @@
 """Generation module for SecReqGen."""
 
+from secreqgen.generation.llm_client import LLMResponse, OllamaClient
 from secreqgen.generation.schemas import (
     ASVSCategory,
     EvaluationResult,
@@ -11,6 +12,10 @@ from secreqgen.generation.schemas import (
 )
 
 __all__ = [
+    # LLM Client
+    "OllamaClient",
+    "LLMResponse",
+    # Schemas
     "ASVSCategory",
     "Priority",
     "UserStory",
