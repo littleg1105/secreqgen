@@ -1,8 +1,8 @@
 # SecReqGen Implementation Log
 
 ## Project Status
-- **Current Phase**: 3 - RAG Pipeline & Generation (IN PROGRESS)
-- **Current Step**: Step 3.5 - Output Formatter (next)
+- **Current Phase**: 3 - RAG Pipeline & Generation (COMPLETE)
+- **Current Step**: Ready for Phase 4 - Evaluation
 - **Last Updated**: 2025-12-30
 
 ---
@@ -132,7 +132,109 @@ if client.check_health():
 
 **Results**: 42 unit tests, all passing
 
-**Next**: Step 3.5 - Output Formatter and Exporter
+---
+
+### 2025-12-30 Step 3.5: Output Formatter & Exporter
+**Files**: src/secreqgen/output/formatter.py, src/secreqgen/output/exporter.py, src/secreqgen/output/__init__.py, tests/unit/test_formatter.py, tests/unit/test_exporter.py
+
+**What**: Created output formatting and file export system for generated security requirements
+
+**Why**: The thesis needs to analyze and present generated requirements in multiple formats. The formatter converts Pydantic models to strings, while the exporter handles file I/O.
+
+**Key Components**:
+
+1. **OutputFormat enum**: JSON, YAML, MARKDOWN, CSV
+
+2. **RequirementsFormatter**:
+   - `format()` for single GenerationResult
+   - `format_batch()` for multiple results
+   - Format-specific methods: `_to_json()`, `_to_yaml()`, `_to_markdown()`, `_to_csv()`
+   - Custom serializers for datetime and enum types
+   - Optional metadata inclusion (model, timestamp, RAG status)
+
+3. **RequirementsExporter**:
+   - `export()` writes pre-formatted content to file
+   - `export_result()` formats and exports a single result
+   - `export_batch()` formats and exports multiple results
+   - `generate_filename()` creates descriptive filenames with timestamp and mode
+   - Automatic directory creation
+
+**Format-Specific Features**:
+- **JSON/YAML**: Full structured output with nested requirements and threat mappings
+- **Markdown**: Human-readable with headers, checkboxes for acceptance criteria, tables for threat mappings
+- **CSV**: Flattened row-per-requirement format for spreadsheet analysis
+
+**Decisions**:
+- Formatter and Exporter separated (Single Responsibility Principle)
+- Lists flattened with semicolon separator in CSV for Excel compatibility
+- Markdown includes `- [ ]` checkboxes for acceptance criteria tracking
+- Batch output includes summary statistics (total stories, total requirements)
+
+**Results**: 35 formatter tests + 25 exporter tests = 60 new tests, total 357 tests passing
+
+---
+
+### 2025-12-30 Step 3.6: Wire Generation CLI Commands
+**Files**: src/secreqgen/cli.py
+
+**What**: Implemented full generation CLI with RAG/baseline modes and format output
+
+**Why**: Makes the generation pipeline accessible via command line for thesis experiments
+
+**CLI Commands Implemented**:
+
+1. **`secreqgen generate check-ollama`**:
+   - Verifies Ollama server is running
+   - Checks if configured model is available
+   - Lists all available models
+   - Provides helpful error messages if connection fails
+
+2. **`secreqgen generate requirements <input.json> [options]`**:
+   - `--output/-o FILE`: Write to file (default: stdout)
+   - `--format/-f FORMAT`: json, yaml, markdown, csv (default: markdown)
+   - `--baseline`: Use zero-shot mode (no RAG)
+   - `--context/-c FILE`: Override system context YAML
+   - Full pipeline: load stories → init components → generate → format → output
+   - Progress bars for each step
+   - Graceful error handling per story
+
+3. **`secreqgen generate single --title TITLE --story STORY [options]`**:
+   - Interactive single-story generation
+   - `--ac CRITERION`: Acceptance criteria (repeatable)
+   - `--baseline`: Zero-shot mode
+   - `--format/-f FORMAT`: Output format
+   - Auto-generates unique story ID
+
+**Input File Format**:
+```json
+{
+  "user_stories": [
+    {"id": "US-001", "title": "...", "story": "...", "acceptance_criteria": [...]}
+  ]
+}
+```
+
+**Design Decisions**:
+- Lazy imports to keep CLI startup fast (heavy imports inside commands)
+- Validates Ollama connection before processing
+- Supports both JSON and YAML input files
+- RAG mode initializes embedder + vectorstore + retriever
+- Zero-shot mode skips retrieval (for baseline comparison)
+
+---
+
+## Phase 3 Completion Checklist
+- [x] Ollama client connecting and generating
+- [x] Prompts loading and rendering correctly
+- [x] Retriever returning relevant chunks
+- [x] Generator producing valid SecurityRequirement objects
+- [x] Baseline mode working (no RAG)
+- [x] JSON, YAML, Markdown, CSV export working
+- [x] CLI generate command functional
+- [x] End-to-end flow: story → requirements
+- [x] docs/log.md updated
+
+**Phase 3 Complete!** 357 tests passing. Ready for Phase 4: Evaluation.
 
 ---
 

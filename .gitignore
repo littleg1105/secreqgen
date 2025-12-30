@@ -71,5 +71,3 @@ venv.bak/
 
 # Project specific
 data/vectordb/
-output/
-*.log

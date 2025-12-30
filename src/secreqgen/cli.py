@@ -443,10 +443,41 @@ def ingest_clear(
 
 
 # Generate commands
+@generate_app.command("check-ollama")
+def check_ollama() -> None:
+    """Check if Ollama is running and model is available."""
+    from secreqgen.generation import OllamaClient
+
+    cfg = get_config()
+
+    console.print(f"[cyan]Checking Ollama at:[/cyan] {cfg.llm.base_url}")
+    console.print(f"[cyan]Model:[/cyan] {cfg.llm.model_name}")
+
+    client = OllamaClient(
+        base_url=cfg.llm.base_url,
+        model_name=cfg.llm.model_name,
+    )
+
+    if client.check_health():
+        console.print("[green]✓[/green] Ollama is running and model is available!")
+        try:
+            models = client.list_models()
+            console.print(f"[dim]Available models: {', '.join(models)}[/dim]")
+        except Exception:
+            pass
+    else:
+        console.print(
+            "[red]✗[/red] Cannot connect to Ollama or model not available.\n"
+            f"Make sure Ollama is running: [cyan]ollama serve[/cyan]\n"
+            f"And model is pulled: [cyan]ollama pull {cfg.llm.model_name}[/cyan]"
+        )
+        raise typer.Exit(1)
+
+
 @generate_app.command("requirements")
 def generate_requirements(
     input_file: Annotated[
-        Path, typer.Argument(help="Input file with user stories")
+        Path, typer.Argument(help="Input file with user stories (JSON/YAML)")
     ],
     output: Annotated[
         Optional[Path],
@@ -456,23 +487,371 @@ def generate_requirements(
             help="Output file for generated requirements",
         ),
     ] = None,
-    baseline: bool = typer.Option(
-        False,
-        "--baseline",
-        help="Generate baseline (zero-shot) requirements without RAG",
-    ),
+    format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format: json, yaml, markdown, csv",
+        ),
+    ] = "markdown",
+    baseline: Annotated[
+        bool,
+        typer.Option(
+            "--baseline",
+            help="Generate baseline (zero-shot) requirements without RAG",
+        ),
+    ] = False,
+    context: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--context",
+            "-c",
+            help="Optional system context YAML file (overrides stored context)",
+        ),
+    ] = None,
 ) -> None:
-    """Generate security requirements from user stories."""
-    mode = "baseline (zero-shot)" if baseline else "RAG-enhanced"
+    """Generate security requirements from user stories.
+
+    Input file should be JSON or YAML with format:
+    {
+      "user_stories": [
+        {"id": "US-001", "title": "...", "story": "...", "acceptance_criteria": [...]}
+      ]
+    }
+    """
+    import json
+    import yaml as yaml_lib
+
+    from secreqgen.exceptions import GenerationError, LLMConnectionError
+    from secreqgen.generation import (
+        GenerationMode,
+        OllamaClient,
+        SecurityRequirementsGenerator,
+        SecurityRequirementsPromptBuilder,
+    )
+    from secreqgen.generation.schemas import UserStory
+    from secreqgen.ingestion import DocumentEmbedder
+    from secreqgen.output import OutputFormat, RequirementsExporter, RequirementsFormatter
+    from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
+
+    # Validate input file
+    if not input_file.exists():
+        console.print(f"[red]Error:[/red] Input file not found: {input_file}")
+        raise typer.Exit(1)
+
+    # Validate format
+    format_map = {
+        "json": OutputFormat.JSON,
+        "yaml": OutputFormat.YAML,
+        "markdown": OutputFormat.MARKDOWN,
+        "md": OutputFormat.MARKDOWN,
+        "csv": OutputFormat.CSV,
+    }
+    output_format = format_map.get(format.lower())
+    if output_format is None:
+        console.print(
+            f"[red]Error:[/red] Invalid format: {format}\n"
+            "Valid formats: json, yaml, markdown, csv"
+        )
+        raise typer.Exit(1)
+
+    # Get config
+    cfg = get_config()
+    mode = GenerationMode.ZERO_SHOT if baseline else GenerationMode.RAG
+
     console.print(
         Panel(
-            f"[yellow]Not yet implemented[/yellow]\n\n"
-            f"Mode: {mode}\n"
-            f"Input: {input_file}\n"
-            f"Output: {output or 'stdout'}",
-            title="Generate Requirements",
+            f"[cyan]Input:[/cyan] {input_file}\n"
+            f"[cyan]Mode:[/cyan] {'Baseline (zero-shot)' if baseline else 'RAG-enhanced'}\n"
+            f"[cyan]Format:[/cyan] {output_format.value}\n"
+            f"[cyan]Output:[/cyan] {output or 'stdout'}",
+            title="Generating Security Requirements",
         )
     )
+
+    # Load user stories
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        progress.add_task("Loading user stories...", total=None)
+
+        try:
+            content = input_file.read_text()
+            if input_file.suffix.lower() in [".yaml", ".yml"]:
+                data = yaml_lib.safe_load(content)
+            else:
+                data = json.loads(content)
+        except Exception as e:
+            console.print(f"[red]Error parsing input file:[/red] {e}")
+            raise typer.Exit(1)
+
+    # Parse user stories
+    stories_data = data.get("user_stories", [])
+    if not stories_data:
+        console.print("[yellow]No user stories found in input file.[/yellow]")
+        raise typer.Exit(0)
+
+    user_stories = []
+    for i, story_data in enumerate(stories_data):
+        try:
+            story = UserStory(
+                id=story_data.get("id", f"US-{i+1:03d}"),
+                title=story_data.get("title", "Untitled"),
+                story=story_data.get("story", ""),
+                acceptance_criteria=story_data.get("acceptance_criteria", []),
+            )
+            user_stories.append(story)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Skipping invalid story {i+1}: {e}[/yellow]")
+
+    console.print(f"[green]✓[/green] Loaded {len(user_stories)} user stories")
+
+    # Load optional system context from file
+    system_context = None
+    if context:
+        if not context.exists():
+            console.print(f"[red]Error:[/red] Context file not found: {context}")
+            raise typer.Exit(1)
+        system_context = context.read_text()
+        console.print(f"[green]✓[/green] Loaded system context from {context.name}")
+
+    # Initialize components
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task("Initializing components...", total=None)
+
+            # Initialize LLM client
+            llm_client = OllamaClient(
+                base_url=cfg.llm.base_url,
+                model_name=cfg.llm.model_name,
+                temperature=cfg.llm.temperature,
+                max_tokens=cfg.llm.max_tokens,
+            )
+
+            # Check Ollama connection
+            if not llm_client.check_health():
+                console.print(
+                    "[red]Error:[/red] Cannot connect to Ollama.\n"
+                    f"Make sure Ollama is running: [cyan]ollama serve[/cyan]"
+                )
+                raise typer.Exit(1)
+
+            # Initialize retriever for RAG mode
+            retriever = None
+            if mode == GenerationMode.RAG:
+                embedder = DocumentEmbedder(
+                    model_name=cfg.embedding.model_name,
+                    device=cfg.embedding.device,
+                )
+                vectorstore = SecReqGenVectorStore(
+                    persist_directory=cfg.vectorstore.persist_directory,
+                    collection_prefix=cfg.vectorstore.collection_prefix,
+                )
+                retriever = SimpleRetriever(
+                    vectorstore=vectorstore,
+                    embedder=embedder,
+                    top_k=cfg.retrieval.top_k,
+                    similarity_threshold=cfg.retrieval.similarity_threshold,
+                )
+
+            # Initialize generator
+            generator = SecurityRequirementsGenerator(
+                llm_client=llm_client,
+                retriever=retriever,
+                prompt_builder=SecurityRequirementsPromptBuilder(),
+            )
+
+        console.print("[green]✓[/green] Components initialized")
+
+    except LLMConnectionError as e:
+        console.print(f"[red]LLM Connection Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Generate requirements
+    results = []
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Generating requirements...", total=len(user_stories))
+
+        for story in user_stories:
+            try:
+                result = generator.generate(
+                    user_story=story,
+                    mode=mode,
+                    system_context=system_context,
+                )
+                results.append(result)
+                progress.advance(task)
+            except GenerationError as e:
+                console.print(f"[yellow]Warning: Failed to generate for {story.id}: {e}[/yellow]")
+                progress.advance(task)
+
+    if not results:
+        console.print("[red]No requirements generated.[/red]")
+        raise typer.Exit(1)
+
+    total_reqs = sum(len(r.requirements) for r in results)
+    console.print(f"[green]✓[/green] Generated {total_reqs} requirements from {len(results)} stories")
+
+    # Format output
+    formatter = RequirementsFormatter()
+    if len(results) == 1:
+        formatted_output = formatter.format(results[0], output_format)
+    else:
+        formatted_output = formatter.format_batch(results, output_format)
+
+    # Output
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(formatted_output, encoding="utf-8")
+        console.print(f"[green]✓[/green] Written to {output}")
+    else:
+        console.print("\n" + formatted_output)
+
+
+@generate_app.command("single")
+def generate_single(
+    title: Annotated[
+        str,
+        typer.Option("--title", "-t", help="User story title"),
+    ],
+    story: Annotated[
+        str,
+        typer.Option("--story", "-s", help="User story text"),
+    ],
+    acceptance_criteria: Annotated[
+        Optional[list[str]],
+        typer.Option("--ac", help="Acceptance criteria (can be repeated)"),
+    ] = None,
+    baseline: Annotated[
+        bool,
+        typer.Option("--baseline", help="Use baseline (zero-shot) mode"),
+    ] = False,
+    format: Annotated[
+        str,
+        typer.Option("--format", "-f", help="Output format: json, yaml, markdown"),
+    ] = "markdown",
+) -> None:
+    """Generate requirements for a single user story (interactive mode)."""
+    import uuid
+
+    from secreqgen.exceptions import GenerationError, LLMConnectionError
+    from secreqgen.generation import (
+        GenerationMode,
+        OllamaClient,
+        SecurityRequirementsGenerator,
+        SecurityRequirementsPromptBuilder,
+    )
+    from secreqgen.generation.schemas import UserStory
+    from secreqgen.ingestion import DocumentEmbedder
+    from secreqgen.output import OutputFormat, RequirementsFormatter
+    from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
+
+    # Validate format
+    format_map = {
+        "json": OutputFormat.JSON,
+        "yaml": OutputFormat.YAML,
+        "markdown": OutputFormat.MARKDOWN,
+        "md": OutputFormat.MARKDOWN,
+    }
+    output_format = format_map.get(format.lower())
+    if output_format is None:
+        console.print(f"[red]Error:[/red] Invalid format: {format}")
+        raise typer.Exit(1)
+
+    cfg = get_config()
+    mode = GenerationMode.ZERO_SHOT if baseline else GenerationMode.RAG
+
+    # Create user story
+    user_story = UserStory(
+        id=f"US-{uuid.uuid4().hex[:6].upper()}",
+        title=title,
+        story=story,
+        acceptance_criteria=acceptance_criteria or [],
+    )
+
+    console.print(
+        Panel(
+            f"[cyan]Title:[/cyan] {title}\n"
+            f"[cyan]Story:[/cyan] {story}\n"
+            f"[cyan]Mode:[/cyan] {'Baseline' if baseline else 'RAG'}",
+            title="Generating Requirements",
+        )
+    )
+
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task("Initializing...", total=None)
+
+            llm_client = OllamaClient(
+                base_url=cfg.llm.base_url,
+                model_name=cfg.llm.model_name,
+                temperature=cfg.llm.temperature,
+                max_tokens=cfg.llm.max_tokens,
+            )
+
+            if not llm_client.check_health():
+                console.print("[red]Cannot connect to Ollama.[/red]")
+                raise typer.Exit(1)
+
+            retriever = None
+            if mode == GenerationMode.RAG:
+                embedder = DocumentEmbedder(
+                    model_name=cfg.embedding.model_name,
+                    device=cfg.embedding.device,
+                )
+                vectorstore = SecReqGenVectorStore(
+                    persist_directory=cfg.vectorstore.persist_directory,
+                    collection_prefix=cfg.vectorstore.collection_prefix,
+                )
+                retriever = SimpleRetriever(
+                    vectorstore=vectorstore,
+                    embedder=embedder,
+                    top_k=cfg.retrieval.top_k,
+                    similarity_threshold=cfg.retrieval.similarity_threshold,
+                )
+
+            generator = SecurityRequirementsGenerator(
+                llm_client=llm_client,
+                retriever=retriever,
+            )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task("Generating requirements...", total=None)
+            result = generator.generate(user_story=user_story, mode=mode)
+
+        console.print(f"[green]✓[/green] Generated {len(result.requirements)} requirements")
+
+        formatter = RequirementsFormatter()
+        formatted_output = formatter.format(result, output_format)
+        console.print("\n" + formatted_output)
+
+    except LLMConnectionError as e:
+        console.print(f"[red]LLM Connection Error:[/red] {e}")
+        raise typer.Exit(1)
+    except GenerationError as e:
+        console.print(f"[red]Generation Error:[/red] {e}")
+        raise typer.Exit(1)
 
 
 # Evaluate commands
