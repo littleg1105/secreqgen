@@ -1,5 +1,10 @@
 """Evaluation framework for comparing generated requirements against ground truth."""
 
+from secreqgen.evaluation.metrics import (
+    ComparisonResult,
+    MetricsBreakdown,
+    MetricsCalculator,
+)
 from secreqgen.evaluation.semantic_matcher import (
     GroundTruthRequirement,
     MatchResult,
@@ -9,9 +14,14 @@ from secreqgen.evaluation.semantic_matcher import (
 )
 
 __all__ = [
+    # Semantic matcher
     "GroundTruthRequirement",
     "MatchResult",
     "MatchType",
     "SemanticMatcher",
     "load_ground_truth",
+    # Metrics
+    "ComparisonResult",
+    "MetricsBreakdown",
+    "MetricsCalculator",
 ]

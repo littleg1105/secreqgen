@@ -2,12 +2,66 @@
 
 ## Project Status
 - **Current Phase**: 4 - Evaluation Framework (IN PROGRESS)
-- **Current Step**: Step 4.1 Complete, continuing with 4.2
+- **Current Step**: Step 4.2 Complete, continuing with 4.3
 - **Last Updated**: 2025-12-30
 
 ---
 
 ## Phase 4: Evaluation Framework
+
+### 2025-12-30 Step 4.2: Metrics Calculator
+**Files**: src/secreqgen/evaluation/metrics.py, tests/unit/test_metrics.py, src/secreqgen/evaluation/__init__.py
+
+**What**: Created metrics calculator for computing Precision, Recall, F1, and hallucination rate from match results
+
+**Why**: Quantitative metrics are essential for the thesis comparison of RAG vs baseline. The calculator transforms MatchResults into actionable metrics and provides comparison utilities.
+
+**Key Components**:
+
+1. **MetricsBreakdown Dataclass**: Complete metrics snapshot
+   - `true_positives`, `false_positives`, `false_negatives`, `partial_matches`
+   - `precision`, `recall`, `f1_score`, `hallucination_rate`
+   - `summary()` method for human-readable output
+   - `to_evaluation_result()` for schema compatibility
+
+2. **ComparisonResult Dataclass**: RAG vs Baseline comparison
+   - Stores both condition's metrics
+   - Delta values (RAG - Baseline)
+   - Percentage improvements
+   - `meets_threshold` flag for thesis success criterion
+   - `summary()` with formatted comparison table
+
+3. **MetricsCalculator Class**:
+   - `calculate(matches, total_ground_truth)` → MetricsBreakdown
+   - `compare_conditions(baseline, rag, threshold)` → ComparisonResult
+   - Safe division handling (0/0 → 0)
+   - Percentage change calculation with edge case handling
+
+**Metric Definitions**:
+- **Precision** = TP / (TP + FP) — Fraction of generated that are correct
+- **Recall** = TP / (TP + FN) — Fraction of GT that were found
+- **F1** = 2 × P × R / (P + R) — Harmonic mean
+- **Hallucination Rate** = FP / total_generated — Made-up requirements
+
+**Classification from MatchResults**:
+- TP: `MatchType.MATCH` (similarity ≥ 0.85)
+- FP: `MatchType.NO_MATCH` (hallucination)
+- FN: GT not matched by any generated
+- Partial: `MatchType.PARTIAL` (counted separately, consumes GT)
+
+**Thesis Success Criterion**:
+- Default threshold: RAG F1 ≥ Baseline F1 × 1.20 (20% improvement)
+- Configurable via `improvement_threshold` parameter
+
+**Design Decisions**:
+- Partial matches consume GT (prevent being counted as FN) but don't count as TP
+- Both MATCH and PARTIAL consume GT to ensure 1:1 assignment
+- Conversion to existing `EvaluationResult` schema for compatibility
+- Edge cases handled: empty inputs, division by zero, baseline zero
+
+**Results**: 22 unit tests, total 413 tests passing
+
+---
 
 ### 2025-12-30 Step 4.1: Semantic Similarity Matcher
 **Files**: src/secreqgen/evaluation/semantic_matcher.py, tests/unit/test_semantic_matcher.py
