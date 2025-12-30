@@ -263,13 +263,342 @@ class TestGenerateRequirements:
         assert "no user stories" in result.stdout.lower()
 
 
-class TestEvaluateCompare:
-    """Tests for evaluate compare command (not yet implemented)."""
+class TestEvaluateRun:
+    """Tests for evaluate run command."""
 
-    def test_evaluate_compare_not_implemented(self) -> None:
-        """Test evaluate compare command shows not implemented."""
+    def test_evaluate_run_stories_not_found(self, tmp_path: Path) -> None:
+        """Test evaluate run errors when stories file not found."""
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('{"ground_truth": []}')
+
         result = runner.invoke(
-            app, ["evaluate", "compare", "/tmp/generated.yaml", "/tmp/ground_truth.yaml"]
+            app, ["evaluate", "run", "/nonexistent/stories.json", str(gt_file)]
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
+
+    def test_evaluate_run_ground_truth_not_found(self, tmp_path: Path) -> None:
+        """Test evaluate run errors when ground truth file not found."""
+        stories_file = tmp_path / "stories.json"
+        stories_file.write_text('{"user_stories": []}')
+
+        result = runner.invoke(
+            app, ["evaluate", "run", str(stories_file), "/nonexistent/gt.json"]
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
+
+    def test_evaluate_run_context_not_found(self, tmp_path: Path) -> None:
+        """Test evaluate run errors when context file not found."""
+        stories_file = tmp_path / "stories.json"
+        stories_file.write_text('{"user_stories": []}')
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('{"ground_truth": []}')
+
+        result = runner.invoke(
+            app,
+            [
+                "evaluate", "run",
+                str(stories_file),
+                str(gt_file),
+                "--context", "/nonexistent/context.yaml"
+            ]
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
+
+
+class TestEvaluateCompare:
+    """Tests for evaluate compare command."""
+
+    def test_evaluate_compare_generated_not_found(self, tmp_path: Path) -> None:
+        """Test evaluate compare errors when generated file not found."""
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('{"requirements": []}')
+
+        result = runner.invoke(
+            app, ["evaluate", "compare", "/nonexistent/generated.json", str(gt_file)]
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
+
+    def test_evaluate_compare_ground_truth_not_found(self, tmp_path: Path) -> None:
+        """Test evaluate compare errors when ground truth file not found."""
+        gen_file = tmp_path / "generated.json"
+        gen_file.write_text('{"requirements": []}')
+
+        result = runner.invoke(
+            app, ["evaluate", "compare", str(gen_file), "/nonexistent/gt.json"]
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
+
+    def test_evaluate_compare_empty_requirements(self, tmp_path: Path) -> None:
+        """Test evaluate compare handles empty requirements list."""
+        gen_file = tmp_path / "generated.json"
+        gen_file.write_text('{"requirements": []}')
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('{"requirements": []}')
+
+        result = runner.invoke(
+            app, ["evaluate", "compare", str(gen_file), str(gt_file)]
         )
         assert result.exit_code == 0
-        assert "Not yet implemented" in result.stdout
+        assert "no generated requirements" in result.stdout.lower()
+
+    def test_evaluate_compare_invalid_json(self, tmp_path: Path) -> None:
+        """Test evaluate compare errors on invalid JSON."""
+        gen_file = tmp_path / "generated.json"
+        gen_file.write_text('not valid json')
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('{"requirements": []}')
+
+        result = runner.invoke(
+            app, ["evaluate", "compare", str(gen_file), str(gt_file)]
+        )
+        assert result.exit_code == 1
+        assert "json" in result.stdout.lower()
+
+    def test_evaluate_compare_with_requirements(self, tmp_path: Path) -> None:
+        """Test evaluate compare with actual requirements computes metrics."""
+        gen_file = tmp_path / "generated.json"
+        gen_file.write_text('''
+        {
+            "requirements": [
+                {
+                    "id": "GEN-001",
+                    "title": "Password Validation",
+                    "description": "Validate password length and complexity"
+                },
+                {
+                    "id": "GEN-002",
+                    "title": "Session Management",
+                    "description": "Implement secure session handling with timeout"
+                }
+            ]
+        }
+        ''')
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('''
+        {
+            "requirements": [
+                {
+                    "id": "GT-001",
+                    "title": "Password Requirements",
+                    "description": "Enforce password complexity rules including length, character types"
+                },
+                {
+                    "id": "GT-002",
+                    "title": "Session Security",
+                    "description": "Implement secure session management with proper timeout"
+                }
+            ]
+        }
+        ''')
+
+        result = runner.invoke(
+            app, ["evaluate", "compare", str(gen_file), str(gt_file)]
+        )
+        assert result.exit_code == 0
+        assert "match" in result.stdout.lower()
+        # Should show metrics table
+        assert "precision" in result.stdout.lower()
+        assert "recall" in result.stdout.lower()
+        assert "f1" in result.stdout.lower()
+
+    def test_evaluate_compare_with_output(self, tmp_path: Path) -> None:
+        """Test evaluate compare saves results to output file."""
+        gen_file = tmp_path / "generated.json"
+        gen_file.write_text('''
+        {
+            "requirements": [
+                {"id": "GEN-001", "title": "Test Requirement", "description": "A test requirement description"}
+            ]
+        }
+        ''')
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('''
+        {
+            "requirements": [
+                {"id": "GT-001", "title": "Test Requirement", "description": "A test requirement description"}
+            ]
+        }
+        ''')
+        output_file = tmp_path / "results.json"
+
+        result = runner.invoke(
+            app,
+            ["evaluate", "compare", str(gen_file), str(gt_file), "--output", str(output_file)]
+        )
+        assert result.exit_code == 0
+        assert output_file.exists()
+
+        # Verify output content
+        import json
+        output_data = json.loads(output_file.read_text())
+        assert "metrics" in output_data
+        assert "matches" in output_data
+        assert "config" in output_data
+
+    def test_evaluate_compare_custom_thresholds(self, tmp_path: Path) -> None:
+        """Test evaluate compare respects custom thresholds."""
+        gen_file = tmp_path / "generated.json"
+        gen_file.write_text('{"requirements": [{"id": "GEN-001", "title": "Test", "description": "Description"}]}')
+        gt_file = tmp_path / "ground_truth.json"
+        gt_file.write_text('{"requirements": [{"id": "GT-001", "title": "Test", "description": "Description"}]}')
+
+        result = runner.invoke(
+            app,
+            [
+                "evaluate", "compare",
+                str(gen_file), str(gt_file),
+                "--threshold", "0.90",
+                "--partial", "0.75"
+            ]
+        )
+        assert result.exit_code == 0
+        assert "0.90" in result.stdout or "0.9" in result.stdout  # Threshold displayed
+
+
+class TestEvaluateReport:
+    """Tests for evaluate report command."""
+
+    def test_evaluate_report_file_not_found(self) -> None:
+        """Test evaluate report errors when results file not found."""
+        result = runner.invoke(
+            app, ["evaluate", "report", "/nonexistent/results.json"]
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.stdout.lower()
+
+    def test_evaluate_report_invalid_json(self, tmp_path: Path) -> None:
+        """Test evaluate report errors on invalid JSON."""
+        results_file = tmp_path / "results.json"
+        results_file.write_text('not valid json')
+
+        result = runner.invoke(app, ["evaluate", "report", str(results_file)])
+        assert result.exit_code == 1
+        assert "json" in result.stdout.lower()
+
+    def test_evaluate_report_missing_key(self, tmp_path: Path) -> None:
+        """Test evaluate report errors on invalid results structure."""
+        results_file = tmp_path / "results.json"
+        results_file.write_text('{"incomplete": "data"}')
+
+        result = runner.invoke(app, ["evaluate", "report", str(results_file)])
+        assert result.exit_code == 1
+        assert "missing" in result.stdout.lower() or "key" in result.stdout.lower()
+
+    def test_evaluate_report_generates_files(self, tmp_path: Path) -> None:
+        """Test evaluate report generates report files from valid results."""
+        results_file = tmp_path / "results.json"
+        # Create a minimal valid results structure
+        results_file.write_text('''
+        {
+            "run_timestamp": "2025-12-31T12:00:00",
+            "total_stories": 1,
+            "meets_thesis_target": true,
+            "config": {"match_threshold": 0.85},
+            "aggregate_metrics": {
+                "baseline": {
+                    "true_positives": 2,
+                    "false_positives": 1,
+                    "false_negatives": 1,
+                    "partial_matches": 0,
+                    "total_generated": 3,
+                    "total_ground_truth": 3
+                },
+                "rag": {
+                    "true_positives": 3,
+                    "false_positives": 0,
+                    "false_negatives": 0,
+                    "partial_matches": 0,
+                    "total_generated": 3,
+                    "total_ground_truth": 3
+                }
+            },
+            "comparison": {
+                "precision_delta": 0.33,
+                "recall_delta": 0.33,
+                "f1_delta": 0.33,
+                "hallucination_delta": -0.33,
+                "precision_improvement_pct": 50.0,
+                "recall_improvement_pct": 50.0,
+                "f1_improvement_pct": 50.0,
+                "improvement_threshold": 1.20
+            },
+            "per_story_results": [
+                {
+                    "story_id": "US-001",
+                    "story_title": "Test Story",
+                    "ground_truth_count": 3,
+                    "baseline_requirement_count": 3,
+                    "rag_requirement_count": 3,
+                    "baseline_metrics": {
+                        "true_positives": 2,
+                        "false_positives": 1,
+                        "false_negatives": 1,
+                        "partial_matches": 0,
+                        "total_generated": 3,
+                        "total_ground_truth": 3
+                    },
+                    "rag_metrics": {
+                        "true_positives": 3,
+                        "false_positives": 0,
+                        "false_negatives": 0,
+                        "partial_matches": 0,
+                        "total_generated": 3,
+                        "total_ground_truth": 3
+                    },
+                    "baseline_matches": [],
+                    "rag_matches": []
+                }
+            ],
+            "partial_matches": []
+        }
+        ''')
+
+        output_dir = tmp_path / "reports"
+
+        result = runner.invoke(
+            app,
+            ["evaluate", "report", str(results_file), "--output", str(output_dir)]
+        )
+        assert result.exit_code == 0
+        assert output_dir.exists()
+        # Should have created at least one report file
+        report_files = list(output_dir.glob("*"))
+        assert len(report_files) >= 1
+
+    def test_evaluate_report_custom_name(self, tmp_path: Path) -> None:
+        """Test evaluate report uses custom report name."""
+        results_file = tmp_path / "results.json"
+        results_file.write_text('''
+        {
+            "run_timestamp": "2025-12-31T12:00:00",
+            "total_stories": 0,
+            "meets_thesis_target": false,
+            "config": {},
+            "aggregate_metrics": {
+                "baseline": {"true_positives": 0, "false_positives": 0, "false_negatives": 0, "partial_matches": 0},
+                "rag": {"true_positives": 0, "false_positives": 0, "false_negatives": 0, "partial_matches": 0}
+            },
+            "comparison": {
+                "precision_delta": 0.0, "recall_delta": 0.0, "f1_delta": 0.0, "hallucination_delta": 0.0,
+                "precision_improvement_pct": 0.0, "recall_improvement_pct": 0.0, "f1_improvement_pct": 0.0,
+                "improvement_threshold": 1.20
+            },
+            "per_story_results": []
+        }
+        ''')
+
+        output_dir = tmp_path / "reports"
+
+        result = runner.invoke(
+            app,
+            ["evaluate", "report", str(results_file), "--output", str(output_dir), "--name", "custom_report"]
+        )
+        assert result.exit_code == 0
+        # Check that files contain the custom name
+        report_files = list(output_dir.glob("custom_report*"))
+        assert len(report_files) >= 1

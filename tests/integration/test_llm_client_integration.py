@@ -21,7 +21,7 @@ pytestmark = [
 def ollama_client() -> OllamaClient:
     """Create an OllamaClient for integration tests."""
     return OllamaClient(
-        model_name="llama3.2:3b",  # Smaller model for faster tests
+        model_name="llama3:8b",  # Use available model (was llama3.2:3b)
         temperature=0.1,
         max_tokens=256,
         timeout=60.0,

@@ -1,13 +1,72 @@
 # SecReqGen Implementation Log
 
 ## Project Status
-- **Current Phase**: 4 - Evaluation Framework (IN PROGRESS)
-- **Current Step**: Step 4.4 Complete, ready for 4.5 (CLI integration)
+- **Current Phase**: 4 - Evaluation Framework (COMPLETE)
+- **Current Step**: Step 4.5 Complete - Phase 4 Finished!
 - **Last Updated**: 2025-12-31
 
 ---
 
 ## Phase 4: Evaluation Framework
+
+### 2025-12-31 Step 4.5: Wire Evaluation CLI
+**Files**: src/secreqgen/cli.py, tests/unit/test_cli.py, tests/integration/test_llm_client_integration.py
+
+**What**: Wired evaluation framework components into CLI commands for thesis experiments
+
+**Why**: The CLI is the user-facing interface for running evaluations. These commands enable running the full RAG vs baseline comparison experiment from the command line.
+
+**CLI Commands Implemented**:
+
+1. **`secreqgen evaluate run <stories> <ground_truth> [options]`**:
+   - Full end-to-end evaluation pipeline
+   - `--output/-o DIR`: Output directory for reports (default: docs/evaluation_results)
+   - `--match-threshold`: Similarity threshold for match (default 0.85)
+   - `--partial-threshold`: Threshold for partial match (default 0.70)
+   - `--improvement-threshold`: F1 improvement factor target (default 1.20 = 20%)
+   - `--context/-c FILE`: Optional system context YAML
+   - `--name/-n NAME`: Base name for report files
+   - Runs both baseline and RAG generation, matches against ground truth
+   - Generates Markdown + JSON reports with per-story and aggregate metrics
+   - Displays thesis success/failure verdict
+
+2. **`secreqgen evaluate compare <generated> <ground_truth> [options]`**:
+   - Quick comparison of already-generated requirements
+   - `--threshold/-t`: Match threshold (default 0.85)
+   - `--partial/-p`: Partial match threshold (default 0.70)
+   - `--output/-o FILE`: Save match results to JSON
+   - Displays Rich tables with match results and metrics
+   - Useful for analyzing individual generation runs
+
+3. **`secreqgen evaluate report <results_file> [options]`**:
+   - Regenerate reports from saved JSON results
+   - `--output/-o DIR`: Output directory for reports
+   - `--name/-n NAME`: Custom report name prefix
+   - Parses JSON from previous `evaluate run` and generates fresh reports
+
+**Input File Formats**:
+- **User Stories**: `{"user_stories": [{"id", "title", "story", "acceptance_criteria"}]}`
+- **Ground Truth**: `{"ground_truth": [{"story_id", "requirements": [{"id", "title", "description"}]}]}`
+- **Compare Input**: `{"requirements": [{"id", "title", "description"}]}`
+
+**Design Decisions**:
+- Lazy imports inside command functions for fast CLI startup
+- Rich progress bars and tables for user feedback
+- Graceful error handling with clear error messages
+- `evaluate compare` accepts simplified requirement format (auto-fills missing fields)
+- `evaluate report` computes metrics from counts if not provided (backwards compatible)
+- All commands follow existing CLI patterns from Phase 3
+
+**Test Coverage**:
+- 15 new CLI tests covering all three evaluate commands
+- Tests cover: file not found, invalid JSON, empty data, successful execution
+- Integration tests updated to use available model (llama3:8b)
+
+**Results**: 474 unit tests + 8 integration tests passing
+
+**Phase 4 Complete!** Evaluation framework ready for thesis experiments.
+
+---
 
 ### 2025-12-30 Step 4.4: Evaluation Pipeline
 **Files**: src/secreqgen/evaluation/pipeline.py, src/secreqgen/evaluation/report.py, src/secreqgen/evaluation/__init__.py, tests/unit/test_evaluation_pipeline.py, pyproject.toml
