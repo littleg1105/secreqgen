@@ -1,6 +1,11 @@
 """Generation module for SecReqGen."""
 
 from secreqgen.generation.llm_client import LLMResponse, OllamaClient
+from secreqgen.generation.prompts import (
+    PromptTemplate,
+    SecurityRequirementsPromptBuilder,
+    format_retrieved_context,
+)
 from secreqgen.generation.schemas import (
     ASVSCategory,
     EvaluationResult,
@@ -15,6 +20,10 @@ __all__ = [
     # LLM Client
     "OllamaClient",
     "LLMResponse",
+    # Prompts
+    "PromptTemplate",
+    "SecurityRequirementsPromptBuilder",
+    "format_retrieved_context",
     # Schemas
     "ASVSCategory",
     "Priority",
