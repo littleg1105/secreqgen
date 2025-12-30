@@ -1,9 +1,60 @@
 # SecReqGen Implementation Log
 
 ## Project Status
-- **Current Phase**: 3 - RAG Pipeline & Generation (COMPLETE)
-- **Current Step**: Ready for Phase 4 - Evaluation
+- **Current Phase**: 4 - Evaluation Framework (IN PROGRESS)
+- **Current Step**: Step 4.1 Complete, continuing with 4.2
 - **Last Updated**: 2025-12-30
+
+---
+
+## Phase 4: Evaluation Framework
+
+### 2025-12-30 Step 4.1: Semantic Similarity Matcher
+**Files**: src/secreqgen/evaluation/semantic_matcher.py, tests/unit/test_semantic_matcher.py
+
+**What**: Created semantic similarity matcher for comparing generated requirements against ground truth using SBERT embeddings
+
+**Why**: The evaluation framework needs to quantitatively compare generated security requirements with expert-defined ground truth. Semantic matching handles paraphrasing and synonym usage that exact string matching would miss.
+
+**Key Components**:
+
+1. **MatchType Enum**: Classifies match quality
+   - `MATCH`: Similarity >= 0.85 (True Positive)
+   - `PARTIAL`: Similarity in [0.70, 0.85) (flagged for review)
+   - `NO_MATCH`: Similarity < 0.70 (False Positive / hallucination)
+
+2. **MatchResult Dataclass**: Captures matching results
+   - Links generated requirement ID to ground truth ID
+   - Stores similarity score and match classification
+   - Helper properties: `is_match`, `is_partial`, `is_hallucination`
+
+3. **GroundTruthRequirement**: Simplified structure for ground truth data
+   - Contains id, title, description, optional ASVS category
+   - `text_for_matching` property combines title + description
+
+4. **SemanticMatcher**: Core matching engine
+   - Reuses `DocumentEmbedder` from Phase 2 for consistency
+   - Cosine similarity via normalized embeddings (dot product)
+   - Greedy 1:1 matching prevents duplicate GT assignments
+   - Embedding cache for efficiency
+   - Configurable thresholds (default: 0.85 match, 0.70 partial)
+
+5. **load_ground_truth()**: Utility to parse ground truth JSON/YAML
+
+**Matching Algorithm**:
+1. Extract text from requirements: `"{title}. {description}"`
+2. Pre-compute embeddings for all generated + ground truth
+3. Build similarity matrix (generated × ground_truth)
+4. Greedy assignment: each generated gets best unmatched GT
+5. Classify based on similarity threshold
+
+**Design Decisions**:
+- Reuse existing `DocumentEmbedder` (all-mpnet-base-v2) for consistent embeddings
+- Greedy matching is O(n²) but sufficient for typical requirement sets (<100)
+- Thresholds 0.85/0.70 based on thesis spec and SBERT similarity semantics
+- Lazy embedder loading to avoid slow imports when not needed
+
+**Results**: 31 unit tests (including 2 integration tests with real embedder), all passing
 
 ---
 
