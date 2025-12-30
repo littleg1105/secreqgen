@@ -8,7 +8,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-from secreqgen.generation.prompts import format_retrieved_context
 from secreqgen.generation.schemas import UserStory
 from secreqgen.ingestion.embedder import DocumentEmbedder
 from secreqgen.ingestion.metadata import DocumentType
@@ -203,6 +202,9 @@ class SimpleRetriever:
         """
         if not chunks:
             return "No relevant security documentation found."
+
+        # Lazy import to avoid circular dependency
+        from secreqgen.generation.prompts import format_retrieved_context
 
         return format_retrieved_context(
             chunks=[c.content for c in chunks],

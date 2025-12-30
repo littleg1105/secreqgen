@@ -4,6 +4,8 @@ Orchestrates LLM generation with optional retrieval-augmented context
 to generate security requirements from user stories.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import re
@@ -11,7 +13,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from pydantic import ValidationError
 
@@ -26,7 +28,10 @@ from secreqgen.generation.schemas import (
     ThreatAgentMapping,
     UserStory,
 )
-from secreqgen.retrieval.retriever import RetrievalResult, SimpleRetriever
+
+# Avoid circular import - import at runtime only
+if TYPE_CHECKING:
+    from secreqgen.retrieval.retriever import RetrievalResult, SimpleRetriever
 
 logger = logging.getLogger(__name__)
 
