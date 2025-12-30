@@ -7,6 +7,30 @@
 
 ---
 
+## Infrastructure
+
+### 2025-12-31 macOS Import Fix: PYTHONPATH Solution
+**Files**: scripts/setup-venv.sh, CLAUDE.md
+
+**What**: Implemented robust PYTHONPATH-based solution for macOS Sequoia .pth hidden flag issue
+
+**Why**: Python 3.8+ intentionally skips .pth files with BSD hidden flag as a security feature ([CPython #113659](https://github.com/python/cpython/issues/113659)). On macOS Sequoia, APFS may set this flag on pip-created files, breaking editable installs. The previous `chflags nohidden` fix was unreliable as the flag could reappear.
+
+**Decisions**:
+- **PYTHONPATH over chflags**: Using PYTHONPATH completely bypasses .pth files, making imports work regardless of hidden flag state
+- **Setup script**: `scripts/setup-venv.sh` creates venv with PYTHONPATH configured in activate script
+- **Documentation**: Updated CLAUDE.md with root cause explanation and best practices
+
+**Usage**:
+```bash
+./scripts/setup-venv.sh   # Creates venv with PYTHONPATH configured
+source .venv/bin/activate
+```
+
+**Next**: Ready for thesis experiments with reliable import infrastructure
+
+---
+
 ## Phase 4: Evaluation Framework
 
 ### 2025-12-31 Step 4.5: Wire Evaluation CLI

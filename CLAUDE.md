@@ -17,13 +17,17 @@ RAG-enhanced security requirements generator for Master's thesis. Compares RAG v
 - Pydantic 2.0 for schemas
 
 ## Development Environment
-Use a Python venv for dependency isolation:
+
+**Recommended: Use the setup script** (handles macOS .pth issues automatically):
 ```bash
-# Create venv with Python 3.13 (or 3.11/3.12)
+./scripts/setup-venv.sh
+source .venv/bin/activate
+```
+
+**Manual setup** (if you prefer):
+```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
-
-# Install Poetry and dependencies
 pip install poetry
 poetry install
 ```
@@ -64,28 +68,26 @@ This happens after:
 ### macOS: Imports fail even after `pip install -e .`
 **Symptom:** Python shows `ModuleNotFoundError` even though `.pth` file exists in site-packages.
 
-**Root Cause:** macOS Sequoia's APFS compression sets the BSD `hidden` flag on files created by pip. Python 3.13 correctly skips hidden `.pth` files, breaking editable installs.
+**Root Cause:** This is a **Python security feature** (see [CPython Issue #113659](https://github.com/python/cpython/issues/113659)). Python 3.8+ intentionally skips .pth files with the BSD `hidden` flag to prevent malicious code execution. On macOS Sequoia, APFS may set this flag on pip-created files.
 
-**Diagnosis:**
+**Best Solution - Use PYTHONPATH:**
+```bash
+# Recreate venv with the setup script (adds PYTHONPATH to activate)
+./scripts/setup-venv.sh
+source .venv/bin/activate
+```
+
+**Quick Fix - Remove hidden flag:**
 ```bash
 # Check if .pth files have hidden flag
 ls -lO .venv/lib/python3.13/site-packages/*.pth
 # Look for "hidden" in the flags column
 
-# Or check with verbose Python startup
-.venv/bin/python -v -c "import site" 2>&1 | grep "Skipping hidden"
+# Remove hidden flag
+chflags -R nohidden .venv/lib/python3.13/site-packages/*.pth
 ```
 
-**Fix:**
-```bash
-# Remove hidden flag from all .pth files
-chflags nohidden .venv/lib/python3.13/site-packages/*.pth
-
-# Or use the convenience script
-./scripts/fix-pth-hidden.sh
-```
-
-**Prevention:** The `pyproject.toml` includes `pythonpath = ["src"]` for pytest, which bypasses this issue for tests. For direct Python usage, run the fix script after pip install if needed.
+**Why PYTHONPATH is better:** The hidden flag can reappear after pip operations. Using PYTHONPATH completely bypasses .pth files, making imports reliable regardless of file flags.
 
 ## Key Design Decisions
 - **Embeddings**: all-mpnet-base-v2 (better semantic nuance)
