@@ -2,12 +2,56 @@
 
 ## Project Status
 - **Current Phase**: 4 - Evaluation Framework (IN PROGRESS)
-- **Current Step**: Step 4.2 Complete, continuing with 4.3
+- **Current Step**: Step 4.3 Complete, continuing with 4.4
 - **Last Updated**: 2025-12-30
 
 ---
 
 ## Phase 4: Evaluation Framework
+
+### 2025-12-30 Step 4.3: Baseline Runner
+**Files**: src/secreqgen/evaluation/baseline.py, tests/unit/test_baseline_runner.py, src/secreqgen/evaluation/__init__.py
+
+**What**: Created orchestration layer for A/B comparison between RAG and baseline (zero-shot) generation
+
+**Why**: The thesis requires side-by-side comparison of RAG-enhanced vs zero-shot generation. The runner coordinates running both modes on the same user stories and packages results for evaluation.
+
+**Key Components**:
+
+1. **ComparativeResults Dataclass**: Holds both result sets
+   - `baseline_results`, `rag_results`: Generation results for each mode
+   - `baseline_time_ms`, `rag_time_ms`: Timing for performance comparison
+   - `baseline_errors`, `rag_errors`: Error tracking for partial failures
+   - Properties: `total_stories`, `*_success_count`, `*_requirements_count`
+   - `summary()` for human-readable output
+
+2. **BaselineRunner Class**: Main orchestration
+   - `run_baseline(stories)` → Run zero-shot only
+   - `run_rag(stories)` → Run RAG-enhanced only
+   - `run_comparative(stories)` → Run both, return `ComparativeResults`
+   - Progress callback support: `(mode, current, total)`
+   - Graceful error handling (continue on partial failures)
+
+3. **create_baseline_runner()**: Factory function
+   - Convenience setup with vector store path
+   - Lazy imports for fast startup
+   - Configurable embedding model
+
+**Design Decisions**:
+- Reuses `SecurityRequirementsGenerator` from Phase 3 (no duplication)
+- Creates separate generator instances for baseline and RAG
+- Baseline runs first to avoid RAG context polluting baseline
+- Errors tracked per-story but don't stop the run
+- Progress callbacks enable CLI integration with Rich progress bars
+
+**Integration**:
+- Uses `GenerationMode.RAG` and `GenerationMode.ZERO_SHOT` from Phase 3
+- Results feed into Step 4.4's evaluation pipeline
+- Will be called by Step 4.5's CLI commands
+
+**Results**: 21 unit tests, total 434 tests passing
+
+---
 
 ### 2025-12-30 Step 4.2: Metrics Calculator
 **Files**: src/secreqgen/evaluation/metrics.py, tests/unit/test_metrics.py, src/secreqgen/evaluation/__init__.py

@@ -1,5 +1,10 @@
 """Evaluation framework for comparing generated requirements against ground truth."""
 
+from secreqgen.evaluation.baseline import (
+    BaselineRunner,
+    ComparativeResults,
+    create_baseline_runner,
+)
 from secreqgen.evaluation.metrics import (
     ComparisonResult,
     MetricsBreakdown,
@@ -24,4 +29,8 @@ __all__ = [
     "ComparisonResult",
     "MetricsBreakdown",
     "MetricsCalculator",
+    # Baseline runner
+    "BaselineRunner",
+    "ComparativeResults",
+    "create_baseline_runner",
 ]
