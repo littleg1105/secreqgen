@@ -1,5 +1,10 @@
 """Generation module for SecReqGen."""
 
+from secreqgen.generation.generator import (
+    GenerationMetrics,
+    GenerationMode,
+    SecurityRequirementsGenerator,
+)
 from secreqgen.generation.llm_client import LLMResponse, OllamaClient
 from secreqgen.generation.prompts import (
     PromptTemplate,
@@ -17,6 +22,10 @@ from secreqgen.generation.schemas import (
 )
 
 __all__ = [
+    # Generator
+    "SecurityRequirementsGenerator",
+    "GenerationMode",
+    "GenerationMetrics",
     # LLM Client
     "OllamaClient",
     "LLMResponse",

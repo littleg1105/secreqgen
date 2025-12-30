@@ -2,7 +2,7 @@
 
 ## Project Status
 - **Current Phase**: 3 - RAG Pipeline & Generation (IN PROGRESS)
-- **Current Step**: Step 3.2 - Prompt Templates
+- **Current Step**: Step 3.5 - Output Formatter (next)
 - **Last Updated**: 2025-12-30
 
 ---
@@ -47,8 +47,8 @@ if client.check_health():
 
 ---
 
-### 2025-12-30 Step 3.2: Prompt Templates (In Progress)
-**Files**: src/secreqgen/generation/prompts.py
+### 2025-12-30 Step 3.2: Prompt Templates
+**Files**: src/secreqgen/generation/prompts.py, tests/unit/test_prompts.py
 
 **What**: Created prompt template system for RAG and zero-shot generation modes
 
@@ -57,23 +57,82 @@ if client.check_health():
 **Key Components**:
 - `PromptTemplate` dataclass with variable substitution
 - `SecurityRequirementsPromptBuilder` class for building generation prompts
-- System prompt defining the security expert persona
+- System prompt defining the security expert persona (OWASP ASVS, SSDLC)
 - RAG prompt template (includes retrieved context)
 - Zero-shot prompt template (baseline, no retrieval)
 - JSON schema specification for structured output
-
-**Template Structure**:
-1. System prompt: Security expert role, ASVS knowledge, guidelines
-2. User prompt: System context + user story + (optional) retrieved docs + JSON schema
-3. `format_retrieved_context()` helper for formatting chunks
+- `format_retrieved_context()` helper for chunk formatting
 
 **Decisions**:
-- Python string templates with `$variable` substitution (simple, no extra dependencies)
+- Python string templates with `$variable` substitution (simple, no Jinja2)
 - Optional external file loading for template customization
 - Explicit JSON schema in prompt to guide LLM output format
 - Same schema for both RAG and zero-shot modes (fair comparison)
 
-**Next**: Write tests for prompts.py, then continue to Step 3.3 (Simple Retriever)
+**Results**: 31 unit tests, all passing
+
+---
+
+### 2025-12-30 Step 3.3: Simple Retriever
+**Files**: src/secreqgen/retrieval/retriever.py, src/secreqgen/retrieval/__init__.py, tests/unit/test_retriever.py
+
+**What**: Created semantic retriever bridging embedder and vectorstore
+
+**Why**: The retriever provides the "R" in RAG - it fetches relevant security documentation to inject into generation prompts.
+
+**Key Components**:
+- `SimpleRetriever` class wrapping embedder + vectorstore
+- `RetrievalResult` dataclass with chunks, timing, and metadata
+- `retrieve()` for general semantic search
+- `retrieve_for_user_story()` for story-specific context
+- `get_system_context()` for fetching SYSTEM_CONTEXT collection
+- Similarity threshold filtering (default 0.7)
+- `format_context()` for prompt injection
+
+**Decisions**:
+- Thin wrapper with no re-ranking or query expansion (deferred to Phase 5)
+- Query built from: story title + story text + acceptance criteria
+- Default excludes SYSTEM_CONTEXT from search (fetched separately)
+- Tracks retrieval timing for thesis metrics
+
+**Results**: 21 unit tests, all passing
+
+---
+
+### 2025-12-30 Step 3.4: Requirements Generator
+**Files**: src/secreqgen/generation/generator.py, src/secreqgen/generation/__init__.py, tests/unit/test_generator.py
+
+**What**: Core orchestration layer combining LLM, retriever, and prompts
+
+**Why**: The generator is the heart of the system - it coordinates retrieval, prompt building, LLM calls, and response parsing to produce structured security requirements.
+
+**Key Components**:
+- `GenerationMode` enum: RAG vs ZERO_SHOT
+- `SecurityRequirementsGenerator` class orchestrating all components
+- `GenerationMetrics` for tracking tokens, latency, retrieval stats
+- JSON extraction handling markdown code blocks (```json ... ```)
+- Retry logic with exponential backoff for malformed JSON
+- ASVS category normalization (handles V2, "Authentication", etc.)
+- Priority normalization (handles synonyms like "highest" → critical)
+
+**Flow**:
+1. Fetch system context (if available)
+2. Retrieve relevant chunks (RAG mode only)
+3. Build prompt (RAG or zero-shot template)
+4. Call LLM with JSON mode
+5. Extract JSON from response (handles code blocks)
+6. Parse into `SecurityRequirement` Pydantic models
+7. Return `GenerationResult`
+
+**Decisions**:
+- Graceful degradation: if one requirement fails to parse, continue with rest
+- ASVS normalization via V-number matching and keyword fallback
+- Default to V1 Architecture for unknown categories
+- Default to Medium priority for unknown values
+
+**Results**: 42 unit tests, all passing
+
+**Next**: Step 3.5 - Output Formatter and Exporter
 
 ---
 
