@@ -1,9 +1,120 @@
 # SecReqGen Implementation Log
 
 ## Project Status
-- **Current Phase**: 4 - Evaluation Framework (COMPLETE)
-- **Current Step**: Step 4.5 Complete - Phase 4 Finished!
+- **Current Phase**: 5 - Real-World Testing (IN PROGRESS)
+- **Current Step**: RAG knowledge base evaluation complete, analyzing results
 - **Last Updated**: 2025-12-31
+
+---
+
+## Phase 5: Real-World Testing
+
+### 2025-12-31 RAG Knowledge Base Ingestion and Re-Evaluation
+**Files**:
+- `/real_test_cases/repos/` - Cloned repositories (keycloak, strapi, nextcloud)
+- `/real_test_cases/extracted_docs_md/` - Converted markdown documentation
+- `/real_test_cases/keycloak/results_with_rag/` - Evaluation results with RAG
+- `/real_test_cases/strapi/results_with_rag/` - Evaluation results with RAG
+- `/real_test_cases/phase1_final_summary.md` - Comparative analysis
+- `data/vectordb/` - ChromaDB vector store with 573 chunks
+
+**What**: Cloned actual project repositories, extracted security documentation, ingested into RAG knowledge base, and re-ran evaluation
+
+**Why**: To test whether actual project documentation improves security requirements generation compared to the initial system-context-only approach
+
+**Process**:
+1. Cloned repos: keycloak/keycloak, strapi/strapi, nextcloud/server
+2. Extracted security docs (AsciiDoc → Markdown via pandoc)
+3. Ingested 573 chunks: 548 Keycloak docs, 23 Strapi docs, 2 system contexts
+4. Re-ran evaluation pipeline with RAG knowledge base
+
+**RAG Knowledge Base Contents**:
+| Project | Documents | Chunks | Content Type |
+|---------|-----------|--------|--------------|
+| Keycloak | 70 | 548 | OIDC, OAuth2, TLS, server config |
+| Strapi | 3 | 23 | Permission engine, RBAC |
+| System Context | 2 | 2 | Architecture YAML |
+
+**Comparative Results** (threshold 0.75):
+
+| Project | Mode | Without RAG KB | With RAG KB | Change |
+|---------|------|----------------|-------------|--------|
+| Keycloak | Baseline F1 | 11.43% | 10.81% | -0.62% |
+| Keycloak | RAG F1 | 13.95% | 10.53% | -3.42% |
+| Keycloak | Improvement | +22.1% | -2.6% | **Worse** |
+| Strapi | Baseline F1 | 6.67% | 6.06% | -0.61% |
+| Strapi | RAG F1 | 18.18% | 12.12% | -6.06% |
+| Strapi | Improvement | +172.7% | +100.0% | Lower but MET |
+
+**Key Finding**: Adding project documentation to RAG **does not always improve** security requirement generation:
+- **Keycloak**: RAG with docs performs *worse* than without (-2.6% vs +22.1%)
+- **Strapi**: RAG with docs still helps but less (+100% vs +172.7%)
+
+**Analysis**:
+1. **Context noise**: Generic API docs may distract from security-specific generation
+2. **Wrong content type**: Project docs explain "how to use" not "what vulnerabilities to prevent"
+3. **Ground truth specificity**: CVE-derived requirements are very specific (exact algorithms, timing)
+4. **LLM variability**: Results vary between runs even with same inputs
+
+**Decisions**:
+- Project documentation alone is insufficient for RAG improvement
+- Need security-specific content: OWASP ASVS, CWE database, CVE mitigations
+- Multiple runs needed for statistical significance
+- Consider retrieval parameter tuning (top_k, similarity threshold)
+
+**Next**:
+- Ingest security standards (OWASP ASVS) instead of project docs
+- Run multiple trials for statistical validation
+- Analyze partial matches for ground truth refinement
+
+---
+
+### 2025-12-31 Real-World Test Case Evaluation (Phase 1)
+**Files**:
+- `/real_test_cases/` folder structure (10 project folders)
+- `/real_test_cases/keycloak/` - user_stories.json, ground_truth.json, system_context.yaml, results/
+- `/real_test_cases/strapi/` - user_stories.json, ground_truth.json, system_context.yaml, results/
+- `/real_test_cases/nextcloud/` - user_stories.json, ground_truth.json, system_context.yaml, results/
+- `/real_test_cases/run_evaluation.py` - Test runner script
+- `/real_test_cases/phase1_summary.md` - Summary report
+
+**What**: Created and evaluated test cases for 3 real-world open-source projects (Keycloak, Strapi, Nextcloud) using the SecReqGen evaluation pipeline
+
+**Why**: The thesis requires testing RAG-enhanced security requirements generation on real-world projects with known CVEs to validate the approach
+
+**Test Case Design**:
+- **User Stories**: Derived from documented features (8-7 stories per project)
+- **Ground Truth**: Security requirements derived from CVEs and OWASP ASVS (25-29 requirements per project)
+- **System Context**: YAML files describing architecture, auth methods, threat model, known CVEs
+
+**Phase 1 Projects and Results** (match threshold 0.75, partial threshold 0.60):
+
+| Project | Stories | Ground Truth | Baseline F1 | RAG F1 | Improvement | Thesis Target |
+|---------|---------|--------------|-------------|--------|-------------|---------------|
+| Keycloak | 8 | 27 | 11.43% | 13.95% | +22.1% | **MET** |
+| Strapi | 7 | 25 | 6.67% | 18.18% | +172.7% | **MET** |
+| Nextcloud | 8 | 29 | 5.13% | 0.00% | -100.0% | NOT MET |
+
+**Key Findings**:
+1. **System context helps**: Even without RAG knowledge base, YAML context improves generation
+2. **Threshold sensitivity**: At 0.85, near-zero matches; at 0.75, meaningful results
+3. **Hallucination rates**: 55-86% - LLM generates plausible but non-matching requirements without domain knowledge
+4. **Variability**: Results vary between runs; RAG sometimes underperforms baseline
+
+**CVE Sources Used**:
+- **Keycloak**: CVE-2023-6927 (redirect URI wildcard bypass), CVE-2023-6291 (HTTP Basic Auth bypass)
+- **Strapi**: CVE-2023-38507 (mass assignment), CVE-2023-34235 (private field exposure), CVE-2023-37263 (rate limiting bypass)
+- **Nextcloud**: CVE-2024-37313 (2FA bypass), CVE-2024-37314 (OAuth secret storage), CVE-2025-66512 (SVG CSP bypass)
+
+**Dependency Fix**:
+- Click 8.3.1 incompatible with Typer 0.15.x - downgraded to Click 8.1.7
+
+**Decisions**:
+- Lower match threshold (0.75) provides better signal for evaluation
+- Ground truth requirements must be CVE-derived for thesis validity
+- Need actual RAG knowledge base (security standards) for meaningful comparison
+
+**Next**: Clone actual project repositories for authentic documentation, ingest into RAG knowledge base
 
 ---
 
