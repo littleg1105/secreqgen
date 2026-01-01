@@ -27,14 +27,54 @@ class VectorStoreConfig(BaseSettings):
 
 
 class LLMConfig(BaseSettings):
-    """Configuration for LLM (Ollama)."""
+    """Configuration for LLM (Ollama).
+
+    Supports separate models for generation and verification (judge).
+    Available models:
+        - llama3:8b (default, fast)
+        - qwen3:30b (larger, more capable)
+        - WhiteRabbitNeo-V3-7B (security-focused)
+        - qwen2.5-coder:7b (code-focused)
+    """
 
     model_config = SettingsConfigDict(env_prefix="SECREQGEN_LLM_")
 
+    # Primary model for requirement generation
     model_name: str = "llama3:8b"
+
+    # Optional separate model for verification/judging
+    # If not set, uses model_name
+    judge_model_name: Optional[str] = None
+
     base_url: str = "http://localhost:11434"
     temperature: float = 0.1
     max_tokens: int = 4096
+
+    @property
+    def judge_model(self) -> str:
+        """Get the model to use for verification/judging."""
+        return self.judge_model_name or self.model_name
+
+
+class VerificationConfig(BaseSettings):
+    """Configuration for LLM-as-Judge verification layer."""
+
+    model_config = SettingsConfigDict(env_prefix="SECREQGEN_VERIFICATION_")
+
+    # Enable/disable verification
+    enabled: bool = False
+
+    # Minimum score (1-10) to keep a requirement
+    min_relevance_score: float = 7.0
+    min_specificity_score: float = 6.0
+    min_actionability_score: float = 6.0
+
+    # Overall average threshold
+    min_average_score: float = 6.5
+
+    # If True, use stricter AND logic (all must pass)
+    # If False, use average score
+    strict_mode: bool = False
 
 
 class RetrievalConfig(BaseSettings):
@@ -68,6 +108,7 @@ class SecReqGenConfig(BaseSettings):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
+    verification: VerificationConfig = Field(default_factory=VerificationConfig)
 
     # Paths
     prompts_dir: Path = Path("./prompts")

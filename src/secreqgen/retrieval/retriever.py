@@ -4,11 +4,65 @@ Combines document embedder and vector store for semantic search,
 with similarity threshold filtering and context formatting for LLM injection.
 """
 
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
 from secreqgen.generation.schemas import UserStory
+
+
+# Security keyword mapping: maps feature concepts to security terminology
+# This bridges the vocabulary gap between user story language and security documentation
+SECURITY_KEYWORD_MAP: dict[str, list[str]] = {
+    # Authentication & Registration
+    "registration": ["password hashing", "key derivation", "PBKDF2", "Argon2", "bcrypt", "account creation", "email verification"],
+    "login": ["authentication", "session", "credential", "brute force", "lockout", "failed attempts"],
+    "password": ["master password", "key derivation", "PBKDF2", "Argon2", "password policy", "password strength"],
+    "authentication": ["session management", "token", "credential storage", "MFA", "multi-factor"],
+    "master password": ["key derivation", "PBKDF2", "Argon2", "HKDF", "stretched key", "vault unlock"],
+
+    # Biometric & Device Security
+    "biometric": ["secure storage", "keychain", "DPAPI", "keystore", "device key", "fingerprint", "face recognition"],
+    "device": ["secure enclave", "hardware security", "TPM", "device binding"],
+    "unlock": ["vault decryption", "key derivation", "memory protection", "session"],
+
+    # Two-Factor Authentication
+    "2fa": ["TOTP", "WebAuthn", "FIDO2", "authenticator", "backup codes", "recovery codes"],
+    "two-factor": ["TOTP", "WebAuthn", "FIDO2", "authenticator", "second factor"],
+    "mfa": ["multi-factor", "TOTP", "WebAuthn", "FIDO2", "authenticator"],
+    "totp": ["time-based one-time password", "authenticator", "seed", "secret key"],
+    "webauthn": ["FIDO2", "passkey", "authenticator", "challenge-response"],
+
+    # Cryptography & Encryption
+    "encrypt": ["AES-256", "encryption key", "cipher", "ciphertext", "authenticated encryption", "AEAD"],
+    "decrypt": ["decryption", "plaintext", "client-side decryption", "vault unlock"],
+    "vault": ["encryption", "zero-knowledge", "client-side", "E2EE", "end-to-end encryption"],
+    "credential": ["encrypted storage", "vault item", "secure storage"],
+
+    # File Handling
+    "file": ["file validation", "file encryption", "file type", "MIME type", "size limit", "upload"],
+    "upload": ["file encryption", "antivirus", "malware scan", "file size", "file type validation"],
+    "attachment": ["file encryption", "per-file key", "attachment storage"],
+
+    # Access Control & Sharing
+    "share": ["key exchange", "asymmetric encryption", "RSA", "access control", "sharing permissions"],
+    "organization": ["RBAC", "role-based access", "collection", "team management"],
+    "access": ["authorization", "RBAC", "permissions", "access control", "privilege"],
+    "revoke": ["access revocation", "key rotation", "permission removal"],
+
+    # API & Tokens
+    "api": ["API token", "rate limiting", "authentication token", "scope", "API key"],
+    "token": ["token generation", "cryptographic random", "entropy", "token expiration", "token revocation"],
+    "rate": ["rate limiting", "throttling", "brute force protection", "DOS protection"],
+
+    # Session & Memory
+    "session": ["session token", "session timeout", "session invalidation", "idle timeout"],
+    "memory": ["memory protection", "secure memory", "memory clearing", "sensitive data"],
+
+    # General Security
+    "security": ["vulnerability", "threat", "mitigation", "security requirement", "OWASP", "ASVS"],
+}
 from secreqgen.ingestion.embedder import DocumentEmbedder
 from secreqgen.ingestion.metadata import DocumentType
 from secreqgen.retrieval.vectorstore import QueryResult, SecReqGenVectorStore
@@ -140,26 +194,69 @@ class SimpleRetriever:
         return self.retrieve(query, top_k=top_k)
 
     def _build_query_from_story(self, user_story: UserStory) -> str:
-        """Build a retrieval query from a user story.
+        """Build a security-focused retrieval query from a user story.
 
-        Combines the story title, text, and acceptance criteria into
-        a single query string for semantic search.
+        Transforms the user story narrative into a query that uses security
+        terminology, bridging the vocabulary gap between functional requirements
+        and security documentation.
 
         Args:
             user_story: The user story to build a query from.
 
         Returns:
-            Query string for semantic search.
+            Query string optimized for security document retrieval.
         """
-        parts = [
-            f"Security requirements for: {user_story.title}",
-            user_story.story,
-        ]
+        # Extract security keywords from the user story
+        security_keywords = self._extract_security_keywords(user_story)
 
+        # Build a security-focused query
+        parts = []
+
+        # Start with extracted security keywords for better semantic matching
+        if security_keywords:
+            parts.append("Security requirements: " + " ".join(security_keywords))
+
+        # Add the story title and context
+        parts.append(f"Feature: {user_story.title}")
+
+        # Include acceptance criteria as they often contain security-relevant terms
         if user_story.acceptance_criteria:
-            parts.append("Acceptance criteria: " + "; ".join(user_story.acceptance_criteria))
+            parts.append("Requirements: " + "; ".join(user_story.acceptance_criteria))
 
         return " ".join(parts)
+
+    def _extract_security_keywords(self, user_story: UserStory) -> list[str]:
+        """Extract security-related keywords from a user story.
+
+        Analyzes the user story text and maps feature concepts to security
+        terminology using the SECURITY_KEYWORD_MAP. This bridges the vocabulary
+        gap between user-facing language and security documentation.
+
+        Args:
+            user_story: The user story to extract keywords from.
+
+        Returns:
+            List of security keywords relevant to the user story.
+        """
+        # Combine all text for analysis
+        text = " ".join([
+            user_story.title.lower(),
+            user_story.story.lower(),
+            " ".join(user_story.acceptance_criteria).lower() if user_story.acceptance_criteria else "",
+        ])
+
+        # Track keywords to avoid duplicates
+        found_keywords: set[str] = set()
+
+        # Check each security concept in our mapping
+        for concept, keywords in SECURITY_KEYWORD_MAP.items():
+            # Use word boundary matching to avoid false positives
+            # e.g., "password" should match but not "passwords" substring issues
+            if re.search(rf'\b{re.escape(concept)}\b', text, re.IGNORECASE):
+                # Add the security keywords for this concept
+                found_keywords.update(keywords[:3])  # Limit to top 3 per concept to avoid query bloat
+
+        return list(found_keywords)
 
     def get_system_context(self) -> Optional[str]:
         """Retrieve the system context from the vector store.

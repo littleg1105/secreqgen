@@ -70,10 +70,21 @@ Guidelines:
 Always respond with valid JSON matching the specified schema."""
 
 # RAG-enhanced prompt template
+# NOTE: Retrieved context appears BEFORE user story to increase LLM attention weight.
+# The instruction is explicit about using the documentation to overcome LLM tendency
+# to rely on training knowledge over provided context.
 RAG_USER_PROMPT_TEMPLATE = """## System Context
 $system_context
 
-## User Story
+## Project Security Documentation (CRITICAL - You MUST use this)
+The following security documentation is from the project's own documentation and standards.
+You MUST reference this documentation when generating requirements.
+
+$retrieved_context
+
+---
+
+## User Story to Analyze
 **ID:** $story_id
 **Title:** $story_title
 
@@ -82,17 +93,22 @@ $system_context
 **Acceptance Criteria:**
 $acceptance_criteria
 
-## Retrieved Security Documentation
-The following security documentation is relevant to this user story:
-
-$retrieved_context
-
 ## Task
-Based on the user story, system context, and retrieved security documentation, generate security requirements that:
-1. Address potential security risks in implementing this user story
-2. Are grounded in the provided security documentation and standards
-3. Include specific implementation guidance for the system's technology stack
-4. Map to OWASP ASVS categories where applicable
+Generate security requirements for this user story. Prioritize requirements that are supported by the Project Security Documentation above.
+
+INSTRUCTIONS:
+1. FIRST, derive requirements from the security documentation above - use specific parameters mentioned (iteration counts, key sizes, algorithms)
+2. THEN, supplement with OWASP ASVS best practices for any gaps not covered by the documentation
+3. When documentation mentions HOW something works, derive requirements that ensure it is implemented SECURELY
+4. Use SPECIFIC values when available (e.g., "600,000 iterations" not "sufficient iterations")
+5. Generate 4-6 requirements per user story covering: authentication, authorization, cryptography, data protection
+
+EXAMPLES of documentation-derived requirements:
+- If docs say "master key derived using PBKDF2" → Require "PBKDF2-SHA256 with minimum 600,000 iterations"
+- If docs say "encrypted with AES-256" → Require "AES-256 encryption with authenticated mode (GCM/CBC-HMAC)"
+- If docs say "stored in Keychain" → Require "Platform-specific secure storage (Keychain/DPAPI/Keystore)"
+
+For gaps not covered by documentation, apply OWASP ASVS best practices for the feature area.
 
 ## Output Format
 Respond with a JSON object containing a "requirements" array. Each requirement must have:

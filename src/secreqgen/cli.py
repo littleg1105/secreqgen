@@ -908,6 +908,28 @@ def evaluate_run(
             help="Base name for report files",
         ),
     ] = "evaluation",
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model",
+            "-m",
+            help="Ollama model for generation (default: llama3:8b). Try qwen3:30b for better results.",
+        ),
+    ] = None,
+    with_verification: Annotated[
+        bool,
+        typer.Option(
+            "--with-verification",
+            help="Enable LLM-as-Judge verification layer to filter low-quality requirements",
+        ),
+    ] = False,
+    verification_threshold: Annotated[
+        float,
+        typer.Option(
+            "--verification-threshold",
+            help="Minimum average score (1-10) to keep a requirement (default: 6.5)",
+        ),
+    ] = 6.5,
 ) -> None:
     """Run full evaluation pipeline: RAG vs baseline comparison.
 
@@ -938,20 +960,26 @@ def evaluate_run(
 
     cfg = get_config()
 
+    # Use specified model or default from config
+    model_name = model if model else cfg.llm.model_name
+
     # Default output directory
     if output_dir is None:
         output_dir = Path("docs/evaluation_results")
 
-    console.print(
-        Panel(
-            f"[cyan]Stories:[/cyan] {stories}\n"
-            f"[cyan]Ground Truth:[/cyan] {ground_truth}\n"
-            f"[cyan]Output:[/cyan] {output_dir}\n"
-            f"[cyan]Match Threshold:[/cyan] {match_threshold}\n"
-            f"[cyan]Improvement Target:[/cyan] {(improvement_threshold - 1) * 100:.0f}%",
-            title="Evaluation Pipeline",
-        )
+    # Build status panel content
+    panel_content = (
+        f"[cyan]Stories:[/cyan] {stories}\n"
+        f"[cyan]Ground Truth:[/cyan] {ground_truth}\n"
+        f"[cyan]Output:[/cyan] {output_dir}\n"
+        f"[cyan]Match Threshold:[/cyan] {match_threshold}\n"
+        f"[cyan]Improvement Target:[/cyan] {(improvement_threshold - 1) * 100:.0f}%\n"
+        f"[cyan]Model:[/cyan] {model_name}"
     )
+    if with_verification:
+        panel_content += f"\n[cyan]Verification:[/cyan] Enabled (threshold: {verification_threshold})"
+
+    console.print(Panel(panel_content, title="Evaluation Pipeline"))
 
     # Load optional system context
     system_context = None
@@ -971,10 +999,10 @@ def evaluate_run(
         ) as progress:
             progress.add_task("Initializing components...", total=None)
 
-            # Initialize LLM client
+            # Initialize LLM client with specified model
             llm_client = OllamaClient(
                 base_url=cfg.llm.base_url,
-                model_name=cfg.llm.model_name,
+                model_name=model_name,
                 temperature=cfg.llm.temperature,
                 max_tokens=cfg.llm.max_tokens,
             )
