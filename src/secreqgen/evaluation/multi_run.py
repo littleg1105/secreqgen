@@ -1,21 +1,30 @@
 """Multi-run aggregation primitives for variance characterization.
 
 This module is the foundation for the `compare-runs` workflow: it provides
-the dataclasses and pure statistical primitives used by later orchestration
-layers. Per the project's revised proposal (post-council, 2026-05-03), the
-primary inferential test is Wilcoxon signed-rank with paired t-test reported
-as a sensitivity check, and the named effect size is paired Cohen's d_z.
+the dataclasses, pure statistical primitives, and the per-run / per-story
+aggregation helpers that the later orchestration and reporting layers
+consume. Per the project's revised proposal (post-council, 2026-05-03),
+the primary inferential test is Wilcoxon signed-rank with paired t-test
+reported as a sensitivity check, the named effect size is paired Cohen's
+d_z, and the primary pairing axis is per-story (not per-run).
 
-This module performs no I/O and does not import from the evaluation
-pipeline; aggregation, orchestration, and reporting live in sibling modules.
+This module performs no I/O. The aggregation helpers operate on the
+``EvaluationPipelineResult`` data shape; the pipeline is imported only
+under ``TYPE_CHECKING`` so that runtime use is fully decoupled and unit
+tests can construct lightweight fixtures. Orchestration and reporting
+live in sibling modules.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy import stats
+
+if TYPE_CHECKING:
+    from secreqgen.evaluation.pipeline import EvaluationPipelineResult
 
 
 @dataclass
@@ -168,3 +177,151 @@ def paired_test_with_sensitivity(
         d_z_interpretation=d_z_label,
         n_pairs=n_pairs,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Aggregation over EvaluationPipelineResult
+# ─────────────────────────────────────────────────────────────────────
+
+_AGGREGATE_METRIC_NAMES: tuple[str, ...] = (
+    "precision",
+    "recall",
+    "f1_score",
+    "hallucination_rate",
+)
+_PAIRED_METRIC_NAMES: frozenset[str] = frozenset(_AGGREGATE_METRIC_NAMES)
+
+
+def _run_statistics(values: list[float], metric_name: str) -> RunStatistics:
+    arr = np.asarray(values, dtype=float)
+    # Sample stdev (ddof=1) is the conventional "report ± std" denominator.
+    # Falls back to 0.0 when N < 2 because ddof=1 is undefined there.
+    std = float(np.std(arr, ddof=1)) if arr.size >= 2 else 0.0
+    return RunStatistics(
+        metric_name=metric_name,
+        mean=float(arr.mean()),
+        std=std,
+        min=float(arr.min()),
+        max=float(arr.max()),
+        values=list(values),
+    )
+
+
+def aggregate_runs(
+    results: list[EvaluationPipelineResult],
+) -> tuple[dict[str, RunStatistics], dict[str, RunStatistics]]:
+    """Mean / std / min / max for precision, recall, F1, and hallucination
+    rate across N runs, separately for baseline and RAG.
+
+    Reads each run's dataset-level ``aggregate_baseline_metrics`` and
+    ``aggregate_rag_metrics`` — i.e. the headline numbers a single
+    ``evaluate run`` would print — so the resulting dicts characterise
+    run-to-run variability in those headlines. This is the per-run
+    sensitivity axis; per-story pairing (the primary axis) is computed
+    by ``per_story_paired_values``.
+
+    Returns:
+        ``(baseline_aggregate, rag_aggregate)`` — each a dict keyed by
+        metric name and valued by ``RunStatistics``.
+    """
+    if not results:
+        raise ValueError("aggregate_runs requires at least one run")
+
+    baseline_aggregate: dict[str, RunStatistics] = {}
+    rag_aggregate: dict[str, RunStatistics] = {}
+    for name in _AGGREGATE_METRIC_NAMES:
+        baseline_values = [
+            float(getattr(run.aggregate_baseline_metrics, name)) for run in results
+        ]
+        rag_values = [
+            float(getattr(run.aggregate_rag_metrics, name)) for run in results
+        ]
+        baseline_aggregate[name] = _run_statistics(baseline_values, name)
+        rag_aggregate[name] = _run_statistics(rag_values, name)
+
+    return baseline_aggregate, rag_aggregate
+
+
+def collect_per_story_f1(
+    results: list[EvaluationPipelineResult],
+    condition: str,
+) -> dict[str, list[float]]:
+    """Per-story F1 trajectory across runs for the named condition.
+
+    Returns ``{story_id: [f1_run_1, ..., f1_run_N]}``. The dict is keyed
+    by ``story_id`` (not list position) so that out-of-order or
+    partially-failed runs are realigned correctly: a story present in
+    only some runs simply gets a shorter list.
+
+    Args:
+        results: One ``EvaluationPipelineResult`` per run.
+        condition: ``"baseline"`` or ``"rag"``.
+    """
+    if condition == "baseline":
+        attr = "baseline_metrics"
+    elif condition == "rag":
+        attr = "rag_metrics"
+    else:
+        raise ValueError(
+            f"condition must be 'baseline' or 'rag', got {condition!r}"
+        )
+
+    per_story: dict[str, list[float]] = {}
+    for run in results:
+        for story_result in run.per_story_results:
+            metrics = getattr(story_result, attr)
+            per_story.setdefault(story_result.story_id, []).append(
+                float(metrics.f1_score)
+            )
+    return per_story
+
+
+def per_story_paired_values(
+    results: list[EvaluationPipelineResult],
+    metric: str,
+) -> tuple[list[float], list[float]]:
+    """Equal-length baseline/RAG vectors for per-story paired tests.
+
+    For each story present in ``results``, takes the mean of the named
+    metric across the runs in which the story appears, separately for
+    baseline and RAG. The two returned lists are aligned by index — the
+    i-th entry in each is the same story — and ordered by first-seen
+    appearance so the pairing is deterministic.
+
+    This is the input shape the proposal's PRIMARY inferential test
+    (per-story Wilcoxon on ``f1_score``) consumes via
+    ``paired_test_with_sensitivity``.
+
+    Args:
+        results: One ``EvaluationPipelineResult`` per run.
+        metric: One of ``"precision"``, ``"recall"``, ``"f1_score"``,
+            ``"hallucination_rate"``.
+    """
+    if not results:
+        raise ValueError("per_story_paired_values requires at least one run")
+    if metric not in _PAIRED_METRIC_NAMES:
+        raise ValueError(
+            f"unsupported metric {metric!r}; expected one of "
+            f"{sorted(_PAIRED_METRIC_NAMES)}"
+        )
+
+    baseline_by_story: dict[str, list[float]] = {}
+    rag_by_story: dict[str, list[float]] = {}
+    for run in results:
+        for story_result in run.per_story_results:
+            sid = story_result.story_id
+            baseline_by_story.setdefault(sid, []).append(
+                float(getattr(story_result.baseline_metrics, metric))
+            )
+            rag_by_story.setdefault(sid, []).append(
+                float(getattr(story_result.rag_metrics, metric))
+            )
+
+    baseline_values: list[float] = []
+    rag_values: list[float] = []
+    # Iterate baseline_by_story to fix the ordering; rag_by_story has the
+    # same keys because both are populated in the same loop.
+    for sid in baseline_by_story:
+        baseline_values.append(float(np.mean(baseline_by_story[sid])))
+        rag_values.append(float(np.mean(rag_by_story[sid])))
+    return baseline_values, rag_values
