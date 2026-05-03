@@ -17,8 +17,11 @@ live in sibling modules.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable
+import json
+import math
+from dataclasses import dataclass, field, fields, is_dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 from scipy import stats
@@ -64,6 +67,30 @@ class PairedTestResult:
     d_z: float
     d_z_interpretation: str
     n_pairs: int
+
+
+@dataclass
+class MultiRunReport:
+    """Aggregate report across N runs of ``EvaluationPipeline.run()``.
+
+    Composes per-condition aggregate ``RunStatistics`` with the per-story
+    paired tests (PRIMARY axis — F1, recall, and precision) and the
+    per-run paired test on F1 (sensitivity axis). The original per-run
+    results are retained so reviewers can drill into raw numbers and so
+    ``serialize_report`` can emit a per-run × per-story F1 matrix
+    without the caller re-running the pipeline.
+    """
+
+    n_runs: int
+    individual_results: list[EvaluationPipelineResult]
+    baseline_aggregate: dict[str, RunStatistics]
+    rag_aggregate: dict[str, RunStatistics]
+    paired_test_per_story_f1: PairedTestResult
+    paired_test_per_story_recall: PairedTestResult
+    paired_test_per_story_precision: PairedTestResult
+    paired_test_per_run_f1: PairedTestResult
+    config: dict[str, Any] = field(default_factory=dict)
+    run_timestamp: datetime = field(default_factory=datetime.now)
 
 
 def _interpret_d_z(d_z: float) -> str:
@@ -385,3 +412,166 @@ def run_multi_evaluation(
         if progress_callback is not None:
             progress_callback(current, n_runs, f"completed run {current}/{n_runs}")
     return results
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Report builder + JSON serializer
+# ─────────────────────────────────────────────────────────────────────
+
+def _per_run_paired_values(
+    results: list[EvaluationPipelineResult],
+    metric: str,
+) -> tuple[list[float], list[float]]:
+    """Per-run aggregate metric pairs — one entry per run.
+
+    Reads each run's dataset-level ``aggregate_baseline_metrics`` and
+    ``aggregate_rag_metrics``, so the resulting paired test has
+    ``n_pairs == len(results)``. This is the SENSITIVITY axis; the
+    PRIMARY axis is per-story (one pair per story, averaged across
+    runs) via :func:`per_story_paired_values`.
+    """
+    if not results:
+        raise ValueError("_per_run_paired_values requires at least one run")
+    if metric not in _PAIRED_METRIC_NAMES:
+        raise ValueError(
+            f"unsupported metric {metric!r}; expected one of "
+            f"{sorted(_PAIRED_METRIC_NAMES)}"
+        )
+    baseline = [
+        float(getattr(run.aggregate_baseline_metrics, metric)) for run in results
+    ]
+    rag = [float(getattr(run.aggregate_rag_metrics, metric)) for run in results]
+    return baseline, rag
+
+
+def build_multi_run_report(
+    results: list[EvaluationPipelineResult],
+    config: dict[str, Any],
+) -> MultiRunReport:
+    """Assemble the full multi-run report.
+
+    Orchestrates :func:`aggregate_runs` (per-condition mean ± std), the
+    per-story paired tests on F1 / recall / precision (PRIMARY axis,
+    one pair per story), and the per-run paired test on F1 (sensitivity
+    axis, one pair per run). The returned ``MultiRunReport`` is
+    self-contained — it carries the raw per-run results so downstream
+    callers (CLI report, plots) do not need to re-run the pipeline.
+
+    Args:
+        results: One ``EvaluationPipelineResult`` per run, in
+            invocation order. Must be non-empty.
+        config: The configuration dict that produced the runs (model,
+            thresholds, paths). Stored on the report verbatim — the
+            caller owns its shape; this layer does not interpret it.
+    """
+    if not results:
+        raise ValueError("build_multi_run_report requires at least one run")
+
+    baseline_agg, rag_agg = aggregate_runs(results)
+
+    bs_f1, rg_f1 = per_story_paired_values(results, "f1_score")
+    paired_per_story_f1 = paired_test_with_sensitivity(
+        bs_f1, rg_f1, pairing_axis="per-story"
+    )
+    bs_rec, rg_rec = per_story_paired_values(results, "recall")
+    paired_per_story_recall = paired_test_with_sensitivity(
+        bs_rec, rg_rec, pairing_axis="per-story"
+    )
+    bs_prec, rg_prec = per_story_paired_values(results, "precision")
+    paired_per_story_precision = paired_test_with_sensitivity(
+        bs_prec, rg_prec, pairing_axis="per-story"
+    )
+
+    bs_run_f1, rg_run_f1 = _per_run_paired_values(results, "f1_score")
+    paired_per_run_f1 = paired_test_with_sensitivity(
+        bs_run_f1, rg_run_f1, pairing_axis="per-run"
+    )
+
+    return MultiRunReport(
+        n_runs=len(results),
+        individual_results=list(results),
+        baseline_aggregate=baseline_agg,
+        rag_aggregate=rag_agg,
+        paired_test_per_story_f1=paired_per_story_f1,
+        paired_test_per_story_recall=paired_per_story_recall,
+        paired_test_per_story_precision=paired_per_story_precision,
+        paired_test_per_run_f1=paired_per_run_f1,
+        config=dict(config),
+    )
+
+
+def _json_safe(value: Any) -> Any:
+    """Recursively coerce a value into JSON-clean primitives.
+
+    Datetimes become ISO-8601 strings; dataclasses are unrolled by field
+    name; non-finite floats (``nan``, ``±inf``) become ``None`` so the
+    output round-trips cleanly through ``json.loads`` even when scipy
+    returns nan from a degenerate paired test (e.g., zero-variance
+    differences from a constant per-story metric in the test fixtures).
+    Bool is checked before int because ``bool`` is a subclass of ``int``.
+    """
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+    if isinstance(value, (int, str)) or value is None:
+        return value
+    if is_dataclass(value):
+        return {f.name: _json_safe(getattr(value, f.name)) for f in fields(value)}
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return str(value)
+
+
+def _per_run_per_story_f1_matrix(
+    results: list[EvaluationPipelineResult],
+) -> dict[str, dict[str, list[float]]]:
+    """Compact per-run × per-story F1 matrix for downstream plotting."""
+    return {
+        "baseline": collect_per_story_f1(results, "baseline"),
+        "rag": collect_per_story_f1(results, "rag"),
+    }
+
+
+def serialize_report(report: MultiRunReport) -> str:
+    """Serialize a ``MultiRunReport`` to pretty JSON for archival.
+
+    The raw ``individual_results`` are intentionally excluded — they
+    contain Pydantic schema objects (``UserStory``, ``GenerationResult``)
+    and matched-requirement records that would balloon the file. A
+    compact per-run × per-story F1 matrix is emitted instead so plots
+    can be regenerated without re-running the pipeline.
+
+    The output is fully round-trippable through ``json.loads``: no
+    ``NaN`` / ``Infinity`` tokens are emitted (degenerate floats become
+    ``null``), so ``allow_nan=False`` is set as a belt-and-braces guard.
+    """
+    payload = {
+        "n_runs": report.n_runs,
+        "run_timestamp": report.run_timestamp.isoformat(),
+        "config": _json_safe(report.config),
+        "baseline_aggregate": {
+            name: _json_safe(rs) for name, rs in report.baseline_aggregate.items()
+        },
+        "rag_aggregate": {
+            name: _json_safe(rs) for name, rs in report.rag_aggregate.items()
+        },
+        "paired_test_per_story_f1": _json_safe(report.paired_test_per_story_f1),
+        "paired_test_per_story_recall": _json_safe(
+            report.paired_test_per_story_recall
+        ),
+        "paired_test_per_story_precision": _json_safe(
+            report.paired_test_per_story_precision
+        ),
+        "paired_test_per_run_f1": _json_safe(report.paired_test_per_run_f1),
+        "per_run_per_story_f1": _per_run_per_story_f1_matrix(
+            report.individual_results
+        ),
+    }
+    return json.dumps(payload, indent=2, allow_nan=False)
