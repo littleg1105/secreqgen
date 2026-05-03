@@ -18,13 +18,18 @@ live in sibling modules.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 from scipy import stats
 
 if TYPE_CHECKING:
-    from secreqgen.evaluation.pipeline import EvaluationPipelineResult
+    from pathlib import Path
+
+    from secreqgen.evaluation.pipeline import (
+        EvaluationPipeline,
+        EvaluationPipelineResult,
+    )
 
 
 @dataclass
@@ -325,3 +330,58 @@ def per_story_paired_values(
         baseline_values.append(float(np.mean(baseline_by_story[sid])))
         rag_values.append(float(np.mean(rag_by_story[sid])))
     return baseline_values, rag_values
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Orchestration
+# ─────────────────────────────────────────────────────────────────────
+
+def run_multi_evaluation(
+    pipeline: EvaluationPipeline,
+    stories_path: Path,
+    ground_truth_path: Path,
+    n_runs: int,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> list[EvaluationPipelineResult]:
+    """Drive ``pipeline.run()`` N times sequentially and return the results.
+
+    Sequential by design: Ollama is single-threaded and the bottleneck is
+    generation latency, so concurrency at this layer would only serialize
+    on the model queue while inflating peak memory. Keeping it sequential
+    also leaves per-run wall-clock timing interpretable for the
+    ``RunStatistics`` consumers downstream.
+
+    The pipeline-internal phase callbacks (data load, generation, scoring)
+    are intentionally not forwarded; this layer reports coarser
+    run-boundary progress so a caller can render a "run 3 of 20"
+    progress bar without flooding the UI.
+
+    Args:
+        pipeline: A configured ``EvaluationPipeline`` whose ``run()``
+            accepts ``(stories_path, ground_truth_path)``. Duck-typed so
+            unit tests can substitute a ``MagicMock``.
+        stories_path: Forwarded unchanged to each pipeline invocation.
+        ground_truth_path: Forwarded unchanged to each pipeline invocation.
+        n_runs: Number of times to invoke ``pipeline.run``. Must be >= 1.
+        progress_callback: Optional ``(current, total, phase)`` callable.
+            ``current`` is the 1-indexed run number, ``total`` equals
+            ``n_runs``, and ``phase`` is a short status string. Invoked
+            both at run start and on completion.
+
+    Returns:
+        Per-run ``EvaluationPipelineResult`` objects in invocation order
+        — index ``i`` is the result of the ``(i + 1)``-th call.
+    """
+    if n_runs < 1:
+        raise ValueError(f"n_runs must be >= 1, got {n_runs}")
+
+    results: list[EvaluationPipelineResult] = []
+    for i in range(n_runs):
+        current = i + 1
+        if progress_callback is not None:
+            progress_callback(current, n_runs, f"starting run {current}/{n_runs}")
+        result = pipeline.run(stories_path, ground_truth_path)
+        results.append(result)
+        if progress_callback is not None:
+            progress_callback(current, n_runs, f"completed run {current}/{n_runs}")
+    return results
