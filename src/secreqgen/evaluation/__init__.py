@@ -10,6 +10,14 @@ from secreqgen.evaluation.metrics import (
     MetricsBreakdown,
     MetricsCalculator,
 )
+from secreqgen.evaluation.multi_run import (
+    MultiRunReport,
+    PairedTestResult,
+    RunStatistics,
+    build_multi_run_report,
+    run_multi_evaluation,
+    serialize_report,
+)
 from secreqgen.evaluation.pipeline import (
     EvaluationPipeline,
     EvaluationPipelineResult,
@@ -51,4 +59,11 @@ __all__ = [
     # Report generation
     "EvaluationReportGenerator",
     "write_evaluation_report",
+    # Multi-run aggregation
+    "MultiRunReport",
+    "PairedTestResult",
+    "RunStatistics",
+    "build_multi_run_report",
+    "run_multi_evaluation",
+    "serialize_report",
 ]

@@ -61,3 +61,24 @@ def pytest_configure(config) -> None:  # type: ignore[no-untyped-def]
         if seed.exists() and not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(seed.read_bytes())
+
+    # Click 8.1's ``CliRunner`` defaults ``mix_stderr=True``, which makes
+    # ``result.stderr`` raise ``ValueError`` (stderr is merged into stdout
+    # and ``stderr_bytes`` is left ``None``). The frozen g5 spec combines
+    # ``stdout + stderr`` to scan ``--help`` output, so the default would
+    # crash the spec mid-assertion. Force separate capture as the default
+    # for any ``CliRunner()`` constructed without an explicit kwarg.
+    # Safe for existing tests: ``tests/unit/test_cli.py`` only inspects
+    # ``result.stdout`` / ``result.exit_code`` and Rich ``console.print``
+    # writes to stdout regardless of this flag.
+    from typer.testing import CliRunner
+
+    _original_cli_runner_init = CliRunner.__init__
+
+    def _cli_runner_init_with_separate_stderr(
+        self, *args, **kwargs  # type: ignore[no-untyped-def]
+    ):
+        kwargs.setdefault("mix_stderr", False)
+        _original_cli_runner_init(self, *args, **kwargs)
+
+    CliRunner.__init__ = _cli_runner_init_with_separate_stderr  # type: ignore[method-assign]

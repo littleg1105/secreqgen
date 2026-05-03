@@ -1113,6 +1113,289 @@ def evaluate_run(
         raise typer.Exit(1)
 
 
+@evaluate_app.command("compare-runs")
+def evaluate_compare_runs(
+    stories: Annotated[
+        Path, typer.Argument(help="User stories JSON file")
+    ],
+    ground_truth: Annotated[
+        Path, typer.Argument(help="Ground truth JSON file")
+    ],
+    runs: Annotated[
+        int,
+        typer.Option(
+            "--runs",
+            help="Number of repeated runs (default 20). Use --pilot for N=10.",
+        ),
+    ] = 20,
+    pilot: Annotated[
+        bool,
+        typer.Option(
+            "--pilot",
+            help="Pilot mode: run N=10 and mark output as pilot (not thesis-grade).",
+        ),
+    ] = False,
+    output_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output directory for the multi-run report",
+        ),
+    ] = None,
+    match_threshold: Annotated[
+        float,
+        typer.Option(
+            "--match-threshold",
+            help="Similarity threshold for match (default 0.85)",
+        ),
+    ] = 0.85,
+    partial_threshold: Annotated[
+        float,
+        typer.Option(
+            "--partial-threshold",
+            help="Similarity threshold for partial match (default 0.70)",
+        ),
+    ] = 0.70,
+    context: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--context",
+            "-c",
+            help="Optional system context YAML file",
+        ),
+    ] = None,
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model",
+            "-m",
+            help="Ollama model for generation (default from config)",
+        ),
+    ] = None,
+) -> None:
+    """Run the evaluation pipeline N times and report aggregate statistics.
+
+    Default N=20 produces thesis-grade variance characterization. Use
+    --pilot for N=10 during development; pilot reports are flagged as
+    such and should not be cited as headline results.
+
+    Reports two paired tests: per-story (PRIMARY) and per-run
+    (SENSITIVITY), with Wilcoxon as the primary inferential test and
+    paired t-test as a sensitivity check. Effect size is paired Cohen's
+    d_z. A Shapiro-Wilk normality check on the paired differences is
+    reported alongside so reviewers can interpret the sensitivity
+    result.
+
+    Example:
+        secreqgen evaluate compare-runs stories.json ground_truth.json --runs 20
+    """
+    from secreqgen.evaluation import (
+        EvaluationPipeline,
+        build_multi_run_report,
+        run_multi_evaluation,
+        serialize_report,
+    )
+    from secreqgen.exceptions import GenerationError, LLMConnectionError
+    from secreqgen.generation import OllamaClient
+    from secreqgen.ingestion import DocumentEmbedder
+    from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
+
+    # Validate input files BEFORE any heavy initialization so the command
+    # fails fast on bad paths without spinning up Ollama or the embedder.
+    if not stories.exists():
+        console.print(f"[red]Error:[/red] Stories file not found: {stories}")
+        raise typer.Exit(1)
+    if not ground_truth.exists():
+        console.print(
+            f"[red]Error:[/red] Ground truth file not found: {ground_truth}"
+        )
+        raise typer.Exit(1)
+
+    if pilot:
+        runs = 10
+
+    cfg = get_config()
+    model_name = model if model else cfg.llm.model_name
+
+    if output_dir is None:
+        output_dir = Path("docs/evaluation_results")
+
+    pilot_label = " (PILOT)" if pilot else ""
+    panel_content = (
+        f"[cyan]Stories:[/cyan] {stories}\n"
+        f"[cyan]Ground Truth:[/cyan] {ground_truth}\n"
+        f"[cyan]Output:[/cyan] {output_dir}\n"
+        f"[cyan]Runs:[/cyan] {runs}{pilot_label}\n"
+        f"[cyan]Match Threshold:[/cyan] {match_threshold}\n"
+        f"[cyan]Partial Threshold:[/cyan] {partial_threshold}\n"
+        f"[cyan]Model:[/cyan] {model_name}"
+    )
+    console.print(Panel(panel_content, title="Multi-Run Evaluation Pipeline"))
+
+    system_context = None
+    if context:
+        if not context.exists():
+            console.print(f"[red]Error:[/red] Context file not found: {context}")
+            raise typer.Exit(1)
+        system_context = context.read_text()
+        console.print(
+            f"[green]✓[/green] Loaded system context from {context.name}"
+        )
+
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task("Initializing components...", total=None)
+
+            llm_client = OllamaClient(
+                base_url=cfg.llm.base_url,
+                model_name=model_name,
+                temperature=cfg.llm.temperature,
+                max_tokens=cfg.llm.max_tokens,
+            )
+
+            if not llm_client.check_health():
+                console.print(
+                    "[red]Error:[/red] Cannot connect to Ollama.\n"
+                    f"Make sure Ollama is running: [cyan]ollama serve[/cyan]"
+                )
+                raise typer.Exit(1)
+
+            embedder = DocumentEmbedder(
+                model_name=cfg.embedding.model_name,
+                device=cfg.embedding.device,
+            )
+            vectorstore = SecReqGenVectorStore(
+                persist_directory=cfg.vectorstore.persist_directory,
+                collection_prefix=cfg.vectorstore.collection_prefix,
+            )
+            retriever = SimpleRetriever(
+                vectorstore=vectorstore,
+                embedder=embedder,
+                top_k=cfg.retrieval.top_k,
+                similarity_threshold=cfg.retrieval.similarity_threshold,
+            )
+
+            pipeline = EvaluationPipeline(
+                llm_client=llm_client,
+                retriever=retriever,
+                match_threshold=match_threshold,
+                partial_threshold=partial_threshold,
+                system_context=system_context,
+            )
+
+        console.print("[green]✓[/green] Components initialized")
+
+        console.print(f"\n[bold]Running {runs} evaluations...[/bold]\n")
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Multi-run evaluation", total=runs)
+
+            def progress_callback(current: int, total: int, phase: str) -> None:
+                if phase.startswith("completed"):
+                    progress.update(
+                        task,
+                        completed=current,
+                        description=f"Run {current}/{total} complete",
+                    )
+                else:
+                    progress.update(
+                        task, description=f"Run {current}/{total}: {phase}"
+                    )
+
+            individual_results = run_multi_evaluation(
+                pipeline=pipeline,
+                stories_path=stories,
+                ground_truth_path=ground_truth,
+                n_runs=runs,
+                progress_callback=progress_callback,
+            )
+
+        console.print()
+
+        report_config = {
+            "stories": str(stories),
+            "ground_truth": str(ground_truth),
+            "model": model_name,
+            "match_threshold": match_threshold,
+            "partial_threshold": partial_threshold,
+            "n_runs": runs,
+            "pilot": pilot,
+        }
+        report = build_multi_run_report(individual_results, report_config)
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = report.run_timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+        run_dir_name = (
+            f"run_comparison_{timestamp}_pilot"
+            if pilot
+            else f"run_comparison_{timestamp}"
+        )
+        run_dir = output_dir / run_dir_name
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        report_json = serialize_report(report)
+        json_path = run_dir / "multi_run_report.json"
+        json_path.write_text(report_json, encoding="utf-8")
+
+        console.print(
+            f"\n[bold]Multi-Run Summary{' (PILOT)' if pilot else ''}[/bold]\n"
+        )
+
+        primary = report.paired_test_per_story_f1
+        console.print(
+            "[bold cyan]Primary inferential result (per-story F1)[/bold cyan]"
+        )
+        console.print(
+            f"  N pairs (stories): {primary.n_pairs}\n"
+            f"  Wilcoxon: W = {primary.primary_statistic:.3f}, "
+            f"p = {primary.primary_p_value:.4f}\n"
+            f"  Paired t-test: t = {primary.sensitivity_statistic:.3f}, "
+            f"p = {primary.sensitivity_p_value:.4f}\n"
+            f"  Shapiro-Wilk on diffs: p = {primary.shapiro_wilk_p:.4f}\n"
+            f"  Cohen's d_z: {primary.d_z:.3f} ({primary.d_z_interpretation})"
+        )
+
+        sensitivity = report.paired_test_per_run_f1
+        console.print(
+            "\n[bold cyan]Sensitivity result (per-run aggregate F1)[/bold cyan]"
+        )
+        console.print(
+            f"  N pairs (runs): {sensitivity.n_pairs}\n"
+            f"  Wilcoxon: W = {sensitivity.primary_statistic:.3f}, "
+            f"p = {sensitivity.primary_p_value:.4f}\n"
+            f"  Paired t-test: t = {sensitivity.sensitivity_statistic:.3f}, "
+            f"p = {sensitivity.sensitivity_p_value:.4f}\n"
+            f"  Cohen's d_z: {sensitivity.d_z:.3f} "
+            f"({sensitivity.d_z_interpretation})"
+        )
+
+        console.print(f"\n[green]✓[/green] Report written to {json_path}")
+
+    except LLMConnectionError as e:
+        console.print(f"[red]LLM Connection Error:[/red] {e}")
+        raise typer.Exit(1)
+    except GenerationError as e:
+        console.print(f"[red]Generation Error:[/red] {e}")
+        raise typer.Exit(1)
+    except FileNotFoundError as e:
+        console.print(f"[red]File Error:[/red] {e}")
+        raise typer.Exit(1)
+    except ValueError as e:
+        console.print(f"[red]Validation Error:[/red] {e}")
+        raise typer.Exit(1)
+
+
 @evaluate_app.command("compare")
 def evaluate_compare(
     generated: Annotated[
