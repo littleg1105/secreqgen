@@ -52,6 +52,10 @@ _SPEC_BOOTSTRAPS: tuple[tuple[Path, Path], ...] = (
         _REPO_ROOT / "tests" / "_council_seeds" / "g4_spec.py",
         _REPO_ROOT / ".council" / "specs" / "test_g4.py",
     ),
+    (
+        _REPO_ROOT / "tests" / "_council_seeds" / "g5_spec.py",
+        _REPO_ROOT / ".council" / "specs" / "test_g5.py",
+    ),
 )
 
 
