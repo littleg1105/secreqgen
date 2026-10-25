@@ -36,17 +36,22 @@ from secreqgen.generation.schemas import GenerationResult, UserStory
 logger = logging.getLogger(__name__)
 
 
+# Every example identifier below is FICTITIOUS. The 2026-10-25 council
+# audit found the previous examples (CAS_UID_KEY, S3_ALIAS_HOST, ...) were
+# the Mastodon probe's own answer vocabulary, and two others were real
+# Bitwarden / Keycloak identifiers. tests/unit/test_prompt_leakage.py
+# enforces that no prompt names an evaluation-corpus identifier.
 STAGE_A_SYSTEM = """You are a code-and-config tokenizer for a security architect.
 Your job is to extract project-specific identifiers from the supplied security documentation that are RELEVANT to the supplied user story.
 
 Output a JSON object with a single key "tokens". The value is a list of strings.
 
 What counts as a project-specific token:
-- Configuration keys (e.g., CAS_UID_KEY, ALLOW_UNSAFE_AUTH_PROVIDER_REATTACH)
-- Environment variables (e.g., S3_HOSTNAME, S3_ALIAS_HOST)
-- Named API endpoint paths or feature names (e.g., /api/v1/follows/synchronize, followers_synchronization)
-- Class, module, or table names that the documentation calls out by name (e.g., PasswordProtectedKeyEnvelope)
-- Realm/role/group names defined by the project (e.g., realm-management)
+- Configuration keys (e.g., AUTH_PROVIDER_ATTRIBUTE_KEY, AUTH_PROVIDER_ASSUME_VERIFIED)
+- Environment variables (e.g., WORKER_UPLOAD_BACKEND, WORKER_UPLOAD_ALIAS_HOST)
+- Named API endpoint paths or feature names (e.g., /api/v2/session/revoke, session_revocation)
+- Class, module, or table names that the documentation calls out by name (e.g., SessionRevocationService)
+- Realm/role/group names defined by the project (e.g., upload-operator)
 
 What is NOT a project-specific token:
 - Generic security terms: AES, RSA, TLS, JWT, OWASP, ASVS, OAuth, SAML, HMAC, PBKDF2, Argon2id, CSRF, XSS, CORS, etc.
@@ -56,7 +61,7 @@ What is NOT a project-specific token:
 Rules:
 - Only return tokens that ACTUALLY appear in the documentation below.
 - Only return tokens RELEVANT to the supplied user story.
-- Preserve exact spelling and casing (CAS_UID_KEY not cas_uid_key).
+- Preserve exact spelling and casing (AUTH_PROVIDER_ATTRIBUTE_KEY not auth_provider_attribute_key).
 - Cap at 30 items. Empty list ({"tokens": []}) is fine when nothing applies.
 - Output JSON only, no commentary."""
 
@@ -259,13 +264,18 @@ class Idea21Generator(SecurityRequirementsGenerator):
             if len(out) >= self.max_tokens_in_list:
                 break
 
+        # 2026-10-25: a token the extractor "found" that is not verbatim in the
+        # retrieved context is a paraphrase or a hallucination. Previously this
+        # was only logged and the token was still handed to Stage B as if it
+        # were grounded; now it is dropped. The May runs showed 0 such tokens in
+        # 50 extractions, so this changes provenance guarantees, not results.
         absent = [t for t in out if t not in retrieved_context]
         if absent:
-            logger.debug(
-                f"[idea21] {len(absent)}/{len(out)} extracted tokens are not "
-                f"verbatim in retrieved_context (likely paraphrase/hallucination): "
-                f"{absent[:5]}"
+            logger.info(
+                f"[idea21] dropping {len(absent)}/{len(out)} extracted tokens not "
+                f"verbatim in retrieved_context: {absent[:5]}"
             )
+            out = [t for t in out if t in retrieved_context]
 
         return out
 

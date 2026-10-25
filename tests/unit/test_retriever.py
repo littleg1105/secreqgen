@@ -1,10 +1,9 @@
 """Unit tests for SimpleRetriever."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-
 from secreqgen.generation.schemas import UserStory
 from secreqgen.ingestion.metadata import DocumentType
 from secreqgen.retrieval.retriever import RetrievalResult, SimpleRetriever
@@ -231,22 +230,32 @@ class TestSimpleRetrieverRetrieveForUserStory:
             ],
         )
 
+    # The query contract below is the one every post-audit experiment ran
+    # under (idea 19 wraps this retriever unchanged). Since the 2026-01-01
+    # query-transformation commit the story NARRATIVE is used only to pick
+    # SECURITY_KEYWORD_MAP terms and is NOT embedded verbatim; the title and
+    # the acceptance criteria are. Changing that changes retrieval for every
+    # arm of the evaluation, so it must be a deliberate, re-justified change
+    # (RAG_ABLATION_LAB_NOTEBOOK.md §13 lists it as a known limitation),
+    # never a side effect — hence the exact-shape assertions.
     def test_retrieve_for_user_story_builds_query(
         self, retriever, sample_user_story
     ):
-        """Test that user story is converted to a proper query."""
-        result = retriever.retrieve_for_user_story(sample_user_story)
+        """The embedded query carries title + criteria, not the narrative."""
+        retriever.retrieve_for_user_story(sample_user_story)
 
-        # Check that embedder was called with combined query
         call_args = retriever.embedder.embed_text.call_args[0][0]
 
-        assert "User Login" in call_args
-        assert "log in to the application" in call_args
-        assert "username and password" in call_args
-        assert "Invalid credentials" in call_args
+        assert "Feature: User Login" in call_args
+        assert (
+            "Requirements: User can enter username and password; "
+            "Invalid credentials show error message"
+        ) in call_args
+        # Narrative is not embedded verbatim (used for keyword extraction only)
+        assert "log in to the application" not in call_args
 
     def test_retrieve_for_user_story_no_acceptance_criteria(self, retriever):
-        """Test retrieval for story without acceptance criteria."""
+        """Without criteria the query has no 'Requirements:' section."""
         story = UserStory(
             id="US-002",
             title="Password Reset",
@@ -254,11 +263,12 @@ class TestSimpleRetrieverRetrieveForUserStory:
             acceptance_criteria=[],
         )
 
-        result = retriever.retrieve_for_user_story(story)
+        retriever.retrieve_for_user_story(story)
 
         call_args = retriever.embedder.embed_text.call_args[0][0]
-        assert "Password Reset" in call_args
-        assert "reset my password" in call_args
+        assert "Feature: Password Reset" in call_args
+        assert "Requirements:" not in call_args
+        assert "reset my password" not in call_args
 
     def test_retrieve_for_user_story_with_custom_top_k(
         self, retriever, sample_user_story
@@ -449,14 +459,19 @@ class TestSimpleRetrieverBuildQueryFromStory:
 
         query = retriever._build_query_from_story(story)
 
-        assert "User Authentication" in query
-        assert "authenticate securely" in query
-        assert "Use MFA" in query
-        assert "Session timeout" in query
-        assert "Acceptance criteria:" in query
+        # Frozen query shape (see the contract note on
+        # TestSimpleRetrieverRetrieveForUserStory): security keywords first,
+        # then the title, then the criteria joined with "; ".
+        assert query.startswith("Security requirements: ")
+        assert "Feature: User Authentication" in query
+        assert "Requirements: Use MFA; Session timeout after 30 minutes" in query
+        # The narrative sentence itself is not part of the query
+        assert "authenticate securely" not in query
+        # Keyword expansion did fire for an MFA/session story
+        assert "session" in query.lower()
 
     def test_build_query_no_acceptance_criteria(self, retriever):
-        """Test query building without acceptance criteria."""
+        """A story with no security concepts and no criteria is just its title."""
         story = UserStory(
             id="US-002",
             title="Simple Story",
@@ -466,10 +481,9 @@ class TestSimpleRetrieverBuildQueryFromStory:
 
         query = retriever._build_query_from_story(story)
 
-        assert "Simple Story" in query
-        assert "I want something" in query
-        # Should NOT have "Acceptance criteria:" since list is empty
-        assert "Acceptance criteria:" not in query
+        assert "Feature: Simple Story" in query
+        assert "Requirements:" not in query
+        assert "I want something" not in query
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -537,12 +551,12 @@ class TestRetrievalThresholdRegression:
         documentation found.' Threshold lowered to 0.4 based on
         empirical similarity distributions for all-mpnet-base-v2.
         """
+        from secreqgen.config import SecReqGenConfig
         from secreqgen.ingestion.chunker import DocumentChunk
         from secreqgen.ingestion.embedder import DocumentEmbedder
         from secreqgen.ingestion.metadata import DocumentType
         from secreqgen.retrieval.retriever import SimpleRetriever
         from secreqgen.retrieval.vectorstore import SecReqGenVectorStore
-        from secreqgen.config import SecReqGenConfig
 
         # Build a tiny corpus of clearly authentication-related chunks
         docs = [

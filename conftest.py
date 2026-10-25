@@ -75,14 +75,22 @@ def pytest_configure(config) -> None:  # type: ignore[no-untyped-def]
     # Safe for existing tests: ``tests/unit/test_cli.py`` only inspects
     # ``result.stdout`` / ``result.exit_code`` and Rich ``console.print``
     # writes to stdout regardless of this flag.
+    import inspect
+
     from typer.testing import CliRunner
 
-    _original_cli_runner_init = CliRunner.__init__
+    # Click >= 8.2 removed ``mix_stderr`` altogether: stderr is always
+    # captured separately and ``result.stderr`` always works, so the shim is
+    # unnecessary there — and passing the kwarg raises ``TypeError`` during
+    # collection of every CliRunner-based test. Apply it only where the
+    # parameter still exists.
+    if "mix_stderr" in inspect.signature(CliRunner.__init__).parameters:
+        _original_cli_runner_init = CliRunner.__init__
 
-    def _cli_runner_init_with_separate_stderr(
-        self, *args, **kwargs  # type: ignore[no-untyped-def]
-    ):
-        kwargs.setdefault("mix_stderr", False)
-        _original_cli_runner_init(self, *args, **kwargs)
+        def _cli_runner_init_with_separate_stderr(
+            self, *args, **kwargs  # type: ignore[no-untyped-def]
+        ):
+            kwargs.setdefault("mix_stderr", False)
+            _original_cli_runner_init(self, *args, **kwargs)
 
-    CliRunner.__init__ = _cli_runner_init_with_separate_stderr  # type: ignore[method-assign]
+        CliRunner.__init__ = _cli_runner_init_with_separate_stderr  # type: ignore[method-assign]

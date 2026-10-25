@@ -6,6 +6,26 @@ partially superseded by later updates.*
 
 ---
 
+# ⚠ 2026-10-25 — read before the section below
+
+Five months passed with no work. A three-agent council (records in
+`../../council-of-agents/`, decision in `synthesis-2026-10-25.md`) re-audited
+the tree. Two corrections to the section below:
+
+- **Phase 4 / idea 21 is superseded.** Its prompts contained the probe's
+  answer vocabulary and its baseline arm had lost the idea-15 exemplars; the
+  +16/+18 pp citation-density lift is confounded and must not be cited
+  (lab notebook §13). The Phase 3 adversarial probe (0 vs 5–7 docs-only
+  identifiers) is clean and stands.
+- **Pending item 2 (the κ worksheet) calibrates the retrieval judge, not the
+  content-quality judge.** No human requirement-correctness review exists yet;
+  Study 2 adds one.
+
+Repairs are committed; the next experiment is Study 2 as specified in the
+synthesis. The Ollama blocker in the Phase 4 caveat is gone (0.40.11).
+
+---
+
 # ⭐ CURRENT STATE — 2026-05-25 (read this section)
 
 ## Where we are

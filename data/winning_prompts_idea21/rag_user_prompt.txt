@@ -164,7 +164,7 @@ Generate security requirements for this user story. Prioritize requirements that
 GROUNDED-CITATION INSTRUCTIONS:
 1. The section labeled "## PROJECT-SPECIFIC TOKENS (CITE BY NAME)" above lists configuration keys, environment variables, endpoint paths, class names, and named features that appear in the Project Security Documentation and are relevant to this user story.
 2. EVERY requirement MUST cite AT LEAST ONE token from that list BY ITS EXACT NAME — in the title, description, acceptance criteria, or implementation notes.
-3. Do NOT paraphrase a token into a generic phrase. If the list contains "CAS_UID_KEY", write "CAS_UID_KEY", not "a configurable user identifier key".
+3. Do NOT paraphrase a token into a generic phrase. If the list contains "AUTH_PROVIDER_ATTRIBUTE_KEY", write "AUTH_PROVIDER_ATTRIBUTE_KEY", not "a configurable user identifier key".
 4. Cite tokens only when materially relevant; do NOT enumerate every token. Each requirement should be about a real security concern, with the relevant token appearing naturally in the requirement's prose.
 5. If the token list is empty or contains only weakly related items, fall back to standard OWASP-grounded requirements without forced citations.
 

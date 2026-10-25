@@ -53,7 +53,13 @@ class TestRetrievalConfig:
         """Test default values."""
         config = RetrievalConfig()
         assert config.top_k == 5
-        assert config.similarity_threshold == 0.7
+        # 2026-05-19 audit (docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md): the old
+        # default of 0.7 was unreachable for all-mpnet-base-v2 on this corpus
+        # (genuinely relevant chunks score 0.45-0.65 cosine), so every RAG
+        # query silently fell back to "No relevant security documentation
+        # found." The default must sit below the relevant-hit band.
+        assert config.similarity_threshold == 0.4
+        assert config.similarity_threshold < 0.45
 
 
 class TestEvaluationConfig:

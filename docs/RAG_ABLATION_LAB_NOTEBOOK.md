@@ -1298,3 +1298,79 @@ Idea 21 is approved as a Chapter-7 methodology contribution.
   expanded vocabulary derived from the actual Stage-A extractions
   (CAS_LOGIN_URL, ONE_CLICK_SSO_LOGIN, etc.) to give RG-21 a fair
   shake on the "distinct tokens cited" metric.
+
+---
+
+## §13 — Council audit and repairs (2026-10-25)
+
+**Context.** Five months idle after §12. Three agents (Codex, Gemini, Claude)
+reviewed the project independently; records and the agreed direction are in
+`../../council-of-agents/` (`synthesis-2026-10-25.md`). Codex's source audit
+found two measurement defects in the §12 idea-21 experiment, verified against
+this tree on 2026-10-25:
+
+1. **Prompt leakage.** `data/winning_prompts_idea21/system_prompt.txt:18` and
+   `rag_user_prompt.txt:167` named `CAS_UID_KEY` and `S3_ALIAS_HOST` as
+   examples; the Stage-A extractor prompt in
+   `src/secreqgen/generation/grounded_citation.py` named `CAS_UID_KEY`,
+   `ALLOW_UNSAFE_AUTH_PROVIDER_REATTACH`, `S3_HOSTNAME`, `S3_ALIAS_HOST`,
+   `/api/v1/follows/synchronize`, `followers_synchronization` — the answer
+   vocabulary of the five probe stories — plus `PasswordProtectedKeyEnvelope`
+   (Bitwarden) and `realm-management` (Keycloak). `analyze_idea21_vs_baseline.py`
+   subtracts only story text, so prompt-supplied terms were scored as
+   "docs-only" citations in both arms.
+2. **Baseline drift.** `scripts/run_idea21_grounded_citation.py` gave the
+   baseline arm the idea-21 prompt builder, whose zero-shot template (24
+   lines) had lost the idea-15 exemplars (124 lines) and gained citation
+   instructions — contrary to the comment beside it.
+
+**Consequence.** The §12 lift (citation density +16/+18 pp; utilisation
+76.6 % / 89.6 %) is confounded and is reclassified as an **exploratory pilot,
+superseded, not citable** — the same status §0 gives the pre-audit F1 results.
+The §11 adversarial probe is unaffected: the idea-15 templates contain none of
+these identifiers (0 hits), and Codex's recount over all five runs gives
+0.0 / 0.2 (baseline) vs 7.2 / 6.6 (RAG) distinct docs-only terms for
+qwen3 / qwen3.6.
+
+**Also recorded.**
+- The 30-pair κ worksheet (`docs/judge_calibration_sample.md`) labels
+  *(story, chunk)* relevance → it calibrates the retrieval judge (§4 P@k /
+  nDCG@5), not the llama3:8b content-quality judge behind the 97–100 %
+  (Codex recount: 92.2–100 %) relevance figure. No human
+  requirement-correctness review exists yet.
+- `Idea19Retriever` → `SimpleRetriever.retrieve_for_user_story` still applies
+  `SECURITY_KEYWORD_MAP` expansion (idea 10 showed removing it doubled top-1
+  in the dense setting) and never folded in BM25/RRF (idea 5); the story
+  narrative is not embedded, only title + criteria + keywords. Known
+  limitation of the frozen idea-19 configuration; deliberately unchanged
+  (retrieval stays frozen for Study 2). `tests/unit/test_retriever.py` now
+  pins this query shape so it cannot drift silently.
+
+**Repairs applied (commit "Council repairs 2026-10-25").**
+- Every example identifier in the three idea-21 templates and the Stage-A
+  prompt replaced by the fictitious exemplar tokens (`AUTH_PROVIDER_*`,
+  `WORKER_UPLOAD_*`, `/api/v2/session/revoke`, `SessionRevocationService`,
+  `upload-operator`).
+- `zero_shot_user_prompt.txt` regenerated from the RAG template: byte-identical
+  exemplars, same 4–6 requirement budget; arms now differ only in the project
+  information supplied.
+- `Idea21Generator`: extracted tokens not verbatim in the retrieved context are
+  dropped (previously only logged).
+- New `tests/unit/test_prompt_leakage.py`: denylist of probe identifiers + a
+  scan of every identifier-like token in every prompt against all five
+  corpora, ground truths and stories; exemplar-parity test between the
+  zero-shot and RAG templates.
+- Test suite repaired to encode the frozen contracts (threshold 0.4 < 0.45;
+  query shape) and to collect under Click 8.3 (`mix_stderr` shim made
+  conditional). **485 unit tests pass.**
+- Ollama 0.34.0 → 0.40.11 (the Phase-4 architecture blocker is gone);
+  models re-pulled: `qwen3.8:27b`, `gemma4:26b`, `llama3:8b`. The disk has
+  ~70 GB free, so `mistral-small3.2:24b` and `qwen3:30b…` are deferred.
+
+**Next.** Study 2 as specified in `council-of-agents/synthesis-2026-10-25.md`:
+18 docs-dependent stories across mastodon / keycloak / bitwarden, arms
+A (no docs) / B (RAG) / C (RAG + repaired extract-then-cite) / D (whole corpus
+in context), `qwen3.8:27b` + `gemma4:26b`, N = 3, pre-registered primary
+contrast C vs B, blinded two-reviewer requirement-correctness review. Before
+any run: extend `analyze_idea21_vs_baseline.py` to subtract the full rendered
+prompt and to iterate over all runs.

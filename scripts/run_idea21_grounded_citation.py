@@ -163,9 +163,13 @@ def run_cell(model: str, n_runs: int, label_prefix: str,
         system_context=system_context,
     )
     idea21_pb = SecurityRequirementsPromptBuilder(prompts_dir=IDEA21_PROMPTS)
-    # Baseline arm: keep using the idea-21 prompt builder too (it loads the
-    # standard zero-shot template which is identical to winning_prompts —
-    # baseline is unchanged across experiments).
+    # Baseline arm: the idea-21 prompt builder too, so every arm shares ONE
+    # instruction set (same system prompt, same two fictitious-token
+    # exemplars); the arms differ only in the project information supplied.
+    # 2026-10-25: the previous zero_shot template in winning_prompts_idea21
+    # had silently dropped the exemplars (24 lines vs 124 in winning_prompts),
+    # so the May idea-21 "baseline" was NOT the idea-15 baseline — see
+    # docs/RAG_ABLATION_LAB_NOTEBOOK.md §13.
     pipeline._runner._baseline_generator.prompt_builder = idea21_pb
 
     # Replace the RAG arm entirely with the idea-21 generator.
