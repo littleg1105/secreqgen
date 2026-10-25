@@ -58,11 +58,23 @@ class ArchitectureAwareChunker:
     # Regex to match PDF page markers from PDFLoader: [Page X]
     PAGE_MARKER_PATTERN = re.compile(r"^\[Page\s+(\d+)\]$", re.MULTILINE)
 
+    # Regex to match YAML front-matter at the very start of a document.
+    # Matches `---\n<yaml>\n---\n` only at position 0 (anchored with \A).
+    # Stripping this is critical because front-matter is short, dense with
+    # security-sounding keywords (title, description), and a top-1 ranker
+    # under sentence-transformers cosine similarity — but contains zero
+    # substantive content. See docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md.
+    FRONT_MATTER_PATTERN = re.compile(
+        r"\A---\s*\n(.*?)\n---\s*\n",
+        re.DOTALL,
+    )
+
     def __init__(
         self,
         max_chunk_tokens: int = 512,
         overlap_tokens: int = 50,
         encoding_name: str = "cl100k_base",
+        max_chunking_level: int = 3,
     ) -> None:
         """Initialize the chunker.
 
@@ -70,9 +82,20 @@ class ArchitectureAwareChunker:
             max_chunk_tokens: Maximum tokens per chunk (default 512).
             overlap_tokens: Tokens to overlap between chunks (default 50).
             encoding_name: Tiktoken encoding name (default cl100k_base for GPT-4).
+            max_chunking_level: Deepest markdown header level that creates
+                a new chunk boundary (default 3). Headers at level >
+                max_chunking_level are kept verbatim in the body of their
+                containing section instead of becoming their own chunks.
+                Tuned to keep semantically-coherent groups together —
+                e.g., `### LDAP` with its 11 child `#### LDAP_*` keys
+                stays as one chunk that surfaces for an "LDAP" query,
+                instead of fragmenting into 12 micro-chunks none of
+                which individually outrank tangential matches.
+                See docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md.
         """
         self.max_chunk_tokens = max_chunk_tokens
         self.overlap_tokens = overlap_tokens
+        self.max_chunking_level = max_chunking_level
         self._encoding = tiktoken.get_encoding(encoding_name)
 
     def count_tokens(self, text: str) -> int:
@@ -132,14 +155,21 @@ class ArchitectureAwareChunker:
     def _chunk_markdown(self, document: LoadedDocument) -> list[DocumentChunk]:
         """Chunk a markdown or DOCX document using header-based structure.
 
+        Strips YAML front-matter before parsing. Front-matter is short
+        and keyword-dense, which makes it consistently outrank substantive
+        content under cosine similarity even though it contains no real
+        information. See docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md.
+
         Args:
             document: The loaded document (markdown or docx format).
 
         Returns:
             List of DocumentChunk objects.
         """
+        content = self._strip_front_matter(document.content)
+
         # Parse markdown structure
-        sections = self._parse_markdown_structure(document.content)
+        sections = self._parse_markdown_structure(content)
 
         # If no sections found, treat entire document as one section
         if not sections:
@@ -147,7 +177,7 @@ class ArchitectureAwareChunker:
                 Section(
                     title="",
                     level=0,
-                    content=document.content,
+                    content=content,
                     hierarchy=[],
                 )
             ]
@@ -339,8 +369,39 @@ class ArchitectureAwareChunker:
             )
         ]
 
+    def _strip_front_matter(self, content: str) -> str:
+        """Remove a leading YAML front-matter block from markdown content.
+
+        Front-matter (``---\\n<yaml>\\n---\\n``) at the very start of the
+        file is dropped. Its parsed fields (``title``, ``description``,
+        ``menu`` …) are not retained as searchable text because they
+        consistently dominate cosine similarity rankings (short, dense
+        with security-sounding keywords) without contributing substantive
+        content. If non-front-matter content present, this is a no-op.
+
+        See docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md §"Diagnosis" for the
+        empirical motivation: 4 of 8 user stories on the mastodon
+        enriched corpus had front-matter blocks as their top-1 retrieved
+        chunk, all of which an LLM judge correctly flagged as irrelevant.
+        """
+        if not content:
+            return content
+        m = self.FRONT_MATTER_PATTERN.match(content)
+        if not m:
+            return content
+        # Drop the matched front-matter region (including the closing `---`
+        # newline). Subsequent leading whitespace is also trimmed so the
+        # first markdown header sits flush at the start.
+        return content[m.end():].lstrip("\n")
+
     def _parse_markdown_structure(self, content: str) -> list[Section]:
         """Parse markdown content into sections based on headers.
+
+        Only headers at level ≤ ``self.max_chunking_level`` are treated
+        as section boundaries. Deeper headers (e.g., h4-h6) are kept
+        verbatim inside their containing section's body. This keeps
+        semantically-related sibling subsections together — see the
+        ``max_chunking_level`` docstring on ``__init__``.
 
         Args:
             content: Markdown content to parse.
@@ -349,13 +410,25 @@ class ArchitectureAwareChunker:
             List of Section objects with hierarchy information.
         """
         sections: list[Section] = []
-        hierarchy: list[str] = []  # Current hierarchy stack
+        # Track hierarchy as a level→title map so sibling headers at the
+        # same depth don't accidentally become each other's ancestors.
+        # (List-based tracking with hierarchy[:level-1] truncation is
+        # correct only when each section has a unique full path; it
+        # fails on the common pattern `## X / ### A / ### B` because
+        # hierarchy=[X, A] truncated to [:2] is still [X, A], so B
+        # incorrectly ends up at [X, A, B] instead of [X, B].)
+        hierarchy_by_level: dict[int, str] = {}
 
-        # Find all headers and their positions
+        # Find all headers AT OR ABOVE the chunking-level cap; deeper
+        # headers are intentionally left in-place inside their parent's
+        # body so a query about (e.g.) "LDAP" surfaces the whole LDAP
+        # subsection including all its `#### LDAP_*` key paragraphs.
         headers: list[tuple[int, int, str, int]] = []  # (start, end, title, level)
 
         for match in self.HEADER_PATTERN.finditer(content):
             level = len(match.group(1))  # Number of # symbols
+            if level > self.max_chunking_level:
+                continue
             title = match.group(2).strip()
             headers.append((match.start(), match.end(), title, level))
 
@@ -378,10 +451,18 @@ class ArchitectureAwareChunker:
 
         # Process each header and its content
         for i, (start, end, title, level) in enumerate(headers):
-            # Update hierarchy for this level
-            # Truncate hierarchy to parent level, then add current title
-            hierarchy = hierarchy[: level - 1]
-            hierarchy.append(title)
+            # Update hierarchy: drop any equal-or-deeper levels (they
+            # belong to previous siblings, not to this new section), then
+            # set this level's title. This handles the `### A / ### B`
+            # case correctly: when B is processed, level-3 is overwritten
+            # to "B" and any level >= 3 entries from A's subtree are
+            # dropped.
+            for stale_level in [lvl for lvl in hierarchy_by_level if lvl >= level]:
+                del hierarchy_by_level[stale_level]
+            hierarchy_by_level[level] = title
+
+            # Build the hierarchy list (in level order) for this section.
+            hierarchy = [hierarchy_by_level[lvl] for lvl in sorted(hierarchy_by_level)]
 
             # Get content until next header or end of document
             if i + 1 < len(headers):
@@ -397,7 +478,7 @@ class ArchitectureAwareChunker:
                         title=title,
                         level=level,
                         content=section_content,
-                        hierarchy=hierarchy.copy(),
+                        hierarchy=hierarchy,
                     )
                 )
 

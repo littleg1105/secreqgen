@@ -4,6 +4,7 @@ Provides a clean interface to Ollama for text generation with
 metrics tracking for thesis analysis.
 """
 
+import os
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -11,6 +12,32 @@ from typing import Optional
 import httpx
 
 from secreqgen.exceptions import GenerationError, LLMConnectionError
+
+_DEFAULT_BASE_URL = "http://localhost:11434"
+
+
+def _resolve_base_url(explicit: Optional[str]) -> str:
+    """Resolve the Ollama base URL with an explicit-arg > env-var > default precedence.
+
+    Accepts the same forms the standard Ollama clients do via OLLAMA_HOST:
+    ``host``, ``host:port``, ``http://host:port``, or ``https://host:port``.
+    Bare hosts get ``http://`` prepended and ``:11434`` appended when missing.
+
+    Pass ``explicit`` to override (e.g., tests). Leave it ``None`` to inherit
+    ``OLLAMA_HOST`` from the environment — this is what lets the DEV box
+    point at a remote GPU WORKER without code changes at call sites.
+    """
+    if explicit is not None:
+        return explicit
+    env = os.environ.get("OLLAMA_HOST", "").strip()
+    if not env:
+        return _DEFAULT_BASE_URL
+    if env.startswith(("http://", "https://")):
+        return env
+    # bare host or host:port — assume http and add default port if absent
+    if ":" not in env:
+        env = f"{env}:11434"
+    return f"http://{env}"
 
 
 @dataclass
@@ -51,7 +78,7 @@ class OllamaClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:11434",
+        base_url: Optional[str] = None,
         model_name: str = "llama3:8b",
         temperature: float = 0.1,
         max_tokens: int = 4096,
@@ -60,13 +87,16 @@ class OllamaClient:
         """Initialize the Ollama client.
 
         Args:
-            base_url: Ollama server URL (default: http://localhost:11434).
+            base_url: Ollama server URL. If ``None`` (the default), the value
+                of the ``OLLAMA_HOST`` environment variable is used, falling
+                back to ``http://localhost:11434``. Pass an explicit string
+                to override both.
             model_name: Model to use for generation (default: llama3:8b).
             temperature: Sampling temperature, lower = more focused (default: 0.1).
             max_tokens: Maximum tokens to generate (default: 4096).
             timeout: Request timeout in seconds (default: 120s for slow generation).
         """
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _resolve_base_url(base_url).rstrip("/")
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -157,6 +187,11 @@ class OllamaClient:
             "model": self.model_name,
             "prompt": prompt,
             "stream": False,
+            # think: False disables reasoning-mode preamble for thinking
+            # models (qwen3.6, deepseek-r1, etc.) that would otherwise
+            # consume num_predict on a "thinking" trace and leave the
+            # final "response" field empty. No-op for non-thinking models.
+            "think": False,
             "options": {
                 "temperature": self.temperature,
                 "num_predict": self.max_tokens,
@@ -246,6 +281,9 @@ class OllamaClient:
             "model": self.model_name,
             "messages": messages,
             "stream": False,
+            # think: False disables reasoning-mode preamble; see /api/generate
+            # variant above for full rationale.
+            "think": False,
             "options": {
                 "temperature": self.temperature,
                 "num_predict": self.max_tokens,

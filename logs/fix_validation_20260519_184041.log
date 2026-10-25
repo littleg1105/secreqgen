@@ -1,0 +1,57 @@
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — fix_validation_n1
+ 2026-05-19 18:40:41
+═══════════════════════════════════════════════════════════════
+ Model:    qwen3:30b-a3b-instruct-2507-q4_K_M
+ Label:    fix_validation_n1
+ N runs:   1 (paired)
+ Projects: mastodon
+ Outputs:  real_test_cases/<proj>/results_compare_runs_fix_validation_n1/
+
+
+═════════════════════════════════════════════════════════════
+  [fix_validation_n1] mastodon  (18:40:41)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[fix_validation_n1/mastodon] clearing vectordb
+[fix_validation_n1/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 10 chunks
+✓ Stored 10 chunks in architecture collection
+│ Total chunks in store: 10                                                    │
+[fix_validation_n1/mastodon] ingesting system context
+[fix_validation_n1/mastodon] running paired N=1 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+╭─────────────────────── Multi-Run Evaluation Pipeline ────────────────────────╮
+│ Stories: /Users/georgeg/Documents/Uni                                        │
+│ Docs/Thesis/coded_project/real_test_cases/mastodon/user_stories.json         │
+│ Ground Truth: /Users/georgeg/Documents/Uni                                   │
+│ Docs/Thesis/coded_project/real_test_cases/mastodon/ground_truth.json         │
+│ Output: /Users/georgeg/Documents/Uni                                         │
+│ Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_fix_ │
+│ validation_n1                                                                │
+│ Runs: 1                                                                      │
+│ Match Threshold: 0.85                                                        │
+│ Partial Threshold: 0.7                                                       │
+│ Model: qwen3:30b-a3b-instruct-2507-q4_K_M                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+✓ Loaded system context from system_context.yaml
+⠙ Initializing components...
+✓ Components initialized
+
+Running 1 evaluations...
+
+'(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: c2152e5b-0a99-4d93-9488-e088719a964a)')' thrown while requesting HEAD https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/modules.json
+Retrying in 1s [Retry 1/5].
+  Run 1/1 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+Validation Error: need at least 2 paired observations for paired test
+
+═══════════════════════════════════════════════════════════════
+ FIX_VALIDATION_N1 SUB-TEST DONE  (2026-05-19 20:29:15)
+  succeeded: 0
+  failed:    1
+  skipped:   0
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version fix_validation_n1
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py

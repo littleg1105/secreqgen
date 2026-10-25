@@ -1,0 +1,24 @@
+## System Context
+$system_context
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Based on the user story and system context, generate security requirements that:
+1. Address potential security risks in implementing this user story
+2. Apply OWASP ASVS and security best practices
+3. Include specific implementation guidance for the system's technology stack
+4. Map to OWASP ASVS categories where applicable
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.

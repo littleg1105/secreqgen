@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
+from pydantic import BaseModel
 from scipy import stats
 
 if TYPE_CHECKING:
@@ -520,6 +521,10 @@ def _json_safe(value: Any) -> Any:
         return value
     if isinstance(value, (int, str)) or value is None:
         return value
+    if isinstance(value, BaseModel):
+        # Pydantic v2: mode="json" coerces datetime/enum/etc. to JSON
+        # primitives; recurse through _json_safe as belt-and-braces.
+        return _json_safe(value.model_dump(mode="json"))
     if is_dataclass(value):
         return {f.name: _json_safe(getattr(value, f.name)) for f in fields(value)}
     if isinstance(value, dict):
@@ -575,3 +580,19 @@ def serialize_report(report: MultiRunReport) -> str:
         ),
     }
     return json.dumps(payload, indent=2, allow_nan=False)
+
+
+def serialize_individual_result(result: "EvaluationPipelineResult") -> str:
+    """Serialize one per-run pipeline result as JSON for qualitative audit.
+
+    Companion to ``serialize_report``. Where ``serialize_report``
+    intentionally drops the raw ``individual_results`` to keep the
+    aggregate report compact, this emits the full payload for a single
+    run: generated requirement text, retrieval context, match decisions
+    (including partial / hallucination classifications), and per-story
+    metrics. Consumers can spot-check what the model actually produced
+    and audit how the F1 numbers were derived.
+
+    Pure / no-I/O: the caller chooses where to write each run's file.
+    """
+    return json.dumps(_json_safe(result), indent=2, allow_nan=False)

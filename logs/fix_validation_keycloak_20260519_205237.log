@@ -1,0 +1,58 @@
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — fix_validation_keycloak_n2
+ 2026-05-19 20:52:38
+═══════════════════════════════════════════════════════════════
+ Model:    qwen3:30b-a3b-instruct-2507-q4_K_M
+ Label:    fix_validation_keycloak_n2
+ N runs:   2 (paired)
+ Projects: keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_fix_validation_keycloak_n2/
+
+
+═════════════════════════════════════════════════════════════
+  [fix_validation_keycloak_n2] keycloak  (20:52:38)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+═════════════════════════════════════════════════════════════
+[fix_validation_keycloak_n2/keycloak] clearing vectordb
+[fix_validation_keycloak_n2/keycloak] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+✓ Created 548 chunks
+✓ Stored 548 chunks in architecture collection
+│ Total chunks in store: 548                                                   │
+[fix_validation_keycloak_n2/keycloak] ingesting system context
+[fix_validation_keycloak_n2/keycloak] running paired N=2 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+✓ Components initialized
+
+Running 2 evaluations...
+
+  Run 2/2 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 7.000, p = 1.0000
+  Paired t-test: t = 0.177, p = 0.8642
+  Shapiro-Wilk on diffs: p = 0.4956
+  Cohen's d_z: 0.063 (negligible)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 2
+  Wilcoxon: W = 0.000, p = 0.5000
+  Paired t-test: t = 1.910, p = 0.3070
+  Cohen's d_z: 1.351 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_fix_vali
+dation_keycloak_n2/run_comparison_2026-05-19_21-07-01/multi_run_report.json
+
+═══════════════════════════════════════════════════════════════
+ FIX_VALIDATION_KEYCLOAK_N2 SUB-TEST DONE  (2026-05-19 21:07:02)
+  succeeded: 1
+  failed:    0
+  skipped:   0
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version fix_validation_keycloak_n2
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py

@@ -1,0 +1,152 @@
+=== STEP 1: content-quality judge on all 20 cells (run_001) ===
+
+[mastodon × qwen3] judging story reqs...
+  bl_rel=1.000 rg_rel=1.000 d_z=+0.000 (82s, 86 calls)
+
+[mastodon × qwen3.6] judging story reqs...
+  bl_rel=1.000 rg_rel=1.000 d_z=+0.000 (72s, 165 calls)
+
+[mastodon × gemma4] judging story reqs...
+  bl_rel=1.000 rg_rel=0.975 d_z=-0.354 (67s, 237 calls)
+
+[mastodon × mistral-sm] judging story reqs...
+  bl_rel=1.000 rg_rel=0.969 d_z=-0.725 (85s, 332 calls)
+
+[keycloak × qwen3] judging story reqs...
+  bl_rel=1.000 rg_rel=0.969 d_z=-0.504 (72s, 413 calls)
+
+[keycloak × qwen3.6] judging story reqs...
+  bl_rel=0.922 rg_rel=1.000 d_z=+0.354 (73s, 490 calls)
+
+[keycloak × gemma4] judging story reqs...
+  bl_rel=1.000 rg_rel=0.950 d_z=-0.468 (63s, 560 calls)
+
+[keycloak × mistral-sm] judging story reqs...
+  bl_rel=0.988 rg_rel=0.938 d_z=-0.570 (84s, 657 calls)
+
+[bitwarden × qwen3] judging story reqs...
+  bl_rel=1.000 rg_rel=1.000 d_z=+0.000 (75s, 738 calls)
+
+[bitwarden × qwen3.6] judging story reqs...
+  bl_rel=0.988 rg_rel=1.000 d_z=+0.354 (74s, 814 calls)
+
+[bitwarden × gemma4] judging story reqs...
+  bl_rel=0.984 rg_rel=0.963 d_z=-0.233 (67s, 885 calls)
+
+[bitwarden × mistral-sm] judging story reqs...
+  bl_rel=1.000 rg_rel=1.000 d_z=+0.000 (85s, 978 calls)
+
+[gitlab × qwen3] judging story reqs...
+  bl_rel=1.000 rg_rel=0.969 d_z=-0.504 (79s, 1063 calls)
+
+[gitlab × qwen3.6] judging story reqs...
+  bl_rel=1.000 rg_rel=0.975 d_z=-0.354 (72s, 1139 calls)
+
+[gitlab × gemma4] judging story reqs...
+  bl_rel=1.000 rg_rel=0.950 d_z=-0.354 (66s, 1210 calls)
+
+[gitlab × mistral-sm] judging story reqs...
+  bl_rel=1.000 rg_rel=0.979 d_z=-0.354 (83s, 1305 calls)
+
+[mattermost × qwen3] judging story reqs...
+  bl_rel=1.000 rg_rel=0.979 d_z=-0.540 (77s, 1390 calls)
+
+[mattermost × qwen3.6] judging story reqs...
+  bl_rel=1.000 rg_rel=1.000 d_z=+0.000 (75s, 1471 calls)
+
+[mattermost × gemma4] judging story reqs...
+  bl_rel=1.000 rg_rel=0.975 d_z=-0.540 (65s, 1542 calls)
+
+[mattermost × mistral-sm] judging story reqs...
+  bl_rel=1.000 rg_rel=0.990 d_z=-0.354 (82s, 1636 calls)
+
+Total: 1636 judge calls in 25.0 min
+
+Wrote summary: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/docs/CROSS_FAMILY_CONTENT_QUALITY_2026-05-23.md
+=== STEP 1 DONE (exit=0) ===
+=== STEP 2: re-run 4 bitwarden cells with fixed code-search path ===
+'/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden'/results_compare_runs_winning_gemma4_26b_n10_bug_pure_doc_only
+'/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden'/results_compare_runs_winning_mistral-small3_2_24b_n10_bug_pure_doc_only
+'/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden'/results_compare_runs_winning_qwen3_6_latest_n10_bug_pure_doc_only
+'/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden'/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10_bug_pure_doc_only
+Models:   ['qwen3:30b-a3b-instruct-2507-q4_K_M', 'qwen3.6:latest', 'gemma4:26b', 'mistral-small3.2:24b']
+Projects: ['bitwarden']
+N:        10
+Total cells: 4
+Estimated time per cell: 30 minutes – 5 hours depending on N and project size.
+
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260523_131045
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260523_131045/multi_run_report.json
+
+=== [qwen3.6:latest] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260523_144121
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260523_144121/multi_run_report.json
+
+=== [gemma4:26b] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260523_171126
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260523_171126/multi_run_report.json
+
+=== [mistral-small3.2:24b] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260523_182509
+  agent role uses: qwen3.6:latest
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260523_182509/multi_run_report.json
+
+All cells done. Total wall time: 525.7 min.
+=== STEP 2 DONE (exit=0) ===

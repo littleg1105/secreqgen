@@ -1,0 +1,58 @@
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — mattermost_whiff_check_n2
+ 2026-05-19 21:55:02
+═══════════════════════════════════════════════════════════════
+ Model:    qwen3:30b-a3b-instruct-2507-q4_K_M
+ Label:    mattermost_whiff_check_n2
+ N runs:   2 (paired)
+ Projects: mattermost
+ Outputs:  real_test_cases/<proj>/results_compare_runs_mattermost_whiff_check_n2/
+
+
+═════════════════════════════════════════════════════════════
+  [mattermost_whiff_check_n2] mattermost  (21:55:02)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+═════════════════════════════════════════════════════════════
+[mattermost_whiff_check_n2/mattermost] clearing vectordb
+[mattermost_whiff_check_n2/mattermost] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+✓ Created 11 chunks
+✓ Stored 11 chunks in architecture collection
+│ Total chunks in store: 11                                                    │
+[mattermost_whiff_check_n2/mattermost] ingesting system context
+[mattermost_whiff_check_n2/mattermost] running paired N=2 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+✓ Components initialized
+
+Running 2 evaluations...
+
+  Run 2/2 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 3.000, p = 0.6250
+  Paired t-test: t = -0.762, p = 0.4709
+  Shapiro-Wilk on diffs: p = 0.0202
+  Cohen's d_z: -0.269 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 2
+  Wilcoxon: W = 0.000, p = 0.5000
+  Paired t-test: t = -1.602, p = 0.3553
+  Cohen's d_z: -1.132 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_matter
+most_whiff_check_n2/run_comparison_2026-05-19_22-06-59/multi_run_report.json
+
+═══════════════════════════════════════════════════════════════
+ MATTERMOST_WHIFF_CHECK_N2 SUB-TEST DONE  (2026-05-19 22:06:59)
+  succeeded: 1
+  failed:    0
+  skipped:   0
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version mattermost_whiff_check_n2
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py

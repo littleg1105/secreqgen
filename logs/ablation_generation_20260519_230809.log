@@ -1,0 +1,57 @@
+Projects: ['mastodon', 'keycloak', 'bitwarden', 'gitlab', 'mattermost']
+Ideas:    [13, 14, 15]
+Stories per project: 3
+
+[mastodon] ingesting docs... 248 chunks
+  [mastodon/MT-US-001] idea 13 self_critique_refine ... 6 reqs (13s)
+  [mastodon/MT-US-001] idea 14 chain_of_thought ... 0 reqs (3s)
+  [mastodon/MT-US-001] idea 15 few_shot_exemplars ... 5 reqs (8s)
+  [mastodon/MT-US-002] idea 13 self_critique_refine ... 5 reqs (8s)
+  [mastodon/MT-US-002] idea 14 chain_of_thought ... 6 reqs (12s)
+  [mastodon/MT-US-002] idea 15 few_shot_exemplars ... 5 reqs (8s)
+  [mastodon/MT-US-003] idea 13 self_critique_refine ... 5 reqs (8s)
+  [mastodon/MT-US-003] idea 14 chain_of_thought ... 5 reqs (8s)
+  [mastodon/MT-US-003] idea 15 few_shot_exemplars ... 5 reqs (8s)
+[keycloak] ingesting docs... 545 chunks
+  [keycloak/KC-US-001] idea 13 self_critique_refine ... 5 reqs (9s)
+  [keycloak/KC-US-001] idea 14 chain_of_thought ... 6 reqs (12s)
+  [keycloak/KC-US-001] idea 15 few_shot_exemplars ... 5 reqs (8s)
+  [keycloak/KC-US-002] idea 13 self_critique_refine ... 5 reqs (9s)
+  [keycloak/KC-US-002] idea 14 chain_of_thought ... 6 reqs (12s)
+  [keycloak/KC-US-002] idea 15 few_shot_exemplars ... 4 reqs (7s)
+  [keycloak/KC-US-003] idea 13 self_critique_refine ... 5 reqs (9s)
+  [keycloak/KC-US-003] idea 14 chain_of_thought ... 6 reqs (11s)
+  [keycloak/KC-US-003] idea 15 few_shot_exemplars ... 4 reqs (8s)
+[bitwarden] ingesting docs... 109 chunks
+  [bitwarden/BW-US-001] idea 13 self_critique_refine ... 6 reqs (9s)
+  [bitwarden/BW-US-001] idea 14 chain_of_thought ... 0 reqs (4s)
+  [bitwarden/BW-US-001] idea 15 few_shot_exemplars ... 5 reqs (8s)
+  [bitwarden/BW-US-002] idea 13 self_critique_refine ... 5 reqs (9s)
+  [bitwarden/BW-US-002] idea 14 chain_of_thought ... 6 reqs (11s)
+  [bitwarden/BW-US-002] idea 15 few_shot_exemplars ... 5 reqs (8s)
+  [bitwarden/BW-US-003] idea 13 self_critique_refine ... 5 reqs (9s)
+  [bitwarden/BW-US-003] idea 14 chain_of_thought ... 6 reqs (12s)
+  [bitwarden/BW-US-003] idea 15 few_shot_exemplars ... 5 reqs (8s)
+[gitlab] ingesting docs... 20 chunks
+  [gitlab/GL-US-001] idea 13 self_critique_refine ... 5 reqs (7s)
+  [gitlab/GL-US-001] idea 14 chain_of_thought ... 6 reqs (9s)
+  [gitlab/GL-US-001] idea 15 few_shot_exemplars ... 5 reqs (7s)
+  [gitlab/GL-US-002] idea 13 self_critique_refine ... 5 reqs (6s)
+  [gitlab/GL-US-002] idea 14 chain_of_thought ... 5 reqs (9s)
+  [gitlab/GL-US-002] idea 15 few_shot_exemplars ... 5 reqs (7s)
+  [gitlab/GL-US-003] idea 13 self_critique_refine ... 6 reqs (8s)
+  [gitlab/GL-US-003] idea 14 chain_of_thought ... 6 reqs (9s)
+  [gitlab/GL-US-003] idea 15 few_shot_exemplars ... 5 reqs (7s)
+[mattermost] ingesting docs... 11 chunks
+  [mattermost/MM-US-001] idea 13 self_critique_refine ... 6 reqs (13s)
+  [mattermost/MM-US-001] idea 14 chain_of_thought ... 0 reqs (2s)
+  [mattermost/MM-US-001] idea 15 few_shot_exemplars ... 5 reqs (6s)
+  [mattermost/MM-US-002] idea 13 self_critique_refine ... 5 reqs (7s)
+  [mattermost/MM-US-002] idea 14 chain_of_thought ... 0 reqs (2s)
+  [mattermost/MM-US-002] idea 15 few_shot_exemplars ... 4 reqs (6s)
+  [mattermost/MM-US-003] idea 13 self_critique_refine ... 5 reqs (7s)
+  [mattermost/MM-US-003] idea 14 chain_of_thought ... 0 reqs (2s)
+  [mattermost/MM-US-003] idea 15 few_shot_exemplars ... 5 reqs (7s)
+
+Wrote /tmp/rag_ablation_generation.json
+Total wall time: 6.5 min

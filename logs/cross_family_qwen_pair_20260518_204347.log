@@ -1,0 +1,341 @@
+═══════════════════════════════════════════════════════════════
+ QWEN PAIR EXTENSION  (2026-05-18 20:43:47)
+═══════════════════════════════════════════════════════════════
+
+═══ MODEL 1/2: qwen3:30b-a3b-instruct-2507-q4_K_M (20:43:47) ═══
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — qwen3_n10
+ 2026-05-18 20:43:47
+═══════════════════════════════════════════════════════════════
+ Model:    qwen3:30b-a3b-instruct-2507-q4_K_M
+ Label:    qwen3_n10
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_qwen3_n10/
+
+
+═════════════════════════════════════════════════════════════
+  [qwen3_n10] mastodon  (20:43:47)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[qwen3_n10/mastodon] clearing vectordb
+[qwen3_n10/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 10 chunks
+✓ Stored 10 chunks in architecture collection
+│ Total chunks in store: 10                                                    │
+[qwen3_n10/mastodon] ingesting system context
+[qwen3_n10/mastodon] running paired N=10 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 3.000, p = 0.3125
+  Paired t-test: t = 1.575, p = 0.1593
+  Shapiro-Wilk on diffs: p = 0.0432
+  Cohen's d_z: 0.557 (medium)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 4.000, p = 0.0547
+  Paired t-test: t = 2.342, p = 0.0439
+  Cohen's d_z: 0.741 (medium)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_qwen3_n1
+0/run_comparison_2026-05-18_21-43-33/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [qwen3_n10] mattermost  (21:43:33)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+═════════════════════════════════════════════════════════════
+[qwen3_n10/mattermost] clearing vectordb
+[qwen3_n10/mattermost] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+✓ Created 11 chunks
+✓ Stored 11 chunks in architecture collection
+│ Total chunks in store: 11                                                    │
+[qwen3_n10/mattermost] ingesting system context
+[qwen3_n10/mattermost] running paired N=10 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+
+Running 10 evaluations...
+
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 117 column 6 (char 8035)
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 2.000, p = 0.7500
+  Paired t-test: t = -0.900, p = 0.3982
+  Shapiro-Wilk on diffs: p = 0.0006
+  Cohen's d_z: -0.318 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 9.000, p = 0.0625
+  Paired t-test: t = -2.144, p = 0.0606
+  Cohen's d_z: -0.678 (medium)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_qwen3_
+n10/run_comparison_2026-05-18_22-41-58/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [qwen3_n10] bitwarden  (22:41:59)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+═════════════════════════════════════════════════════════════
+[qwen3_n10/bitwarden] clearing vectordb
+[qwen3_n10/bitwarden] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+✓ Created 133 chunks
+✓ Stored 133 chunks in architecture collection
+│ Total chunks in store: 133                                                   │
+[qwen3_n10/bitwarden] ingesting system context
+[qwen3_n10/bitwarden] running paired N=10 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 9.000, p = 0.8438
+  Paired t-test: t = 0.323, p = 0.7565
+  Shapiro-Wilk on diffs: p = 0.9168
+  Cohen's d_z: 0.114 (negligible)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 20.000, p = 0.4922
+  Paired t-test: t = 0.986, p = 0.3497
+  Cohen's d_z: 0.312 (small)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_qwen3_n
+10/run_comparison_2026-05-18_23-39-10/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [qwen3_n10] keycloak  (23:39:10)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+═════════════════════════════════════════════════════════════
+[qwen3_n10/keycloak] clearing vectordb
+[qwen3_n10/keycloak] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+✓ Created 548 chunks
+✓ Stored 548 chunks in architecture collection
+│ Total chunks in store: 548                                                   │
+[qwen3_n10/keycloak] ingesting system context
+[qwen3_n10/keycloak] running paired N=10 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 2.000, p = 0.3750
+  Paired t-test: t = 0.881, p = 0.4074
+  Shapiro-Wilk on diffs: p = 0.3353
+  Cohen's d_z: 0.312 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 0.000, p = 0.0039
+  Paired t-test: t = 4.284, p = 0.0020
+  Cohen's d_z: 1.355 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_qwen3_n1
+0/run_comparison_2026-05-19_00-37-32/multi_run_report.json
+
+═══════════════════════════════════════════════════════════════
+ QWEN3_N10 SUB-TEST DONE  (2026-05-19 00:37:32)
+  succeeded: 4
+  failed:    0
+  skipped:   0
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version qwen3_n10
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py
+
+═══ MODEL 2/2: qwen3.6:latest (00:37:32) ═══
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — qwen36_n10
+ 2026-05-19 00:37:33
+═══════════════════════════════════════════════════════════════
+ Model:    qwen3.6:latest
+ Label:    qwen36_n10
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_qwen36_n10/
+
+
+═════════════════════════════════════════════════════════════
+  [qwen36_n10] mastodon  (00:37:33)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[qwen36_n10/mastodon] clearing vectordb
+[qwen36_n10/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 10 chunks
+✓ Stored 10 chunks in architecture collection
+│ Total chunks in store: 10                                                    │
+[qwen36_n10/mastodon] ingesting system context
+[qwen36_n10/mastodon] running paired N=10 pilot with qwen3.6:latest
+
+Running 10 evaluations...
+
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 81 column 6 (char 6810)
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 3.000, p = 0.6250
+  Paired t-test: t = -0.922, p = 0.3873
+  Shapiro-Wilk on diffs: p = 0.0060
+  Cohen's d_z: -0.326 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 16.000, p = 0.2754
+  Paired t-test: t = -1.704, p = 0.1226
+  Cohen's d_z: -0.539 (medium)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_qwen36_n
+10/run_comparison_2026-05-19_02-37-27/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [qwen36_n10] mattermost  (02:37:28)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+═════════════════════════════════════════════════════════════
+[qwen36_n10/mattermost] clearing vectordb
+[qwen36_n10/mattermost] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+✓ Created 11 chunks
+✓ Stored 11 chunks in architecture collection
+│ Total chunks in store: 11                                                    │
+[qwen36_n10/mattermost] ingesting system context
+[qwen36_n10/mattermost] running paired N=10 pilot with qwen3.6:latest
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 1.000, p = 0.5000
+  Paired t-test: t = 1.422, p = 0.1980
+  Shapiro-Wilk on diffs: p = 0.0005
+  Cohen's d_z: 0.503 (medium)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 2.000, p = 0.3750
+  Paired t-test: t = 1.012, p = 0.3379
+  Cohen's d_z: 0.320 (small)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_qwen36
+_n10/run_comparison_2026-05-19_04-33-31/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [qwen36_n10] bitwarden  (04:33:31)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+═════════════════════════════════════════════════════════════
+[qwen36_n10/bitwarden] clearing vectordb
+[qwen36_n10/bitwarden] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+✓ Created 133 chunks
+✓ Stored 133 chunks in architecture collection
+│ Total chunks in store: 133                                                   │
+[qwen36_n10/bitwarden] ingesting system context
+[qwen36_n10/bitwarden] running paired N=10 pilot with qwen3.6:latest
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 3.000, p = 0.6250
+  Paired t-test: t = 0.971, p = 0.3638
+  Shapiro-Wilk on diffs: p = 0.0317
+  Cohen's d_z: 0.343 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 9.000, p = 0.0645
+  Paired t-test: t = 2.487, p = 0.0346
+  Cohen's d_z: 0.786 (medium)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_qwen36_
+n10/run_comparison_2026-05-19_06-31-42/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [qwen36_n10] keycloak  (06:31:43)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+═════════════════════════════════════════════════════════════
+[qwen36_n10/keycloak] clearing vectordb
+[qwen36_n10/keycloak] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+✓ Created 548 chunks
+✓ Stored 548 chunks in architecture collection
+│ Total chunks in store: 548                                                   │
+[qwen36_n10/keycloak] ingesting system context
+[qwen36_n10/keycloak] running paired N=10 pilot with qwen3.6:latest
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 4.000, p = 0.8750
+  Paired t-test: t = 0.024, p = 0.9815
+  Shapiro-Wilk on diffs: p = 0.0210
+  Cohen's d_z: 0.009 (negligible)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 18.000, p = 0.6289
+  Paired t-test: t = -0.170, p = 0.8690
+  Cohen's d_z: -0.054 (negligible)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_qwen36_n
+10/run_comparison_2026-05-19_08-36-51/multi_run_report.json
+
+═══════════════════════════════════════════════════════════════
+ QWEN36_N10 SUB-TEST DONE  (2026-05-19 08:36:52)
+  succeeded: 4
+  failed:    0
+  skipped:   0
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version qwen36_n10
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py
+
+═══ QWEN PAIR EXTENSION DONE  (2026-05-19 08:36:52) ═══

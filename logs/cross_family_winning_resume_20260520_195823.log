@@ -1,0 +1,365 @@
+Models:   ['qwen3:30b-a3b-instruct-2507-q4_K_M']
+Projects: ['bitwarden', 'gitlab', 'mattermost']
+N:        10
+Total cells: 3
+Estimated time per cell: 30 minutes – 5 hours depending on N and project size.
+
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_195831
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_195831/multi_run_report.json
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [gitlab] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_205911
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/docs ... 537 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_205911/multi_run_report.json
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [mattermost] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_223415
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 97 column 6 (char 7315)
+1080 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_223415/multi_run_report.json
+
+All cells done. Total wall time: 237.0 min.
+--- BATCH 1 DONE (exit=0) ---
+Models:   ['qwen3.6:latest', 'gemma4:26b', 'mistral-small3.2:24b']
+Projects: ['mastodon', 'keycloak', 'bitwarden', 'gitlab', 'mattermost']
+N:        10
+Total cells: 15
+Estimated time per cell: 30 minutes – 5 hours depending on N and project size.
+
+
+=== [qwen3.6:latest] × [mastodon] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260520_235532
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 68 column 216 (char 5323)
+248 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260520_235532/multi_run_report.json
+
+=== [qwen3.6:latest] × [keycloak] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_022142
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak ... 545 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    [code-agent error] Unterminated string starting at: line 2 column 16 (char 17)
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_022142/multi_run_report.json
+
+=== [qwen3.6:latest] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_045413
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_045413/multi_run_report.json
+
+=== [qwen3.6:latest] × [gitlab] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_065802
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/docs ... 537 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    [code-agent error] Unterminated string starting at: line 1 column 324 (char 323)
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_065802/multi_run_report.json
+
+=== [qwen3.6:latest] × [mattermost] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_093440
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs ... JSON parsing failed (attempt 1/3): Unterminated string starting at: line 17 column 108 (char 1502)
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 40 column 6 (char 3230)
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 41 column 6 (char 3179)
+JSON parsing failed (attempt 1/3): Unterminated string starting at: line 226 column 9 (char 17892)
+1080 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_qwen3_6_latest_n10/run_comparison_20260521_093440/multi_run_report.json
+
+=== [gemma4:26b] × [mastodon] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_121009
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 78 column 6 (char 5576)
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 78 column 6 (char 5439)
+248 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_121009/multi_run_report.json
+
+=== [gemma4:26b] × [keycloak] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_132439
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak ... 545 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    [code-agent error] Unterminated string starting at: line 2 column 849 (char 850)
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_132439/multi_run_report.json
+
+=== [gemma4:26b] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_144245
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_144245/multi_run_report.json
+
+=== [gemma4:26b] × [gitlab] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_153932
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/docs ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 21 column 6 (char 1721)
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 48 column 25 (char 3397)
+537 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_153932/multi_run_report.json
+
+=== [gemma4:26b] × [mattermost] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_171258
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs ... 1080 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_gemma4_26b_n10/run_comparison_20260521_171258/multi_run_report.json
+
+=== [mistral-small3.2:24b] × [mastodon] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260521_182759
+  agent role uses: qwen3.6:latest
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 18 column 6 (char 1337)
+248 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260521_182759/multi_run_report.json
+
+=== [mistral-small3.2:24b] × [keycloak] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260521_215410
+  agent role uses: qwen3.6:latest
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 7 column 256 (char 394)
+JSON parsing failed (attempt 2/3): Expecting ',' delimiter: line 7 column 246 (char 384)
+[baseline] Failed to generate for KC-US-001: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+[rag] Failed to generate for KC-US-003: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 7 column 246 (char 384)
+545 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    [code-agent error] Unterminated string starting at: line 1 column 1462 (char 1461)
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260521_215410/multi_run_report.json
+
+=== [mistral-small3.2:24b] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260522_014559
+  agent role uses: qwen3.6:latest
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 109 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260522_014559/multi_run_report.json
+
+=== [mistral-small3.2:24b] × [gitlab] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260522_045041
+  agent role uses: qwen3.6:latest
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/docs ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 18 column 6 (char 1258)
+537 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/gitlab/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260522_045041/multi_run_report.json
+
+=== [mistral-small3.2:24b] × [mattermost] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260522_081321
+  agent role uses: qwen3.6:latest
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs ... 1080 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_winning_mistral-small3_2_24b_n10/run_comparison_20260522_081321/multi_run_report.json
+
+All cells done. Total wall time: 2139.4 min.
+--- BATCH 2 DONE (exit=0) ---

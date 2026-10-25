@@ -1,0 +1,18 @@
+Models:   ['qwen3:30b-a3b-instruct-2507-q4_K_M']
+Projects: ['mastodon']
+N:        2
+Total cells: 1
+Estimated time per cell: 30 minutes – 5 hours depending on N and project size.
+
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [mastodon] N=2 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_smoke_qwen3_30b-a3b-instruct-2507-q4_K_M_n2/run_comparison_20260520_125646
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... 248 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 2 paired baseline+RAG evaluations...
+    run 1/2 complete
+    run 2/2 complete
+  ✓ 2/2 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_smoke_qwen3_30b-a3b-instruct-2507-q4_K_M_n2/run_comparison_20260520_125646/multi_run_report.json
+
+All cells done. Total wall time: 15.6 min.

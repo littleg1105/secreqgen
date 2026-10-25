@@ -1,0 +1,274 @@
+Models:   ['qwen3:30b-a3b-instruct-2507-q4_K_M']
+Projects: ['mastodon']
+N:        2
+Total cells: 1
+Estimated time per cell: 30 minutes – 5 hours depending on N and project size.
+
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [mastodon] N=2 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_smoke_qwen3_30b-a3b-instruct-2507-q4_K_M_n2/run_comparison_20260520_122952
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-001: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-002: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-003: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-004: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-005: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-006: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-007: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-008: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-001: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-002: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-003: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-004: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-005: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-006: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-007: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+[rag] Failed to generate for MT-US-008: 'Idea19Retriever' object has no attribute 'format_result_for_prompt'
+248 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 2 paired baseline+RAG evaluations...
+    [code-search error on pattern '(register|signup|create_account).*?(email|password)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'email.*?(verify|verification)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'username.*?valid': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'upload\\w*|attach\\w*|process\\w*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'transcode\\w*|convert\\w*|encode\\w*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'alt\\w*|description\\w*|text\\w*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'setVisibility\\s*\\(|"visibility"\\)|"access_control"': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'isAuthorized\\s*\\(|"can_view_post"|"check_permission"': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'timelineFilter\\s*\\(|"exclude_unlisted"|"filter_posts_by_visibility"': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'fetch\\s*\\w*\\s*\\([^)]*\\s*url\\s*[^)]*\\)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'oembed\\s*|\\s*oEmbed\\s*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'sanitize\\s*\\w*\\s*\\([^)]*\\s*html\\s*[^)]*\\)|\\s*strip\\s*\\w*\\s*\\([^)]*\\s*html\\s*[^)]*\\)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'ldap.*(config|server|client)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'auth.*(ldap|login)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'ldap.*(attribute|mapping)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'OIDC.*(Provider|Config)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'OAuth.*(Flow|Redirect)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'validate.*(Token|OIDC)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'ActivityPub.*(follow|request)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'federat.*(search|user|instance)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'timeline.*(remote|federat)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern '(review|moderate|report).*?(user|content)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'suspend.*?user': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern '(remove|delete).*?(content|post)': [Errno 2] No such file or directory: 'rg']
+    run 1/2 complete
+    [code-search error on pattern 'register|signup|create_account': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'verify_email|email_verification|verify_account': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'validate_username|username_validation': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'upload\\w*|attach\\w*|process\\w*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'transcode\\w*|convert\\w*|encode\\w*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'alt\\w*|description\\w*|text\\w*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern '(public|followers_only|direct_message|unlisted)_post': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'timeline.*(filter|restrict)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'access_control': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'fetch\\s*[\\w\\s]*url': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'oembed\\s*[\\w\\s]*': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'sanitize\\s*[\\w\\s]*html': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'ldap.*(config|configure|connection)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'auth.*(ldap|directory)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'ldap.*(attribute|mapping)': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'OIDC|OpenIDConnect': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'oauth|redirect_uri|authorization_code': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'validate_token|jwt|access_token': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'ActivityPub': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'federation': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'remote_user': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'moderation': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'suspend': [Errno 2] No such file or directory: 'rg']
+    [code-search error on pattern 'logModeration': [Errno 2] No such file or directory: 'rg']
+    run 2/2 complete
+  ✓ 2/2 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_smoke_qwen3_30b-a3b-instruct-2507-q4_K_M_n2/run_comparison_20260520_122952/multi_run_report.json
+
+All cells done. Total wall time: 6.7 min.

@@ -470,3 +470,143 @@ class TestSimpleRetrieverBuildQueryFromStory:
         assert "I want something" in query
         # Should NOT have "Acceptance criteria:" since list is empty
         assert "Acceptance criteria:" not in query
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-19 regression tests — see docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md
+#
+# Background: the original 0.7 similarity_threshold in RetrievalConfig
+# caused every RAG query in the qwen3 N=20 baseline, qwen3.6 N=10
+# sub-test, and cross-family N=10 matrix to fall back to the
+# "No relevant security documentation found." whiff string. The bug
+# was caught only after the Option B raw-outputs patch surfaced the
+# retrieval_context field. These tests prevent recurrence.
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestSimilarityFormula:
+    """Unit-level guard for the L2-distance to cosine-similarity formula.
+
+    Chroma's default ``hnsw:space="l2"`` returns squared L2 distance.
+    For unit-normalized vectors, squared_L2 = 2(1 - cos), so cos = 1 - d/2.
+    This test pins the formula in vectorstore.QueryResult.similarity.
+    """
+
+    @pytest.mark.parametrize(
+        "distance, expected_cos",
+        [
+            (0.0,  1.0),    # identical vectors
+            (1.0,  0.5),    # cos = 0.5 (mild correlation)
+            (2.0,  0.0),    # orthogonal-equivalent for normalized
+            (4.0,  0.0),    # clamped (worst case)
+            (0.828, 0.586), # the keycloak OIDC top-hit observed in the 2026-05-19 audit
+        ],
+    )
+    def test_cosine_recovery_from_squared_l2(self, distance, expected_cos):
+        from secreqgen.retrieval.vectorstore import QueryResult
+        r = QueryResult(
+            chunk_id="x",
+            content="x",
+            source_document="x",
+            section_hierarchy=[],
+            distance=distance,
+        )
+        assert abs(r.similarity - expected_cos) < 1e-3, (
+            f"Similarity formula regression: distance={distance} → "
+            f"got {r.similarity:.4f}, expected ≈ {expected_cos:.4f}. "
+            "Check QueryResult.similarity in vectorstore.py."
+        )
+
+
+class TestRetrievalThresholdRegression:
+    """End-to-end test that would have caught the 2026-05-19 audit failure.
+
+    Marked ``slow`` because it spins up the real sentence-transformers
+    embedder (loads ~420MB model). Skipped by default in fast CI runs;
+    enable with ``pytest -m slow``.
+    """
+
+    @pytest.mark.slow
+    def test_relevant_query_does_not_whiff(self, tmp_path):
+        """Querying for 'authentication' against a populated corpus
+        about authentication MUST return chunks, not the whiff string.
+
+        Before the 2026-05-19 fix (threshold = 0.7), this test would
+        have failed — every single query in every cell of the 16-cell
+        cross-family matrix returned 'No relevant security
+        documentation found.' Threshold lowered to 0.4 based on
+        empirical similarity distributions for all-mpnet-base-v2.
+        """
+        from secreqgen.ingestion.chunker import DocumentChunk
+        from secreqgen.ingestion.embedder import DocumentEmbedder
+        from secreqgen.ingestion.metadata import DocumentType
+        from secreqgen.retrieval.retriever import SimpleRetriever
+        from secreqgen.retrieval.vectorstore import SecReqGenVectorStore
+        from secreqgen.config import SecReqGenConfig
+
+        # Build a tiny corpus of clearly authentication-related chunks
+        docs = [
+            "Authentication: users must verify their identity using "
+            "passwords or multi-factor authentication tokens before "
+            "accessing protected resources.",
+            "Password storage: passwords must be hashed using bcrypt "
+            "or Argon2 with a unique salt per user. Plaintext "
+            "passwords must never be stored or logged.",
+            "Session management: session tokens must be cryptographically "
+            "random, have a finite expiration, and be invalidated on "
+            "logout to prevent session fixation attacks.",
+            # A clearly off-topic chunk to verify it does NOT get pulled
+            "Database backups must be encrypted at rest and stored in "
+            "geographically separate locations from the primary store.",
+        ]
+        chunks = [
+            DocumentChunk(
+                chunk_id=f"test-chunk-{i}",
+                content=text,
+                source_document="test-corpus.md",
+                section_hierarchy=[f"Section {i}"],
+                chunk_index=i,
+                token_count=len(text.split()),
+                metadata={},
+            )
+            for i, text in enumerate(docs)
+        ]
+
+        embedder = DocumentEmbedder()
+        embeddings = embedder.embed_texts(docs)
+
+        vs = SecReqGenVectorStore(persist_directory=tmp_path / "vs")
+        vs.add_chunks(chunks, embeddings, DocumentType.ARCHITECTURE)
+
+        cfg = SecReqGenConfig()
+        # Sanity-check the default we're shipping
+        assert cfg.retrieval.similarity_threshold <= 0.5, (
+            "RetrievalConfig.similarity_threshold > 0.5 — this threshold "
+            "is too aggressive for all-mpnet-base-v2 cosine similarities "
+            "(see docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md). Relevant "
+            "content typically scores 0.45-0.65 cosine."
+        )
+
+        retriever = SimpleRetriever(
+            vs, embedder,
+            top_k=cfg.retrieval.top_k,
+            similarity_threshold=cfg.retrieval.similarity_threshold,
+        )
+
+        result = retriever.retrieve("authentication and password security")
+        context = retriever.format_context(result.chunks)
+
+        # The core regression check: must NOT fall back to the whiff string
+        assert "No relevant security documentation found" not in context, (
+            f"Retrieval returned the whiff fallback for an obviously "
+            f"relevant query. This is the 2026-05-19 bug pattern. "
+            f"total_retrieved={result.total_retrieved}, "
+            f"above_threshold={result.above_threshold}, "
+            f"threshold={retriever.similarity_threshold}. "
+            f"See docs/RAG_RETRIEVAL_AUDIT_2026-05-19.md."
+        )
+        # And must include real content
+        assert any(
+            "password" in c.content.lower() or "authentication" in c.content.lower()
+            for c in result.chunks
+        ), "Retrieved chunks don't contain expected content for query."

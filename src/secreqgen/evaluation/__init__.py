@@ -16,6 +16,7 @@ from secreqgen.evaluation.multi_run import (
     RunStatistics,
     build_multi_run_report,
     run_multi_evaluation,
+    serialize_individual_result,
     serialize_report,
 )
 from secreqgen.evaluation.pipeline import (
@@ -65,5 +66,6 @@ __all__ = [
     "RunStatistics",
     "build_multi_run_report",
     "run_multi_evaluation",
+    "serialize_individual_result",
     "serialize_report",
 ]

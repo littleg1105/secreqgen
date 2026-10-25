@@ -1194,6 +1194,7 @@ def evaluate_compare_runs(
         EvaluationPipeline,
         build_multi_run_report,
         run_multi_evaluation,
+        serialize_individual_result,
         serialize_report,
     )
     from secreqgen.exceptions import GenerationError, LLMConnectionError
@@ -1347,6 +1348,19 @@ def evaluate_compare_runs(
         report_json = serialize_report(report)
         json_path = run_dir / "multi_run_report.json"
         json_path.write_text(report_json, encoding="utf-8")
+
+        # Persist the raw per-run payloads (generated text, retrieval
+        # context, match records) for qualitative audit. serialize_report
+        # intentionally drops these to keep the aggregate file small; this
+        # is the side-channel for spot-checking the F1 numbers and
+        # examining what the model actually produced.
+        raw_runs_dir = run_dir / "raw_runs"
+        raw_runs_dir.mkdir(parents=True, exist_ok=True)
+        for idx, result in enumerate(individual_results, start=1):
+            raw_path = raw_runs_dir / f"run_{idx:03d}.json"
+            raw_path.write_text(
+                serialize_individual_result(result), encoding="utf-8"
+            )
 
         console.print(
             f"\n[bold]Multi-Run Summary{' (PILOT)' if pilot else ''}[/bold]\n"

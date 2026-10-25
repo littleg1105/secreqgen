@@ -2,12 +2,200 @@
 
 ## Project Status
 - **Current Phase**: 5 - Real-World Testing (IN PROGRESS)
-- **Current Step**: RAG pipeline fixes implemented, improved from -31% to +15%
+- **Current Step**: Full 10-project evaluation complete, analyzing results
 - **Last Updated**: 2026-01-01
 
 ---
 
 ## Phase 5: Real-World Testing
+
+### 2026-01-01 Full 10-Project Evaluation and Analysis
+
+**Files**:
+- `/real_test_cases/*/results_v3/` - Evaluation results for all 10 projects
+- `docs/log.md` - This analysis
+
+**What**: Ran evaluation pipeline on all 10 real-world projects with fixed RAG pipeline (threshold=0.80)
+
+**Results Summary**:
+
+| Project | Baseline F1 | RAG F1 | Improvement | Target Met? |
+|---------|-------------|--------|-------------|-------------|
+| **bitwarden** | 0.00% | 8.00% | +100.0% | ✓ |
+| discourse | 0.00% | 0.00% | +0.0% | ✗ |
+| gitlab | 4.88% | 3.92% | -19.6% | ✗ |
+| **grafana** | 5.41% | 7.69% | +42.3% | ✓ |
+| **joomla** | 4.88% | 7.69% | +57.7% | ✓ |
+| keycloak | 4.65% | 4.08% | -12.2% | ✗ |
+| mastodon | 9.09% | 7.84% | -13.7% | ✗ |
+| mattermost | 14.63% | 4.35% | -70.3% | ✗ |
+| nextcloud | 0.00% | 0.00% | +0.0% | ✗ |
+| **strapi** | 0.00% | 4.65% | +100.0% | ✓ |
+
+**Summary**: 4/10 projects met 20% improvement target, 6/10 did not.
+
+---
+
+### Manual Analysis of Edge Cases
+
+#### 1. Mattermost: -70.3% (RAG Hurt Performance)
+
+**Root Cause**: RAG generates more requirements (34 vs 21) but with LOWER precision.
+
+**Ground Truth Style** (CVE-specific):
+```
+"OAuth state parameter must be cryptographically random and validated on callback.
+State parameter bypass must be prevented (CVE-2025-12419)"
+```
+
+**RAG Generated** (generic):
+```
+"Validate OIDC authentication tokens to prevent token tampering and replay attacks"
+```
+
+**Problem**: RAG produces broader coverage but vaguer wording. Ground truth expects specific CVE mitigations, RAG gives generic OWASP guidance.
+
+**Metrics Detail**:
+- Baseline: 3 TP, 16 FP, 2 partial → 14.63% F1
+- RAG: 1 TP, 27 FP, 6 partial → 4.35% F1
+- RAG's additional partial matches (6 vs 2) don't compensate for lost TPs
+
+#### 2. Nextcloud: 0% F1 (Both Modes Failed)
+
+**Root Cause**: Strict threshold. All matches fall in 0.70-0.76 range (below 0.80).
+
+**Partial Matches Found**:
+| Generated | Ground Truth | Similarity |
+|-----------|--------------|------------|
+| "Password Protection for File Sharing Links" | "Share Link Brute Force Protection" | 0.700 |
+| "Secure User Authentication for External Storage" | "Storage Credential Encryption" | 0.754 |
+| "Backup Codes Available for Recovery" | "Backup Code Single Use" | 0.756 |
+
+**Problem**: Semantic equivalence not captured at 0.80 threshold. Generated requirements are conceptually correct but worded differently than CVE-derived ground truth.
+
+#### 3. Bitwarden: +100% (Best Performer)
+
+**Apparent Success**: RAG got 2 TPs vs baseline's 0 TPs.
+
+**Key Insight**: Success likely comes from **prompt engineering**, not KB retrieval.
+
+**Evidence**:
+- KB search for "bitwarden PBKDF2" returns **0 chunks**
+- KB contains only Keycloak server docs (571 chunks)
+- Yet RAG generated: "PBKDF2-SHA256 with minimum 600,000 iterations"
+
+**Why It Worked**:
+1. Prompt examples explicitly mention "600,000 iterations" as documentation-derived example
+2. LLM's training data includes bitwarden's public documentation
+3. Security keyword extraction added "PBKDF2", "Argon2" to query
+
+**Concern**: This isn't true RAG benefit - it's prompt engineering + LLM training data.
+
+#### 4. Discourse: 0% F1 (Both Modes Failed)
+
+Similar to Nextcloud. Partial matches exist but fall below threshold.
+
+---
+
+### Key Findings
+
+1. **Threshold Sensitivity**: 0.80 threshold is too strict for many project's ground truth styles. Lowering to 0.75 would capture more semantically equivalent matches.
+
+2. **Ground Truth Variability**: CVE-derived ground truth varies in specificity:
+   - Some are highly specific (exact parameters, CVE numbers)
+   - Some are conceptual (security control categories)
+   - A single threshold can't capture both styles
+
+3. **RAG Without Relevant KB**: The KB (571 chunks) contains primarily Keycloak server config docs. For most projects, RAG retrieves irrelevant content, which may explain why RAG hurts performance in 3/10 cases.
+
+4. **Prompt Engineering Dominance**: The improvements seen (bitwarden, strapi) may come from:
+   - Stronger "You MUST use" instructions
+   - Prompt examples with specific parameters
+   - Security keyword extraction
+   - NOT from retrieved context
+
+5. **Quantity vs Quality Tradeoff**: RAG consistently generates MORE requirements (avg 33 vs 23), but more isn't always better - it increases FP count.
+
+---
+
+### Decisions
+
+1. **Lower threshold for thesis**: Use 0.75 instead of 0.80 for final evaluation
+2. **Report honest findings**: RAG helps some projects, hurts others
+3. **Analyze KB relevance**: Need project-specific KB content for meaningful RAG
+4. **Consider per-project thresholds**: Different ground truth styles need different thresholds
+
+**Next**:
+- Run threshold sensitivity analysis across all projects
+- Ingest project-specific security docs into KB
+- Consider LLM-as-Judge verification to filter low-quality RAG output
+
+---
+
+### 2026-01-01 Isolated Per-Project Evaluation (Corrected Methodology)
+
+**Files**:
+- `/real_test_cases/run_isolated_evaluation.py` - New evaluation script
+- `/real_test_cases/*/results_isolated/` - Isolated evaluation results
+- `/real_test_cases/isolated_evaluation_summary.json` - Summary
+
+**What**: Fixed critical methodology flaw - previous runs used shared KB (Keycloak docs for all projects). Now each project is evaluated with ONLY its own documentation.
+
+**Methodology**:
+1. Clear KB before each project
+2. Ingest only that project's system_context.yaml
+3. Ingest project docs if available (from `extracted_docs_md/`)
+4. Run evaluation
+5. Repeat for next project
+
+**Results** (threshold=0.80):
+
+| Project | KB Chunks | Baseline F1 | RAG F1 | Improvement | Target? |
+|---------|-----------|-------------|--------|-------------|---------|
+| bitwarden | 0 | 0.0% | 4.3% | +100% | ✓ |
+| discourse | 0 | 0.0% | 0.0% | +0% | ✗ |
+| gitlab | 0 | 9.3% | 0.0% | -100% | ✗ |
+| grafana | 0 | 4.8% | 4.3% | -9% | ✗ |
+| joomla | 0 | 20.5% | 4.8% | -77% | ✗ |
+| **keycloak** | **548** | 13.0% | 3.6% | **-72%** | ✗ |
+| mastodon | 0 | 8.3% | 20.0% | +140% | ✓ |
+| mattermost | 0 | 15.8% | 8.7% | -45% | ✗ |
+| nextcloud | 0 | 0.0% | 3.4% | +100% | ✓ |
+| **strapi** | **23** | 0.0% | 0.0% | +0% | ✗ |
+
+**Summary**: 3/10 met 20% target, 7/10 did not.
+
+---
+
+### Critical Finding: Documentation Type Matters
+
+**The Paradox**:
+- Projects WITH docs (keycloak: 548, strapi: 23) → RAG **hurts** or no change
+- Projects WITHOUT docs (0 chunks) → 3/10 met target via prompt engineering
+
+**Root Cause**:
+The available documentation is NOT security-relevant:
+- Keycloak docs: Server configuration, TLS setup, caching, Windows service
+- Strapi docs: Permission engine, RBAC configuration
+- These are "how to configure" docs, NOT "what vulnerabilities to prevent"
+
+**When RAG Hurts**:
+1. Irrelevant context distracts LLM from using training knowledge
+2. Server config docs don't contain security parameters (iteration counts, key sizes)
+3. LLM tries to ground requirements in retrieved noise
+
+**What Would Help**:
+- OWASP ASVS requirements mapped to project features
+- Security hardening guides with specific parameters
+- CVE analyses with mitigation requirements
+- Project security whitepapers (e.g., Bitwarden's security whitepaper)
+
+**Decisions**:
+1. **Report honest findings**: Current docs don't help RAG
+2. **For thesis**: Compare "prompt engineering only" vs "baseline"
+3. **Future work**: Curate security-specific KB content
+
+---
 
 ### 2026-01-01 RAG Pipeline Diagnosis and Fix
 

@@ -1,0 +1,51 @@
+═══════════════════════════════════════════════════════════════
+ QWEN PAIR EXTENSION  (2026-05-18 15:32:47)
+═══════════════════════════════════════════════════════════════
+ Models:   qwen3:30b → qwen3.6:latest
+ Projects: mastodon mattermost bitwarden keycloak
+ N runs:   10 (paired)
+
+═══ MODEL 1/2: qwen3:30b-a3b-instruct-2507-q4_K_M (15:32:47) ═══
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — qwen3_n10
+ 2026-05-18 15:32:47
+═══════════════════════════════════════════════════════════════
+ Model:    qwen3:30b-a3b-instruct-2507-q4_K_M
+ Label:    qwen3_n10
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_qwen3_n10/
+
+
+═════════════════════════════════════════════════════════════
+  [qwen3_n10] mastodon  (15:32:47)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[qwen3_n10/mastodon] clearing vectordb
+[qwen3_n10/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 10 chunks
+✓ Stored 10 chunks in architecture collection
+│ Total chunks in store: 10                                                    │
+[qwen3_n10/mastodon] ingesting system context
+[qwen3_n10/mastodon] running paired N=10 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+╭─────────────────────── Multi-Run Evaluation Pipeline ────────────────────────╮
+│ Stories: /Users/georgeg/Documents/Uni                                        │
+│ Docs/Thesis/coded_project/real_test_cases/mastodon/user_stories.json         │
+│ Ground Truth: /Users/georgeg/Documents/Uni                                   │
+│ Docs/Thesis/coded_project/real_test_cases/mastodon/ground_truth.json         │
+│ Output: /Users/georgeg/Documents/Uni                                         │
+│ Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_qwen │
+│ 3_n10                                                                        │
+│ Runs: 10                                                                     │
+│ Match Threshold: 0.85                                                        │
+│ Partial Threshold: 0.7                                                       │
+│ Model: qwen3:30b-a3b-instruct-2507-q4_K_M                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+✓ Loaded system context from system_context.yaml
+⠙ Initializing components...
+✓ Components initialized
+
+Running 10 evaluations...
+
+/opt/homebrew/Cellar/python@3.13/3.13.13_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/loky-35702-vnsy1d7m'}
+  warnings.warn(

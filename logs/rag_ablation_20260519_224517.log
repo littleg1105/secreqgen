@@ -1,0 +1,162 @@
+Projects: ['mastodon', 'keycloak', 'bitwarden', 'gitlab', 'mattermost']
+Ideas:    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] (10)
+Output:   /tmp
+
+[idea 1 baseline_threshold_fix_only] × [mastodon] chunks=400  stories=8  (9.5s)
+[idea 1 baseline_threshold_fix_only] × [keycloak] chunks=548  stories=8  (15.8s)
+[idea 1 baseline_threshold_fix_only] × [bitwarden] chunks=133  stories=8  (3.5s)
+[idea 1 baseline_threshold_fix_only] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 1 baseline_threshold_fix_only] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 2 frontmatter_strip] × [mastodon] chunks=387  stories=8  (7.4s)
+[idea 2 frontmatter_strip] × [keycloak] chunks=548  stories=8  (16.0s)
+[idea 2 frontmatter_strip] × [bitwarden] chunks=122  stories=8  (3.4s)
+[idea 2 frontmatter_strip] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 2 frontmatter_strip] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 3 h3cap_plus_hierarchy_fix] × [mastodon] chunks=248  stories=8  (6.9s)
+[idea 3 h3cap_plus_hierarchy_fix] × [keycloak] chunks=545  stories=8  (15.6s)
+[idea 3 h3cap_plus_hierarchy_fix] × [bitwarden] chunks=109  stories=8  (3.1s)
+[idea 3 h3cap_plus_hierarchy_fix] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 3 h3cap_plus_hierarchy_fix] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 4 ce_rerank_phase4] × [mastodon] chunks=248  stories=8  (8.7s)
+[idea 4 ce_rerank_phase4] × [keycloak] chunks=545  stories=8  (17.2s)
+[idea 4 ce_rerank_phase4] × [bitwarden] chunks=109  stories=8  (3.9s)
+[idea 4 ce_rerank_phase4] × [gitlab] chunks=20  stories=8  (0.7s)
+[idea 4 ce_rerank_phase4] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 5 bm25_hybrid_rrf] × [mastodon] chunks=248  stories=8  (7.0s)
+[idea 5 bm25_hybrid_rrf] × [keycloak] chunks=545  stories=8  (16.1s)
+[idea 5 bm25_hybrid_rrf] × [bitwarden] chunks=109  stories=8  (3.1s)
+[idea 5 bm25_hybrid_rrf] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 5 bm25_hybrid_rrf] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 6 chunking_level_2] × [mastodon] chunks=151  stories=8  (5.8s)
+[idea 6 chunking_level_2] × [keycloak] chunks=526  stories=8  (15.4s)
+[idea 6 chunking_level_2] × [bitwarden] chunks=78  stories=8  (2.7s)
+[idea 6 chunking_level_2] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 6 chunking_level_2] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 7 chunking_level_4] × [mastodon] chunks=387  stories=8  (7.5s)
+[idea 7 chunking_level_4] × [keycloak] chunks=548  stories=8  (15.7s)
+[idea 7 chunking_level_4] × [bitwarden] chunks=122  stories=8  (3.7s)
+[idea 7 chunking_level_4] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 7 chunking_level_4] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 8 threshold_0_3] × [mastodon] chunks=248  stories=8  (6.9s)
+[idea 8 threshold_0_3] × [keycloak] chunks=545  stories=8  (15.7s)
+[idea 8 threshold_0_3] × [bitwarden] chunks=109  stories=8  (3.1s)
+[idea 8 threshold_0_3] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 8 threshold_0_3] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 9 top_k_10] × [mastodon] chunks=248  stories=8  (7.0s)
+[idea 9 top_k_10] × [keycloak] chunks=545  stories=8  (16.3s)
+[idea 9 top_k_10] × [bitwarden] chunks=109  stories=8  (3.1s)
+[idea 9 top_k_10] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 9 top_k_10] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 10 no_keyword_expansion] × [mastodon] chunks=248  stories=8  (6.9s)
+[idea 10 no_keyword_expansion] × [keycloak] chunks=545  stories=8  (16.0s)
+[idea 10 no_keyword_expansion] × [bitwarden] chunks=109  stories=8  (3.1s)
+[idea 10 no_keyword_expansion] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 10 no_keyword_expansion] × [mattermost] chunks=11  stories=8  (0.6s)
+
+Wrote /tmp/rag_ablation_retrieval.json
+Total wall time: 4.6 min
+
+Next step: run judge on each cell and aggregate.
+  Use scripts/judge_retrieval_quality.py with --output, OR
+  use scripts/rag_ablation_judge.py (which reads /tmp/rag_ablation_retrieval.json and judges all cells)
+
+=== retrieval done, starting judge ===
+Loaded 50 (idea × project) cells from /tmp/rag_ablation_retrieval.json
+Judge model: llama3:8b
+  [ 1/50] idea1/mastodon                       chunks= 28  P@k=0.20/0.40  top1=1/8  (32.0s)
+  [ 2/50] idea1/keycloak                       chunks= 40  P@k=0.22/0.49  top1=3/8  (55.0s)
+  [ 3/50] idea1/bitwarden                      chunks= 36  P@k=0.33/0.55  top1=3/8  (47.2s)
+  [ 4/50] idea1/gitlab                         chunks=  2  P@k=0.00/0.03  top1=0/8  (2.3s)
+  [ 5/50] idea1/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [ 6/50] idea2/mastodon                       chunks= 21  P@k=0.24/0.43  top1=1/8  (25.5s)
+  [ 7/50] idea2/keycloak                       chunks= 40  P@k=0.22/0.47  top1=3/8  (56.5s)
+  [ 8/50] idea2/bitwarden                      chunks= 36  P@k=0.33/0.55  top1=3/8  (45.8s)
+  [ 9/50] idea2/gitlab                         chunks=  2  P@k=0.00/0.03  top1=0/8  (2.3s)
+  [10/50] idea2/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [11/50] idea3/mastodon                       chunks= 25  P@k=0.38/0.56  top1=2/8  (29.5s)
+  [12/50] idea3/keycloak                       chunks= 40  P@k=0.22/0.47  top1=3/8  (55.0s)
+  [13/50] idea3/bitwarden                      chunks= 36  P@k=0.30/0.56  top1=3/8  (48.9s)
+  [14/50] idea3/gitlab                         chunks=  2  P@k=0.00/0.03  top1=0/8  (2.3s)
+  [15/50] idea3/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [16/50] idea4/mastodon                       chunks= 25  P@k=0.43/0.59  top1=3/8  (29.5s)
+  [17/50] idea4/keycloak                       chunks= 40  P@k=0.35/0.55  top1=4/8  (54.3s)
+  [18/50] idea4/bitwarden                      chunks= 36  P@k=0.53/0.70  top1=6/8  (46.3s)
+  [19/50] idea4/gitlab                         chunks=  2  P@k=0.00/0.00  top1=0/8  (2.4s)
+  [20/50] idea4/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [21/50] idea5/mastodon                       chunks= 22  P@k=0.38/0.61  top1=5/8  (26.4s)
+  [22/50] idea5/keycloak                       chunks= 34  P@k=0.30/0.54  top1=4/8  (45.7s)
+  [23/50] idea5/bitwarden                      chunks= 36  P@k=0.55/0.73  top1=5/8  (47.1s)
+  [24/50] idea5/gitlab                         chunks= 11  P@k=0.06/0.10  top1=1/8  (12.4s)
+  [25/50] idea5/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [26/50] idea6/mastodon                       chunks= 19  P@k=0.33/0.54  top1=2/8  (25.6s)
+  [27/50] idea6/keycloak                       chunks= 40  P@k=0.17/0.46  top1=3/8  (55.6s)
+  [28/50] idea6/bitwarden                      chunks= 38  P@k=0.28/0.60  top1=2/8  (52.8s)
+  [29/50] idea6/gitlab                         chunks=  2  P@k=0.00/0.03  top1=0/8  (2.3s)
+  [30/50] idea6/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [31/50] idea7/mastodon                       chunks= 21  P@k=0.24/0.43  top1=1/8  (24.9s)
+  [32/50] idea7/keycloak                       chunks= 40  P@k=0.22/0.47  top1=3/8  (55.2s)
+  [33/50] idea7/bitwarden                      chunks= 36  P@k=0.33/0.55  top1=3/8  (45.9s)
+  [34/50] idea7/gitlab                         chunks=  2  P@k=0.00/0.03  top1=0/8  (2.3s)
+  [35/50] idea7/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [36/50] idea8/mastodon                       chunks= 40  P@k=0.30/0.55  top1=2/8  (50.2s)
+  [37/50] idea8/keycloak                       chunks= 40  P@k=0.22/0.49  top1=3/8  (57.9s)
+  [38/50] idea8/bitwarden                      chunks= 40  P@k=0.25/0.54  top1=3/8  (56.6s)
+  [39/50] idea8/gitlab                         chunks=  7  P@k=0.03/0.16  top1=0/8  (9.0s)
+  [40/50] idea8/mattermost                     chunks=  3  P@k=0.00/0.00  top1=0/8  (4.8s)
+  [41/50] idea9/mastodon                       chunks= 37  P@k=0.34/0.54  top1=2/8  (45.7s)
+  [42/50] idea9/keycloak                       chunks= 80  P@k=0.16/0.44  top1=3/8  (114.6s)
+  [43/50] idea9/bitwarden                      chunks= 65  P@k=0.31/0.54  top1=3/8  (89.6s)
+  [44/50] idea9/gitlab                         chunks=  2  P@k=0.00/0.03  top1=0/8  (2.4s)
+  [45/50] idea9/mattermost                     chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+  [46/50] idea10/mastodon                      chunks= 31  P@k=0.29/0.57  top1=4/8  (36.8s)
+  [47/50] idea10/keycloak                      chunks= 37  P@k=0.30/0.56  top1=4/8  (50.2s)
+  [48/50] idea10/bitwarden                     chunks= 39  P@k=0.47/0.68  top1=5/8  (50.6s)
+  [49/50] idea10/gitlab                        chunks= 14  P@k=0.03/0.07  top1=1/8  (15.4s)
+  [50/50] idea10/mattermost                    chunks=  1  P@k=0.00/0.00  top1=0/8  (1.5s)
+
+Wrote /tmp/rag_ablation_judged.json
+Wrote /tmp/rag_ablation_pivot.csv
+Total wall time: 25.3 min
+
+=== P@k strict (idea × project) ===
+  idea                                 bitwarden   gitlab      keycloak    mastodon    mattermost    mean
+----------------------------------------------------------------------------------------------------
+   1 baseline_threshold_fix_only       0.33        0.00        0.22        0.20        0.00        0.15
+   2 frontmatter_strip                 0.33        0.00        0.22        0.24        0.00        0.16
+   3 h3cap_plus_hierarchy_fix          0.30        0.00        0.22        0.38        0.00        0.18
+   4 ce_rerank_phase4                  0.53        0.00        0.35        0.43        0.00        0.26
+   5 bm25_hybrid_rrf                   0.55        0.06        0.30        0.38        0.00        0.26
+   6 chunking_level_2                  0.28        0.00        0.17        0.33        0.00        0.16
+   7 chunking_level_4                  0.33        0.00        0.22        0.24        0.00        0.16
+   8 threshold_0_3                     0.25        0.03        0.22        0.30        0.00        0.16
+   9 top_k_10                          0.31        0.00        0.16        0.34        0.00        0.16
+  10 no_keyword_expansion              0.47        0.03        0.30        0.29        0.00        0.22
+
+=== P@k lenient (idea × project) ===
+  idea                                 bitwarden   gitlab      keycloak    mastodon    mattermost    mean
+----------------------------------------------------------------------------------------------------
+   1 baseline_threshold_fix_only       0.55        0.03        0.49        0.40        0.00        0.29
+   2 frontmatter_strip                 0.55        0.03        0.47        0.43        0.00        0.30
+   3 h3cap_plus_hierarchy_fix          0.56        0.03        0.47        0.56        0.00        0.33
+   4 ce_rerank_phase4                  0.70        0.00        0.55        0.59        0.00        0.37
+   5 bm25_hybrid_rrf                   0.73        0.10        0.54        0.61        0.00        0.40
+   6 chunking_level_2                  0.60        0.03        0.46        0.54        0.00        0.33
+   7 chunking_level_4                  0.55        0.03        0.47        0.43        0.00        0.30
+   8 threshold_0_3                     0.54        0.16        0.49        0.55        0.00        0.35
+   9 top_k_10                          0.54        0.03        0.44        0.54        0.00        0.31
+  10 no_keyword_expansion              0.68        0.07        0.56        0.57        0.00        0.38
+
+=== top-1 relevant (idea × project) ===
+  idea                                 bitwarden   gitlab      keycloak    mastodon    mattermost    mean
+----------------------------------------------------------------------------------------------------
+   1 baseline_threshold_fix_only       3           0           3           1           0           1.40
+   2 frontmatter_strip                 3           0           3           1           0           1.40
+   3 h3cap_plus_hierarchy_fix          3           0           3           2           0           1.60
+   4 ce_rerank_phase4                  6           0           4           3           0           2.60
+   5 bm25_hybrid_rrf                   5           1           4           5           0           3.00
+   6 chunking_level_2                  2           0           3           2           0           1.40
+   7 chunking_level_4                  3           0           3           1           0           1.40
+   8 threshold_0_3                     3           0           3           2           0           1.60
+   9 top_k_10                          3           0           3           2           0           1.60
+  10 no_keyword_expansion              5           1           4           4           0           2.80
+

@@ -1,0 +1,124 @@
+## Few-shot exemplars (anchor format, depth, and ASVS mapping)
+
+The following two examples show the level of specificity expected. The exemplars are deliberately drawn from generic ASVS practice, NOT from your project, so do not copy their content; use them to calibrate the form.
+
+### Example 1
+USER STORY: User Login with Password and 2FA
+ACCEPTANCE CRITERIA:
+- Email and password authenticate against the database
+- Password complexity rules enforced at signup
+- 2FA TOTP supported after initial password verification
+
+EXPECTED OUTPUT:
+{
+  "requirements": [
+    {
+      "id": "SR-001",
+      "user_story_id": "EXAMPLE-1",
+      "title": "Argon2id password verification",
+      "description": "Server MUST verify submitted passwords against an Argon2id hash with memory cost 19MiB, iterations 2, parallelism 1. Plaintext passwords MUST NEVER be persisted or logged. The verification timing MUST be constant-time to prevent enumeration.",
+      "rationale": "OWASP ASVS V2.4.4 requires modern memory-hard hashing; Argon2id is OWASP-recommended (RFC 9106).",
+      "acceptance_criteria": [
+        "All stored password hashes use Argon2id with the documented parameters",
+        "No plaintext password appears in application or webserver logs",
+        "Password verification timing variance under 10ms across valid and invalid inputs"
+      ],
+      "asvs_category": "V2: Authentication",
+      "priority": "critical",
+      "implementation_notes": "Use libsodium or argon2-cffi; ensure the per-password salt is at least 16 bytes from a CSPRNG.",
+      "source_references": ["OWASP ASVS v4.0.3 V2.4.4", "RFC 9106"]
+    },
+    {
+      "id": "SR-002",
+      "user_story_id": "EXAMPLE-1",
+      "title": "TOTP second factor verification",
+      "description": "After password verification, a 6-digit TOTP MUST be required. The TOTP shared secret MUST be stored encrypted at rest using AES-256-GCM with a per-secret IV. The TOTP verification window MUST be limited to ±1 step (30 seconds) and replay MUST be prevented by tracking the last accepted timestamp per user.",
+      "rationale": "OWASP ASVS V2.8 mandates a strong second factor; TOTP with encrypted seed prevents secret exfiltration.",
+      "acceptance_criteria": [
+        "TOTP secrets stored encrypted; no plaintext seed in DB",
+        "TOTP verification rejects reuse within the same 30s window",
+        "Failed-TOTP attempts rate-limited to 5 per 5 minutes per user"
+      ],
+      "asvs_category": "V2: Authentication",
+      "priority": "high",
+      "implementation_notes": "Use a TOTP library that supports last-used-timestamp tracking, e.g., pyotp with custom replay guard.",
+      "source_references": ["OWASP ASVS v4.0.3 V2.8.2", "RFC 6238"]
+    }
+  ]
+}
+
+### Example 2
+USER STORY: Comment with Attached File Upload
+ACCEPTANCE CRITERIA:
+- Users can attach images and PDFs up to 10 MB
+- Uploaded files are stored in object storage
+- Attachments are linked to comments
+
+EXPECTED OUTPUT:
+{
+  "requirements": [
+    {
+      "id": "SR-001",
+      "user_story_id": "EXAMPLE-2",
+      "title": "MIME-type allow-list with magic-byte verification",
+      "description": "Server MUST verify uploaded file MIME types against a server-side allow-list (image/png, image/jpeg, application/pdf). The Content-Type header from the client MUST be ignored; the server MUST detect the actual MIME via magic-byte inspection (e.g. libmagic) and reject files whose detected type is outside the allow-list.",
+      "rationale": "OWASP ASVS V12.2.1 — prevents content-sniffing exploits and disguised executable upload.",
+      "acceptance_criteria": [
+        "Uploaded executables (.exe, .sh, .php) renamed to .pdf are rejected",
+        "Empty files and files smaller than valid magic bytes are rejected",
+        "Allow-list MIME types stored in code/config, not derived from header"
+      ],
+      "asvs_category": "V12: Files and Resources",
+      "priority": "critical",
+      "implementation_notes": "Use python-magic or libmagic via FFI; do NOT trust Content-Type header.",
+      "source_references": ["OWASP ASVS v4.0.3 V12.2.1"]
+    },
+    {
+      "id": "SR-002",
+      "user_story_id": "EXAMPLE-2",
+      "title": "Filename sanitization and UUID storage",
+      "description": "Uploaded filenames MUST be replaced with server-generated UUIDs (v4) before storage. The original filename may be preserved in object-storage metadata but MUST NEVER appear in filesystem paths or URLs. The storage path MUST NOT include user-controlled segments.",
+      "rationale": "OWASP ASVS V5.3.4 — prevents path traversal via crafted filenames and reduces info disclosure.",
+      "acceptance_criteria": [
+        "All stored files have UUID basenames matching ^[0-9a-f-]+$",
+        "Original filenames retrievable via metadata API but not via URL guessing",
+        "Filenames containing '../' or null bytes are rejected at upload"
+      ],
+      "asvs_category": "V5: Validation, Sanitization and Encoding",
+      "priority": "high",
+      "implementation_notes": "Generate UUIDs server-side using uuid.uuid4(); never trust client-suggested IDs.",
+      "source_references": ["OWASP ASVS v4.0.3 V5.3.4", "OWASP File Upload Cheat Sheet"]
+    }
+  ]
+}
+
+---
+
+## Now generate requirements for the actual user story below.
+
+## System Context
+$system_context
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Based on the user story and system context, generate security requirements that:
+1. Address potential security risks in implementing this user story
+2. Apply OWASP ASVS and security best practices
+3. Include specific implementation guidance for the system's technology stack
+4. Map to OWASP ASVS categories where applicable
+
+Match the level of specificity, detail, and ASVS mapping shown in the two examples — do not copy their content, but copy their form.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.

@@ -1,0 +1,160 @@
+═══════════════════════════════════════════════════════════════
+ CROSS-FAMILY SUB-TEST  (2026-05-17 14:28:02)
+═══════════════════════════════════════════════════════════════
+ Models:   gemma4:26b → mistral-small3.2:24b
+ Projects: mastodon mattermost bitwarden keycloak
+ N runs:   10 (paired)
+
+
+═══ MODEL 1/2: gemma4:26b (14:28:02) ═══
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — gemma4
+ 2026-05-17 14:28:02
+═══════════════════════════════════════════════════════════════
+ Model:    gemma4:26b
+ Label:    gemma4
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_gemma4_n10/
+
+
+═════════════════════════════════════════════════════════════
+  [gemma4] mastodon  (14:28:02)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[gemma4/mastodon] clearing vectordb
+[gemma4/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 10 chunks
+✓ Stored 10 chunks in architecture collection
+│ Total chunks in store: 10                                                    │
+[gemma4/mastodon] ingesting system context
+[gemma4/mastodon] running paired N=10 pilot with gemma4:26b
+Running 10 evaluations...
+
+[rag] Failed to generate for MT-US-001: 'str' object has no attribute 'get'
+[rag] Failed to generate for MT-US-001: 'str' object has no attribute 'get'
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 0.000, p = 0.5000
+  Paired t-test: t = 1.241, p = 0.2546
+  Shapiro-Wilk on diffs: p = 0.0000
+  Cohen's d_z: 0.439 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 13.000, p = 0.1543
+  Paired t-test: t = 2.541, p = 0.0316
+  Cohen's d_z: 0.804 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_gemma4_n
+10/run_comparison_2026-05-17_15-15-57/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [gemma4] mattermost  (15:15:57)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+═════════════════════════════════════════════════════════════
+[gemma4/mattermost] clearing vectordb
+[gemma4/mattermost] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+✓ Created 11 chunks
+✓ Stored 11 chunks in architecture collection
+│ Total chunks in store: 11                                                    │
+[gemma4/mattermost] ingesting system context
+[gemma4/mattermost] running paired N=10 pilot with gemma4:26b
+      "description": "The search engine must implement a mandatory access control (MAC) check to ensure that search results only include channels where the requesting user has explicit membership or appropriate permissions. This must apply to both active and archived channels.",
+      "rationale": "Preventing 'Insecure Direct Object Re
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 21 column 6 (char 1445)
+JSON parsing failed (attempt 2/3): Expecting ',' delimiter: line 21 column 6 (char 1600)
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 1.000, p = 0.2500
+  Paired t-test: t = -1.550, p = 0.1651
+  Shapiro-Wilk on diffs: p = 0.0022
+  Cohen's d_z: -0.548 (medium)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 1.000, p = 0.0039
+  Paired t-test: t = -5.755, p = 0.0003
+  Cohen's d_z: -1.820 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_gemma4
+_n10/run_comparison_2026-05-17_16-04-36/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [gemma4] bitwarden  (16:04:36)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+═════════════════════════════════════════════════════════════
+[gemma4/bitwarden] clearing vectordb
+[gemma4/bitwarden] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+✓ Created 133 chunks
+✓ Stored 133 chunks in architecture collection
+│ Total chunks in store: 133                                                   │
+[gemma4/bitwarden] ingesting system context
+[gemma4/bitwarden] running paired N=10 pilot with gemma4:26b
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 3.000, p = 0.6250
+  Paired t-test: t = 1.125, p = 0.2976
+  Shapiro-Wilk on diffs: p = 0.0104
+  Cohen's d_z: 0.398 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 0.000, p = 0.0020
+  Paired t-test: t = 7.445, p = 0.0000
+  Cohen's d_z: 2.354 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_gemma4_
+n10/run_comparison_2026-05-17_16-52-55/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [gemma4] keycloak  (16:52:55)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+═════════════════════════════════════════════════════════════
+[gemma4/keycloak] clearing vectordb
+[gemma4/keycloak] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+✓ Created 548 chunks
+✓ Stored 548 chunks in architecture collection
+│ Total chunks in store: 548                                                   │
+[gemma4/keycloak] ingesting system context
+[gemma4/keycloak] running paired N=10 pilot with gemma4:26b
+╭─────────────────────── Multi-Run Evaluation Pipeline ────────────────────────╮
+│ Stories: /Users/georgeg/Documents/Uni                                        │
+│ Docs/Thesis/coded_project/real_test_cases/keycloak/user_stories.json         │
+│ Ground Truth: /Users/georgeg/Documents/Uni                                   │
+│ Docs/Thesis/coded_project/real_test_cases/keycloak/ground_truth.json         │
+│ Output: /Users/georgeg/Documents/Uni                                         │
+│ Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_gemm │
+│ a4_n10                                                                       │
+│ Runs: 10                                                                     │
+│ Match Threshold: 0.85                                                        │
+│ Partial Threshold: 0.7                                                       │
+│ Model: gemma4:26b                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+✓ Loaded system context from system_context.yaml
+⠙ Initializing components...
+✓ Components initialized
+
+Running 10 evaluations...
+
+/opt/homebrew/Cellar/python@3.13/3.13.13_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/loky-39937-tv74aup9'}
+  warnings.warn(

@@ -1,0 +1,105 @@
+═══════════════════════════════════════════════════════════════
+ CROSS-FAMILY SUB-TEST  (2026-05-18 10:24:22)
+═══════════════════════════════════════════════════════════════
+ Models:   gemma4:26b → mistral-small3.2:24b
+ Projects: mastodon mattermost bitwarden keycloak
+ N runs:   10 (paired)
+
+
+═══ MODEL 1/2: gemma4:26b (10:24:22) ═══
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — gemma4
+ 2026-05-18 10:24:23
+═══════════════════════════════════════════════════════════════
+ Model:    gemma4:26b
+ Label:    gemma4
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_gemma4_n10/
+
+[gemma4/mastodon] skip — /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_gemma4_n10 exists (FORCE=1 to redo)
+[gemma4/mattermost] skip — /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_gemma4_n10 exists (FORCE=1 to redo)
+[gemma4/bitwarden] skip — /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_gemma4_n10 exists (FORCE=1 to redo)
+[gemma4/keycloak] skip — /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_gemma4_n10 exists (FORCE=1 to redo)
+
+═══════════════════════════════════════════════════════════════
+ GEMMA4 SUB-TEST DONE  (2026-05-18 10:24:23)
+  succeeded: 0
+  failed:    0
+  skipped:   4
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version gemma4
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py
+
+
+═══ MODEL 2/2: mistral-small3.2:24b (10:24:23) ═══
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — mistral_small_32
+ 2026-05-18 10:24:23
+═══════════════════════════════════════════════════════════════
+ Model:    mistral-small3.2:24b
+ Label:    mistral_small_32
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_mistral_small_32_n10/
+
+[mistral_small_32/mastodon] skip — /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_mistral_small_32_n10 exists (FORCE=1 to redo)
+[mistral_small_32/mattermost] skip — /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_mistral_small_32_n10 exists (FORCE=1 to redo)
+[mistral_small_32/bitwarden] skip — /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_mistral_small_32_n10 exists (FORCE=1 to redo)
+
+═════════════════════════════════════════════════════════════
+  [mistral_small_32] keycloak  (10:24:23)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+═════════════════════════════════════════════════════════════
+[mistral_small_32/keycloak] clearing vectordb
+[mistral_small_32/keycloak] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+✓ Created 548 chunks
+✓ Stored 548 chunks in architecture collection
+│ Total chunks in store: 548                                                   │
+[mistral_small_32/keycloak] ingesting system context
+[mistral_small_32/keycloak] running paired N=10 pilot with mistral-small3.2:24b
+│ Partial Threshold: 0.7                                                       │
+│ Model: mistral-small3.2:24b                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+✓ Loaded system context from system_context.yaml
+⠙ Initializing components...
+✓ Components initialized
+
+Running 10 evaluations...
+
+[baseline] Failed to generate for KC-US-001: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+[baseline] Failed to generate for KC-US-002: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+[baseline] Failed to generate for KC-US-003: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+[baseline] Failed to generate for KC-US-004: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+[baseline] Failed to generate for KC-US-005: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+[baseline] Failed to generate for KC-US-006: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+[baseline] Failed to generate for KC-US-007: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+/opt/homebrew/Cellar/python@3.13/3.13.13_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/loky-21209-brfo67fa'}
+  warnings.warn(
+/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/scripts/run_cross_model_pilot.sh: line 109: 21209 Terminated: 15          poetry run secreqgen evaluate compare-runs "$US" "$GT" --runs "$N" --context "$CTX" --model "$MODEL" --output "$OUT" 2>&1
+     21210 Done                    | tail -25
+
+═══════════════════════════════════════════════════════════════
+ MISTRAL_SMALL_32 SUB-TEST DONE  (2026-05-18 11:40:06)
+  succeeded: 0
+  failed:    1
+  skipped:   3
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version mistral_small_32
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py
+
+═══════════════════════════════════════════════════════════════
+ CROSS-FAMILY SUB-TEST DONE  (2026-05-18 11:40:06)
+═══════════════════════════════════════════════════════════════
+Next: PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py

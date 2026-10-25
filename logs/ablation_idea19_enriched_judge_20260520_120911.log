@@ -1,0 +1,29 @@
+Loaded 2 (idea × project) cells from /tmp/rag_ablation_idea19_enriched.json
+Judge model: llama3:8b
+  [ 1/2] idea19/gitlab                        chunks= 57  P@k=0.29/0.62  nDCG@5=0.90  top1=3/8  (68.6s)
+  [ 2/2] idea19/mattermost                    chunks= 52  P@k=0.28/0.60  nDCG@5=0.86  top1=0/8  (61.5s)
+
+Wrote /tmp/rag_ablation_idea19_enriched_judged.json
+Wrote /tmp/rag_ablation_idea19_enriched_pivot.csv
+Total wall time: 2.2 min
+
+=== P@k strict (idea × project) ===
+  idea                                 gitlab      mattermost    mean
+----------------------------------------------------------------------------------------------------
+  19 hybrid_doc_code_agent             0.29        0.28        0.29
+
+=== P@k lenient (idea × project) ===
+  idea                                 gitlab      mattermost    mean
+----------------------------------------------------------------------------------------------------
+  19 hybrid_doc_code_agent             0.62        0.60        0.61
+
+=== nDCG@5 (idea × project) ===
+  idea                                 gitlab      mattermost    mean
+----------------------------------------------------------------------------------------------------
+  19 hybrid_doc_code_agent             0.90        0.86        0.88
+
+=== top-1 relevant (idea × project) ===
+  idea                                 gitlab      mattermost    mean
+----------------------------------------------------------------------------------------------------
+  19 hybrid_doc_code_agent             3           0           1.50
+

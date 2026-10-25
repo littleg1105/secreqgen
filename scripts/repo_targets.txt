@@ -1,0 +1,75 @@
+# Target GitHub repos for the SecReqGen thesis-evaluation dataset.
+#
+# Diverse selection across application categories so the multi-project
+# RAG-vs-baseline analysis can generalize. Each repo must have a
+# substantial README and ideally a SECURITY.md.
+#
+# Categories (target ~3-5 per category):
+#   AUTH      identity / SSO / MFA
+#   E_COMM    e-commerce / payments
+#   COLLAB    chat / forum / collaboration
+#   FILE      file storage / sync / sharing
+#   DATA      database / analytics / search
+#   API_FW    API frameworks / gateways
+#   CMS       content management
+#   DEV_TOOL  developer tooling / CI
+#   ML_AI     ML / vector DB
+#   INFRA     infrastructure / orchestration
+#
+# Lines starting with # are ignored. One slug per line.
+
+# AUTH (identity, SSO, MFA, password mgmt)
+authelia/authelia
+authentik/authentik
+ory/kratos
+openzitadel/zitadel
+goauthentik/passbolt-api
+fusionauth/fusionauth-jwt
+
+# E_COMM
+saleor/saleor
+medusajs/medusa
+woocommerce/woocommerce
+
+# COLLAB
+zulip/zulip
+rocketchat/Rocket.Chat
+matrix-org/synapse
+
+# FILE
+nextcloud/server
+seafile/seafile
+syncthing/syncthing
+minio/minio
+
+# DATA
+elastic/elasticsearch
+ClickHouse/ClickHouse
+TimescaleDB/timescaledb
+neo4j/neo4j
+
+# API_FW
+fastify/fastify
+strapi/strapi
+django/django
+laravel/laravel
+
+# CMS
+ghost/Ghost
+wagtail/wagtail
+directus/directus
+
+# DEV_TOOL
+gitea/gitea
+woodpecker-ci/woodpecker
+sourcegraph/sourcegraph
+
+# ML_AI
+weaviate/weaviate
+chroma-core/chroma
+qdrant/qdrant
+
+# INFRA
+hashicorp/vault
+hashicorp/consul
+traefik/traefik

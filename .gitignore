@@ -77,3 +77,6 @@ docs/proposal_explanations.md
 docs/stoxoi_ergasias.md
 docs/thesis_proposal_gr.docx
 docs/thesis_proposal_gr.md
+
+# agent-council frozen specs are intentionally untracked (see conftest.py)
+.council/

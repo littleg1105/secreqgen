@@ -1,0 +1,329 @@
+═══════════════════════════════════════════════════════════════
+ CROSS-FAMILY SUB-TEST  (2026-05-17 22:22:56)
+═══════════════════════════════════════════════════════════════
+ Models:   gemma4:26b → mistral-small3.2:24b
+ Projects: mastodon mattermost bitwarden keycloak
+ N runs:   10 (paired)
+
+
+═══ MODEL 1/2: gemma4:26b (22:22:56) ═══
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — gemma4
+ 2026-05-17 22:22:56
+═══════════════════════════════════════════════════════════════
+ Model:    gemma4:26b
+ Label:    gemma4
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_gemma4_n10/
+
+
+═════════════════════════════════════════════════════════════
+  [gemma4] mastodon  (22:22:56)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[gemma4/mastodon] clearing vectordb
+[gemma4/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 10 chunks
+✓ Stored 10 chunks in architecture collection
+│ Total chunks in store: 10                                                    │
+[gemma4/mastodon] ingesting system context
+[gemma4/mastodon] running paired N=10 pilot with gemma4:26b
+Running 10 evaluations...
+
+[rag] Failed to generate for MT-US-001: 'str' object has no attribute 'get'
+[rag] Failed to generate for MT-US-001: 'str' object has no attribute 'get'
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 0.000, p = 1.0000
+  Paired t-test: t = 1.000, p = 0.3506
+  Shapiro-Wilk on diffs: p = 0.0000
+  Cohen's d_z: 0.354 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 27.000, p = 1.0000
+  Paired t-test: t = 1.682, p = 0.1268
+  Cohen's d_z: 0.532 (medium)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_gemma4_n
+10/run_comparison_2026-05-17_23-11-47/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [gemma4] mattermost  (23:11:47)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+═════════════════════════════════════════════════════════════
+[gemma4/mattermost] clearing vectordb
+[gemma4/mattermost] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+✓ Created 11 chunks
+✓ Stored 11 chunks in architecture collection
+│ Total chunks in store: 11                                                    │
+[gemma4/mattermost] ingesting system context
+[gemma4/mattermost] running paired N=10 pilot with gemma4:26b
+Running 10 evaluations...
+
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 21 column 6 (char 1502)
+JSON parsing failed (attempt 2/3): Expecting ',' delimiter: line 21 column 6 (char 1436)
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 3.000, p = 0.6250
+  Paired t-test: t = -1.361, p = 0.2158
+  Shapiro-Wilk on diffs: p = 0.0010
+  Cohen's d_z: -0.481 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 8.000, p = 0.0488
+  Paired t-test: t = -3.275, p = 0.0096
+  Cohen's d_z: -1.036 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_gemma4
+_n10/run_comparison_2026-05-17_23-59-49/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [gemma4] bitwarden  (23:59:49)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+═════════════════════════════════════════════════════════════
+[gemma4/bitwarden] clearing vectordb
+[gemma4/bitwarden] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+✓ Created 133 chunks
+✓ Stored 133 chunks in architecture collection
+│ Total chunks in store: 133                                                   │
+[gemma4/bitwarden] ingesting system context
+[gemma4/bitwarden] running paired N=10 pilot with gemma4:26b
+
+Running 10 evaluations...
+
+[baseline] Failed to generate for BW-US-005: 'str' object has no attribute 'get'
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 1.000, p = 0.5000
+  Paired t-test: t = 0.998, p = 0.3517
+  Shapiro-Wilk on diffs: p = 0.0268
+  Cohen's d_z: 0.353 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 0.000, p = 0.0020
+  Paired t-test: t = 6.701, p = 0.0001
+  Cohen's d_z: 2.119 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_gemma4_
+n10/run_comparison_2026-05-18_00-48-00/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [gemma4] keycloak  (00:48:01)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+═════════════════════════════════════════════════════════════
+[gemma4/keycloak] clearing vectordb
+[gemma4/keycloak] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+✓ Created 548 chunks
+✓ Stored 548 chunks in architecture collection
+│ Total chunks in store: 548                                                   │
+[gemma4/keycloak] ingesting system context
+[gemma4/keycloak] running paired N=10 pilot with gemma4:26b
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 1.000, p = 1.0000
+  Paired t-test: t = 0.598, p = 0.5685
+  Shapiro-Wilk on diffs: p = 0.0003
+  Cohen's d_z: 0.212 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 14.000, p = 0.3438
+  Paired t-test: t = 0.875, p = 0.4042
+  Cohen's d_z: 0.277 (small)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_gemma4_n
+10/run_comparison_2026-05-18_01-39-21/multi_run_report.json
+
+═══════════════════════════════════════════════════════════════
+ GEMMA4 SUB-TEST DONE  (2026-05-18 01:39:21)
+  succeeded: 4
+  failed:    0
+  skipped:   0
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version gemma4
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py
+
+
+═══ MODEL 2/2: mistral-small3.2:24b (01:39:22) ═══
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — mistral_small_32
+ 2026-05-18 01:39:22
+═══════════════════════════════════════════════════════════════
+ Model:    mistral-small3.2:24b
+ Label:    mistral_small_32
+ N runs:   10 (paired)
+ Projects: mastodon mattermost bitwarden keycloak
+ Outputs:  real_test_cases/<proj>/results_compare_runs_mistral_small_32_n10/
+
+
+═════════════════════════════════════════════════════════════
+  [mistral_small_32] mastodon  (01:39:22)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[mistral_small_32/mastodon] clearing vectordb
+[mistral_small_32/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 10 chunks
+✓ Stored 10 chunks in architecture collection
+│ Total chunks in store: 10                                                    │
+[mistral_small_32/mastodon] ingesting system context
+[mistral_small_32/mastodon] running paired N=10 pilot with mistral-small3.2:24b
+
+Running 10 evaluations...
+
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 116 column 6 (char 5655)
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 3.000, p = 0.3125
+  Paired t-test: t = 1.401, p = 0.2040
+  Shapiro-Wilk on diffs: p = 0.0473
+  Cohen's d_z: 0.495 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 0.000, p = 0.0020
+  Paired t-test: t = 5.421, p = 0.0004
+  Cohen's d_z: 1.714 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_mistral_
+small_32_n10/run_comparison_2026-05-18_03-59-51/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [mistral_small_32] mattermost  (03:59:52)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+═════════════════════════════════════════════════════════════
+[mistral_small_32/mattermost] clearing vectordb
+[mistral_small_32/mattermost] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mattermost/docs
+✓ Created 11 chunks
+✓ Stored 11 chunks in architecture collection
+│ Total chunks in store: 11                                                    │
+[mistral_small_32/mattermost] ingesting system context
+[mistral_small_32/mattermost] running paired N=10 pilot with mistral-small3.2:24b
+✓ Components initialized
+
+Running 10 evaluations...
+
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 0.000, p = 0.1250
+  Paired t-test: t = 2.269, p = 0.0576
+  Shapiro-Wilk on diffs: p = 0.0526
+  Cohen's d_z: 0.802 (large)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 0.000, p = 0.0020
+  Paired t-test: t = 6.955, p = 0.0001
+  Cohen's d_z: 2.200 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mattermost/results_compare_runs_mistra
+l_small_32_n10/run_comparison_2026-05-18_06-14-26/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [mistral_small_32] bitwarden  (06:14:27)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+═════════════════════════════════════════════════════════════
+[mistral_small_32/bitwarden] clearing vectordb
+[mistral_small_32/bitwarden] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data
+✓ Created 133 chunks
+✓ Stored 133 chunks in architecture collection
+│ Total chunks in store: 133                                                   │
+[mistral_small_32/bitwarden] ingesting system context
+[mistral_small_32/bitwarden] running paired N=10 pilot with mistral-small3.2:24b
+JSON parsing failed (attempt 1/3): Expecting value: line 1 column 1 (char 0)
+[baseline] Failed to generate for BW-US-003: Generation timed out after 120.0s: Consider increasing timeout or using a faster model.
+Error: timed out
+JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 17 column 72 (char 807)
+  Run 10/10 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 0.000, p = 0.0156
+  Paired t-test: t = 3.053, p = 0.0185
+  Shapiro-Wilk on diffs: p = 0.2248
+  Cohen's d_z: 1.080 (large)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 10
+  Wilcoxon: W = 0.000, p = 0.0020
+  Paired t-test: t = 7.864, p = 0.0000
+  Cohen's d_z: 2.487 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_mistral
+_small_32_n10/run_comparison_2026-05-18_08-47-12/multi_run_report.json
+
+═════════════════════════════════════════════════════════════
+  [mistral_small_32] keycloak  (08:47:12)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+═════════════════════════════════════════════════════════════
+[mistral_small_32/keycloak] clearing vectordb
+[mistral_small_32/keycloak] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak
+✓ Created 548 chunks
+✓ Stored 548 chunks in architecture collection
+│ Total chunks in store: 548                                                   │
+[mistral_small_32/keycloak] ingesting system context
+[mistral_small_32/keycloak] running paired N=10 pilot with mistral-small3.2:24b
+╭─────────────────────── Multi-Run Evaluation Pipeline ────────────────────────╮
+│ Stories: /Users/georgeg/Documents/Uni                                        │
+│ Docs/Thesis/coded_project/real_test_cases/keycloak/user_stories.json         │
+│ Ground Truth: /Users/georgeg/Documents/Uni                                   │
+│ Docs/Thesis/coded_project/real_test_cases/keycloak/ground_truth.json         │
+│ Output: /Users/georgeg/Documents/Uni                                         │
+│ Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_mist │
+│ ral_small_32_n10                                                             │
+│ Runs: 10                                                                     │
+│ Match Threshold: 0.85                                                        │
+│ Partial Threshold: 0.7                                                       │
+│ Model: mistral-small3.2:24b                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+✓ Loaded system context from system_context.yaml
+⠙ Initializing components...
+✓ Components initialized
+
+Running 10 evaluations...
+
+/opt/homebrew/Cellar/python@3.13/3.13.13_1/Frameworks/Python.framework/Versions/3.13/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/loky-95728-fb6_v0us'}
+  warnings.warn(

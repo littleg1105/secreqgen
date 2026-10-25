@@ -1,0 +1,64 @@
+Projects: ['mastodon', 'keycloak', 'bitwarden', 'gitlab', 'mattermost']
+Ideas:    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] (10)
+Output:   /tmp
+
+[idea 1 baseline_threshold_fix_only] × [mastodon] chunks=400  stories=8  (9.5s)
+[idea 1 baseline_threshold_fix_only] × [keycloak] chunks=548  stories=8  (15.6s)
+[idea 1 baseline_threshold_fix_only] × [bitwarden] chunks=133  stories=8  (3.5s)
+[idea 1 baseline_threshold_fix_only] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 1 baseline_threshold_fix_only] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 2 frontmatter_strip] × [mastodon] chunks=387  stories=8  (7.4s)
+[idea 2 frontmatter_strip] × [keycloak] chunks=548  stories=8  (15.8s)
+[idea 2 frontmatter_strip] × [bitwarden] chunks=122  stories=8  (3.4s)
+[idea 2 frontmatter_strip] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 2 frontmatter_strip] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 3 h3cap_plus_hierarchy_fix] × [mastodon] chunks=248  stories=8  (6.9s)
+[idea 3 h3cap_plus_hierarchy_fix] × [keycloak] chunks=545  stories=8  (16.0s)
+[idea 3 h3cap_plus_hierarchy_fix] × [bitwarden] chunks=109  stories=8  (3.4s)
+[idea 3 h3cap_plus_hierarchy_fix] × [gitlab] chunks=20  stories=8  (0.6s)
+[idea 3 h3cap_plus_hierarchy_fix] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 4 ce_rerank_phase4] × [mastodon] chunks=248  stories=8  (9.0s)
+[idea 4 ce_rerank_phase4] × [keycloak] chunks=545  stories=8  (17.3s)
+[idea 4 ce_rerank_phase4] × [bitwarden] chunks=109  stories=8  (3.6s)
+[idea 4 ce_rerank_phase4] × [gitlab] chunks=20  stories=8  (0.7s)
+[idea 4 ce_rerank_phase4] × [mattermost] chunks=11  stories=8  (0.6s)
+[idea 5 bm25_hybrid_rrf] × [mastodon] Traceback (most recent call last):
+  File "/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/scripts/rag_ablation_study.py", line 344, in <module>
+    main()
+    ~~~~^^
+  File "/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/scripts/rag_ablation_study.py", line 326, in main
+    result = run_idea_on_project(idea, project, embedder, vs)
+  File "/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/scripts/rag_ablation_study.py", line 284, in run_idea_on_project
+    chunks = bm25_hybrid_retrieve(
+        vs, embedder, query, all_chunks_list,
+        idea.top_k, idea.similarity_threshold, idea.rrf_k,
+    )
+  File "/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/scripts/rag_ablation_study.py", line 209, in bm25_hybrid_retrieve
+    all_chunks._bm25_index = BM25Okapi(tokens)
+    ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'list' object has no attribute '_bm25_index' and no __dict__ for setting new attributes
+
+=== retrieval done, starting judge ===
+Loaded 1 (idea × project) cells from /tmp/rag_ablation_retrieval.json
+Judge model: llama3:8b
+  [ 1/1] idea3/mastodon                       chunks= 26  P@k=0.38/0.56  top1=2/8  (31.9s)
+
+Wrote /tmp/rag_ablation_judged.json
+Wrote /tmp/rag_ablation_pivot.csv
+Total wall time: 0.5 min
+
+=== P@k strict (idea × project) ===
+  idea                                 mastodon      mean
+----------------------------------------------------------------------------------------------------
+   3 h3cap_plus_hierarchy_fix          0.38        0.38
+
+=== P@k lenient (idea × project) ===
+  idea                                 mastodon      mean
+----------------------------------------------------------------------------------------------------
+   3 h3cap_plus_hierarchy_fix          0.56        0.56
+
+=== top-1 relevant (idea × project) ===
+  idea                                 mastodon      mean
+----------------------------------------------------------------------------------------------------
+   3 h3cap_plus_hierarchy_fix          2           2.00
+

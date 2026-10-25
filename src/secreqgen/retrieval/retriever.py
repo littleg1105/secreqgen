@@ -106,6 +106,8 @@ class SimpleRetriever:
         embedder: DocumentEmbedder,
         top_k: int = 5,
         similarity_threshold: float = 0.7,
+        reranker: Optional["CrossEncoderReranker"] = None,
+        rerank_candidates: int = 30,
     ) -> None:
         """Initialize the retriever.
 
@@ -115,11 +117,19 @@ class SimpleRetriever:
             top_k: Maximum number of results to retrieve (default: 5).
             similarity_threshold: Minimum similarity score [0-1] to include
                 a result (default: 0.7). Lower = more results but less relevant.
+            reranker: Optional CrossEncoderReranker. If provided, retrieval
+                runs two stages: dense retrieves ``rerank_candidates`` chunks,
+                cross-encoder reranks them, and the top-``top_k`` are returned.
+            rerank_candidates: How many dense-stage candidates to feed the
+                reranker (default 30). Larger = better recall at the cost
+                of rerank latency.
         """
         self.vectorstore = vectorstore
         self.embedder = embedder
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
+        self.reranker = reranker
+        self.rerank_candidates = rerank_candidates
 
     def retrieve(
         self,
@@ -128,6 +138,13 @@ class SimpleRetriever:
         top_k: Optional[int] = None,
     ) -> RetrievalResult:
         """Retrieve relevant chunks for a query.
+
+        Two-stage when ``self.reranker`` is set: dense retrieves
+        ``rerank_candidates`` (default 30), cross-encoder reranks them,
+        top-``top_k`` returned. The dense-stage similarity threshold is
+        intentionally applied BEFORE rerank so the reranker doesn't waste
+        time on clearly-irrelevant candidates, but the final ranking is
+        the cross-encoder's, not cosine similarity.
 
         Args:
             query: The search query text.
@@ -153,15 +170,22 @@ class SimpleRetriever:
         # Generate query embedding
         query_embedding = self.embedder.embed_text(query)
 
-        # Query vector store
+        # Dense stage: pull a wide candidate set if a reranker is wired
+        # in, otherwise just pull top_k directly.
+        dense_n = self.rerank_candidates if self.reranker is not None else k
         results = self.vectorstore.query(
             query_embedding=query_embedding,
             doc_types=doc_types,
-            n_results=k,
+            n_results=dense_n,
         )
 
         # Filter by similarity threshold
         filtered = [r for r in results if r.similarity >= self.similarity_threshold]
+
+        # Rerank stage: cross-encoder scores (query, chunk) pairs jointly
+        # and reorders. Returns top-k by rerank score.
+        if self.reranker is not None and filtered:
+            filtered = self.reranker.rerank(query=query, candidates=filtered, top_k=k)
 
         retrieval_time_ms = (time.perf_counter() - start_time) * 1000
 

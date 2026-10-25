@@ -1,0 +1,58 @@
+[setup] reset .pth hidden flag
+═══════════════════════════════════════════════════════════════
+ CROSS-MODEL PILOT — mastodon_enriched_n2
+ 2026-05-19 21:25:26
+═══════════════════════════════════════════════════════════════
+ Model:    qwen3:30b-a3b-instruct-2507-q4_K_M
+ Label:    mastodon_enriched_n2
+ N runs:   2 (paired)
+ Projects: mastodon
+ Outputs:  real_test_cases/<proj>/results_compare_runs_mastodon_enriched_n2/
+
+
+═════════════════════════════════════════════════════════════
+  [mastodon_enriched_n2] mastodon  (21:25:26)   docs: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+═════════════════════════════════════════════════════════════
+[mastodon_enriched_n2/mastodon] clearing vectordb
+[mastodon_enriched_n2/mastodon] ingesting docs from /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+✓ Created 401 chunks
+✓ Stored 401 chunks in architecture collection
+│ Total chunks in store: 401                                                   │
+[mastodon_enriched_n2/mastodon] ingesting system context
+[mastodon_enriched_n2/mastodon] running paired N=2 pilot with qwen3:30b-a3b-instruct-2507-q4_K_M
+✓ Components initialized
+
+Running 2 evaluations...
+
+  Run 2/2 complete ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+
+Multi-Run Summary
+
+Primary inferential result (per-story F1)
+  N pairs (stories): 8
+  Wilcoxon: W = 1.000, p = 1.0000
+  Paired t-test: t = 0.886, p = 0.4048
+  Shapiro-Wilk on diffs: p = 0.0000
+  Cohen's d_z: 0.313 (small)
+
+Sensitivity result (per-run aggregate F1)
+  N pairs (runs): 2
+  Wilcoxon: W = 0.000, p = 0.5000
+  Paired t-test: t = 1.346, p = 0.4068
+  Cohen's d_z: 0.952 (large)
+
+✓ Report written to /Users/georgeg/Documents/Uni 
+Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_mastodon
+_enriched_n2/run_comparison_2026-05-19_21-38-39/multi_run_report.json
+
+═══════════════════════════════════════════════════════════════
+ MASTODON_ENRICHED_N2 SUB-TEST DONE  (2026-05-19 21:38:40)
+  succeeded: 1
+  failed:    0
+  skipped:   0
+═══════════════════════════════════════════════════════════════
+
+Next step: cross-model meta-analysis
+  PYTHONPATH=src .venv/bin/python scripts/meta_analysis.py --version mastodon_enriched_n2
+  PYTHONPATH=src .venv/bin/python scripts/cross_model_comparison.py

@@ -39,13 +39,25 @@ class QueryResult:
 
     @property
     def similarity(self) -> float:
-        """Convert distance to similarity score (1 - distance for L2).
+        """Cosine similarity derived from ChromaDB's L2-space distance.
 
-        ChromaDB uses L2 distance by default. Smaller distance = more similar.
-        For normalized vectors, L2 distance ranges from 0 (identical) to 2 (opposite).
+        Chroma's default ``hnsw:space="l2"`` returns *squared* L2 distance
+        (verified empirically 2026-05-19). For unit-normalized vectors a
+        and b: ||a - b||² = 2(1 - cos(a, b)). So cos = 1 - distance/2.
+
+        For sentence-transformers all-mpnet-base-v2 (DocumentEmbedder's
+        default), output embeddings are L2-normalized, so this formula
+        yields the true cosine similarity, in [0, 1].
+
+        Reference range on this corpus:
+          - identical paraphrase: 0.85 - 0.95
+          - strongly related: 0.55 - 0.80
+          - topical: 0.30 - 0.55
+          - unrelated: < 0.20
         """
-        # Clamp to [0, 2] and convert to [0, 1] similarity
-        return max(0.0, 1.0 - (self.distance / 2.0))
+        # Clamp to [0, 1] (out-of-range only happens if vectors aren't
+        # unit-normalized, e.g., with a different embedder).
+        return max(0.0, min(1.0, 1.0 - (self.distance / 2.0)))
 
 
 class SecReqGenVectorStore:

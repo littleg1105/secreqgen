@@ -1,0 +1,48 @@
+Models:   ['qwen3:30b-a3b-instruct-2507-q4_K_M', 'qwen3.6:latest', 'gemma4:26b', 'mistral-small3.2:24b']
+Projects: ['mastodon', 'keycloak', 'bitwarden', 'gitlab', 'mattermost']
+N:        10
+Total cells: 20
+Estimated time per cell: 30 minutes – 5 hours depending on N and project size.
+
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [mastodon] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_135010
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... 248 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_135010/multi_run_report.json
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [keycloak] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_150720
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/extracted_docs_md/keycloak ... 545 chunks
+  prompt builder: winning_prompts (/Users/georgeg/Documents/Uni Docs/Thesis/coded_project/secreqgen/data/winning_prompts)
+  running 10 paired baseline+RAG evaluations...
+    [code-agent error] Unterminated string starting at: line 2 column 763 (char 764)
+    run 1/10 complete
+    run 2/10 complete
+    run 3/10 complete
+    run 4/10 complete
+    run 5/10 complete
+    run 6/10 complete
+    run 7/10 complete
+    run 8/10 complete
+    run 9/10 complete
+    run 10/10 complete
+  ✓ 10/10 runs completed; report at /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/keycloak/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_150720/multi_run_report.json
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [bitwarden] N=10 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden/results_compare_runs_winning_qwen3_30b-a3b-instruct-2507-q4_K_M_n10/run_comparison_20260520_165105
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/bitwarden-test-data ... 

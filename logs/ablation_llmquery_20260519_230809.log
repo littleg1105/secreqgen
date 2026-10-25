@@ -1,0 +1,65 @@
+Projects: ['mastodon', 'keycloak', 'bitwarden', 'gitlab', 'mattermost']
+Ideas:    [11, 12, 16]
+Output:   /tmp/rag_ablation_llm_query.json
+
+[idea 11 hyde_query] × [mastodon] chunks=248  stories=8  (77.0s)
+[idea 11 hyde_query] × [keycloak] chunks=545  stories=8  (77.2s)
+[idea 11 hyde_query] × [bitwarden] chunks=109  stories=8  (75.8s)
+[idea 11 hyde_query] × [gitlab] chunks=20  stories=8  (76.2s)
+[idea 11 hyde_query] × [mattermost] chunks=11  stories=8  (64.1s)
+[idea 12 llm_query_rewrite] × [mastodon] chunks=248  stories=8  (21.9s)
+[idea 12 llm_query_rewrite] × [keycloak] chunks=545  stories=8  (32.6s)
+[idea 12 llm_query_rewrite] × [bitwarden] chunks=109  stories=8  (17.9s)
+[idea 12 llm_query_rewrite] × [gitlab] chunks=20  stories=8  (14.4s)
+[idea 12 llm_query_rewrite] × [mattermost] chunks=11  stories=8  (13.9s)
+[idea 16 multi_query_decompose] × [mastodon] chunks=248  stories=8  (30.4s)
+[idea 16 multi_query_decompose] × [keycloak] chunks=545  stories=8  (42.7s)
+[idea 16 multi_query_decompose] × [bitwarden] chunks=109  stories=8  (25.7s)
+[idea 16 multi_query_decompose] × [gitlab] chunks=20  stories=8  (20.9s)
+[idea 16 multi_query_decompose] × [mattermost] chunks=11  stories=8  (22.4s)
+
+Wrote /tmp/rag_ablation_llm_query.json
+Total wall time: 10.2 min
+Loaded 15 (idea × project) cells from /tmp/rag_ablation_llm_query.json
+Judge model: llama3:8b
+  [ 1/15] idea11/mastodon                      chunks= 27  P@k=0.23/0.52  top1=3/8  (32.6s)
+  [ 2/15] idea11/keycloak                      chunks= 40  P@k=0.30/0.55  top1=4/8  (53.0s)
+  [ 3/15] idea11/bitwarden                     chunks= 40  P@k=0.35/0.56  top1=5/8  (49.0s)
+  [ 4/15] idea11/gitlab                        chunks=  9  P@k=0.03/0.04  top1=1/8  (10.5s)
+  [ 5/15] idea11/mattermost                    chunks=  4  P@k=0.00/0.00  top1=0/8  (5.4s)
+  [ 6/15] idea12/mastodon                      chunks= 20  P@k=0.19/0.36  top1=3/8  (23.3s)
+  [ 7/15] idea12/keycloak                      chunks= 39  P@k=0.25/0.52  top1=3/8  (53.2s)
+  [ 8/15] idea12/bitwarden                     chunks= 31  P@k=0.55/0.67  top1=6/8  (38.5s)
+  [ 9/15] idea12/gitlab                        chunks= 16  P@k=0.00/0.10  top1=0/8  (17.9s)
+  [10/15] idea12/mattermost                    chunks=  4  P@k=0.00/0.00  top1=0/8  (5.1s)
+  [11/15] idea16/mastodon                      chunks= 25  P@k=0.25/0.55  top1=3/8  (30.8s)
+  [12/15] idea16/keycloak                      chunks= 40  P@k=0.38/0.57  top1=3/8  (52.5s)
+  [13/15] idea16/bitwarden                     chunks= 38  P@k=0.55/0.74  top1=4/8  (49.2s)
+  [14/15] idea16/gitlab                        chunks=  1  P@k=0.00/0.06  top1=0/8  (1.5s)
+  [15/15] idea16/mattermost                    chunks=  0  P@k=0.00/0.00  top1=0/8  (0.0s)
+
+Wrote /tmp/rag_ablation_llm_query_judged.json
+Wrote /tmp/rag_ablation_llm_query_pivot.csv
+Total wall time: 7.0 min
+
+=== P@k strict (idea × project) ===
+  idea                                 bitwarden   gitlab      keycloak    mastodon    mattermost    mean
+----------------------------------------------------------------------------------------------------
+  11 hyde_query                        0.35        0.03        0.30        0.23        0.00        0.18
+  12 llm_query_rewrite                 0.55        0.00        0.25        0.19        0.00        0.20
+  16 multi_query_decompose             0.55        0.00        0.38        0.25        0.00        0.24
+
+=== P@k lenient (idea × project) ===
+  idea                                 bitwarden   gitlab      keycloak    mastodon    mattermost    mean
+----------------------------------------------------------------------------------------------------
+  11 hyde_query                        0.56        0.04        0.55        0.52        0.00        0.34
+  12 llm_query_rewrite                 0.67        0.10        0.52        0.36        0.00        0.33
+  16 multi_query_decompose             0.74        0.06        0.57        0.55        0.00        0.39
+
+=== top-1 relevant (idea × project) ===
+  idea                                 bitwarden   gitlab      keycloak    mastodon    mattermost    mean
+----------------------------------------------------------------------------------------------------
+  11 hyde_query                        5           1           4           3           0           2.60
+  12 llm_query_rewrite                 6           0           3           3           0           2.40
+  16 multi_query_decompose             4           0           3           3           0           2.00
+

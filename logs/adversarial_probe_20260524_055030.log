@@ -1,0 +1,34 @@
+Models:   ['qwen3:30b-a3b-instruct-2507-q4_K_M', 'qwen3.6:latest']
+N:        5
+Adversarial project: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon_adversarial
+Docs source:         /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs
+
+
+=== [qwen3:30b-a3b-instruct-2507-q4_K_M] × [mastodon_adversarial] N=5 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon_adversarial/results_compare_runs_adversarial_qwen3_30b-a3b-instruct-2507-q4_K_M_n5/run_comparison_20260524_055033
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... JSON parsing failed (attempt 1/3): Expecting ',' delimiter: line 40 column 6 (char 3116)
+248 chunks
+  prompt builder: winning_prompts
+  running 5 paired baseline+RAG evaluations...
+    run 1/5 complete
+    run 2/5 complete
+    run 3/5 complete
+    run 4/5 complete
+    run 5/5 complete
+  ✓ 5/5 runs completed
+
+=== [qwen3.6:latest] × [mastodon_adversarial] N=5 ===
+  output: /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon_adversarial/results_compare_runs_adversarial_qwen3_6_latest_n5/run_comparison_20260524_061412
+  agent role uses: mistral-small3.2:24b
+  ingesting /Users/georgeg/Documents/Uni Docs/Thesis/coded_project/real_test_cases/mastodon/docs ... 248 chunks
+  prompt builder: winning_prompts
+  running 5 paired baseline+RAG evaluations...
+    run 1/5 complete
+    run 2/5 complete
+    run 3/5 complete
+    run 4/5 complete
+    run 5/5 complete
+  ✓ 5/5 runs completed
+
+All cells done. Total wall time: 68.0 min.
