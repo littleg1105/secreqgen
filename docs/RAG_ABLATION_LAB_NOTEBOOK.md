@@ -1374,3 +1374,70 @@ in context), `qwen3.8:27b` + `gemma4:26b`, N = 3, pre-registered primary
 contrast C vs B, blinded two-reviewer requirement-correctness review. Before
 any run: extend `analyze_idea21_vs_baseline.py` to subtract the full rendered
 prompt and to iterate over all runs.
+
+---
+
+## §14 — Study 2 pre-registration (written 2026-11-02, before any run)
+
+**Question.** On stories whose correct security requirements depend on
+project-specific, documented configuration, does giving a model the project's
+documentation produce requirements that cite that documentation's identifiers —
+and does the extract-then-cite step add anything once the passages are held
+fixed?
+
+**Design.** Three projects × 5 docs-dependent stories (`real_test_cases/study2/`;
+Mastodon = the §11 probes unchanged, Keycloak + Bitwarden new, each story with a
+fact sheet written before generation). Four arms, identical system prompt,
+exemplars and 4–6-requirement budget (`data/winning_prompts_idea21/`, repaired
+in §13), differing only in the project information supplied: **A** none ·
+**B** frozen idea-19 passages (dense + CE rerank + cross-family code-grep agent)
+· **C** the *same* frozen passages + Stage-A token extraction (idea 21, with
+non-verbatim tokens dropped) · **D** the whole documentation corpus in context
+(only where it fits an explicit `num_ctx` of 98,304 tokens without truncation —
+Mastodon ≈ 50K and Bitwarden ≈ 22K qualify, Keycloak ≈ 132K does not and is
+reported as skipped). Generators `qwen3.8:27b` and `gemma4:26b`; the agent and
+extractor are the *other* model; `num_ctx` 16,384 for A/B/C (the server default
+every May run used); temperature 0.1; N = 3 repeats. Retrieval runs once per
+(project, model, story) and is reused by B and C across repeats; the exact
+passages, the corpus text, model digests and prompt hashes are recorded by
+`scripts/run_study2.py`.
+
+**Primary outcome.** Per requirement: 1 if it cites at least one fact-sheet
+identifier that was *not* present in the non-documentation part of the prompt
+(system prompt, template, story text, system context), else 0. Averaged per
+(model, story, arm, run), then over runs. Computed by
+`scripts/analyze_study2.py`. Identifiers cited in B/C/D that do not occur in
+the supplied documentation text are reported separately as unsupported.
+
+**Pre-registered contrasts** (paired by story within model; Wilcoxon
+signed-rank, two-sided, plus Cohen's d_z; no multiplicity adjustment, the
+contrasts are three and named in advance): **primary C − B**; secondary
+**B − A** (does documentation help at all) and **D − B** (retrieval vs pasting
+everything, with tokens and seconds per story reported beside it). Results are
+reported per project and per model; no pooling across models.
+
+**Predictions.** B − A > 0 in every project (documentation supplies identifiers
+the model cannot produce alone; arm A measures how much is already memorised).
+C − B: open — the May pilot's lift (§12) is confounded; a null here is a
+legitimate finding. D − B: similar citation at ≥ 10× the prompt tokens.
+
+**Human validation.** 60 requirements stratified by project × arm (both models),
+blinded to arm and model, each shown with its story, fact sheet and the
+documentation the model was given; two reviewers label *supported & correct
+project-specific constraint / generic but correct / unsupported or wrong*;
+Cohen's κ and per-arm rates reported. If only one reviewer is available this
+is stated as a limitation.
+
+**Secondary diagnostics.** Content-quality judge (`llama3:8b`,
+`scripts/judge_content_quality.py`) over all records; semantic F1 only for the
+five Mastodon stories that have ground truth; requirement counts; prompt and
+completion tokens; latency.
+
+**Exclusions and stop rules.** A generation that errors is retried once; a
+second failure leaves an error record and the cell is reported with reduced N.
+No tuning of prompts, retrieval or thresholds after the first full run starts.
+Dataset frozen when `status` in each `stories.json` reads `FROZEN`; the
+Keycloak and Bitwarden sheets are drafts until George has checked them against
+the docs (MASTER_PLAN Day 2). No new inference after Friday 6 Nov 2026.
+Deviations from this section are recorded below it, dated, before results are
+read.

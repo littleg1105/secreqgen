@@ -83,6 +83,7 @@ class OllamaClient:
         temperature: float = 0.1,
         max_tokens: int = 4096,
         timeout: float = 120.0,
+        num_ctx: Optional[int] = None,
     ) -> None:
         """Initialize the Ollama client.
 
@@ -95,12 +96,17 @@ class OllamaClient:
             temperature: Sampling temperature, lower = more focused (default: 0.1).
             max_tokens: Maximum tokens to generate (default: 4096).
             timeout: Request timeout in seconds (default: 120s for slow generation).
+            num_ctx: Context window (tokens) to request from Ollama. ``None``
+                leaves the server default (``OLLAMA_CONTEXT_LENGTH``, 16384 on
+                this host). Experiments must set it explicitly so the window
+                is part of the recorded configuration.
         """
         self.base_url = _resolve_base_url(base_url).rstrip("/")
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.timeout = timeout
+        self.num_ctx = num_ctx
 
         # Initialize httpx client with timeout
         self._client = httpx.Client(timeout=httpx.Timeout(timeout))
@@ -197,6 +203,9 @@ class OllamaClient:
                 "num_predict": self.max_tokens,
             },
         }
+
+        if self.num_ctx:
+            payload["options"]["num_ctx"] = self.num_ctx
 
         if system_prompt:
             payload["system"] = system_prompt
