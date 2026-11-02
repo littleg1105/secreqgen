@@ -6,6 +6,21 @@ partially superseded by later updates.*
 
 ---
 
+# ⚠ 2026-11-03 — Study 2 is done; this is now the thesis's main result
+
+Study 2 (notebook §14 design, §15 results) ran 2026-11-02: 3 projects × 5
+docs-dependent stories × arms A (no docs) / B (frozen idea-19 retrieval) /
+C (B + extract-then-cite) / D (whole corpus) × qwen3.8:27b + gemma4:26b ×
+N = 3 — 330 generations, 1 retried parse failure. **Documentation access
+raises the share of requirements citing documented project identifiers from
+≈ 0 to 0.30–0.61 in every cell (B − A d_z 1.0–1.8; pooled 15/15 stories
+positive, p ≤ 0.0006), with ≈ 0 invented identifiers.** Extract-then-cite
+adds +0.06–0.16, not significant. Whole-corpus prompting beats retrieval
+only on the smallest corpus. Next: blinded 60-item human review
+(`real_test_cases/study2/review/`), then Chapter 6.
+
+---
+
 # ⚠ 2026-10-25 — read before the section below
 
 Five months passed with no work. A three-agent council (records in

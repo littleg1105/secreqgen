@@ -1452,3 +1452,90 @@ alike, in every arm — and relies on the templates' "respond only with valid
 JSON" instruction plus the existing parse-and-retry (3 attempts). Recorded
 in each manifest as `json_mode`. This applies equally to all arms, so the
 contrasts are unaffected; JSON failure counts are reported.
+
+---
+
+## §15 — Study 2 results (run 2026-11-02 02:25 → 06:51; retry 07:0x)
+
+**What ran.** Exactly the §14 design: 3 projects × 5 stories × arms A/B/C (+D
+for Mastodon and Bitwarden) × `qwen3.8:27b` and `gemma4:26b` × N = 3 →
+330 generations, 1 JSON-parse failure (Keycloak × gemma4 × KC-S2-003 × B ×
+run 2, an invalid `\` escape inside a `${vault…}` placeholder) which
+succeeded on the pre-registered single retry. Wall time 4 h 25 m on the
+M4 Max; both models stayed resident (46 GB). Records, frozen passages,
+corpora, manifests: `real_test_cases/study2/<project>/results/<model>/`;
+analysis: `study2/analysis_2026-11-02.json`;
+pooled exploratory: `study2/analysis_pooled_exploratory_2026-11-02.json`.
+Dataset status at run time: Mastodon frozen; Keycloak and Bitwarden stories
+**still marked DRAFT** (George's review pending) — see Deviations.
+
+**Primary outcome** — fraction of requirements citing ≥ 1 fact-sheet identifier
+not present in the non-documentation prompt (mean over 3 runs, then over 5
+stories). `sup`/`unsup` = mean distinct identifiers cited that are / are not
+in the documentation the model was given (for arm A every citation is
+parametric, listed under `unsup`).
+
+| project | model | A | B | C | D | sup B / C / D | unsup A / B / C / D | prompt tok B / D |
+|---|---|---|---|---|---|---|---|---|
+| mastodon | gemma4 | 0.00 | 0.46 | 0.43 | 0.32 | 2.5 / 2.5 / 1.8 | 0 / 0 / 0 / 0 | 6.2K / 57.9K |
+| mastodon | qwen3.8 | 0.00 | 0.30 | 0.40 | 0.30 | 1.9 / 2.7 / 1.7 | 0 / 0 / 0 / 0 | 5.9K / 55.2K |
+| keycloak | gemma4 | 0.03 | 0.56 | 0.63 | — | 3.5 / 4.3 / — | 0.13 / 0.07 / 0 / — | 7.3K / — |
+| keycloak | qwen3.8 | 0.07 | 0.56 | 0.71 | — | 3.9 / 4.3 / — | 0.47 / 0.07 / 0.27 / — | 6.9K / — |
+| bitwarden | gemma4 | 0.04 | 0.51 | 0.67 | 0.94 | 2.5 / 3.0 / 6.3 | 0.20 / 0.20 / 0.07 / 0 | 6.6K / 28.4K |
+| bitwarden | qwen3.8 | 0.10 | 0.61 | 0.67 | 0.85 | 3.3 / 2.8 / 7.3 | 0.20 / 0.20 / 0.07 / 0 | 6.4K / 27.5K |
+
+**Pre-registered contrasts** (paired by story, n = 5 per cell; Wilcoxon
+two-sided — note p = 0.062 is the smallest value attainable at n = 5):
+
+| project | model | C − B (primary) | B − A | D − B |
+|---|---|---|---|---|
+| mastodon | gemma4 | −0.04, d_z −0.30, p = 1.00 | +0.46, d_z +1.58, p = 0.062 | −0.14, d_z −0.61, p = 0.31 |
+| mastodon | qwen3.8 | +0.10, d_z +0.58, p = 0.44 | +0.30, d_z +1.05, p = 0.062 | −0.00, d_z −0.02, p = 1.00 |
+| keycloak | gemma4 | +0.06, d_z +0.38, p = 0.44 | +0.54, d_z +1.75, p = 0.062 | — |
+| keycloak | qwen3.8 | +0.15, d_z +0.98, p = 0.125 | +0.49, d_z +1.68, p = 0.062 | — |
+| bitwarden | gemma4 | +0.16, d_z +0.62, p = 0.25 | +0.47, d_z +1.81, p = 0.062 | +0.44, d_z +1.77, p = 0.062 |
+| bitwarden | qwen3.8 | +0.06, d_z +0.31, p = 0.63 | +0.51, d_z +1.60, p = 0.062 | +0.24, d_z +0.86, p = 0.062 |
+
+**Exploratory, not pre-registered** — the same contrasts pooled over the 15
+stories within each model (10 for D − B):
+
+| model | C − B | B − A | D − B |
+|---|---|---|---|
+| gemma4 | +0.06, d_z +0.32, p = 0.32 (10+/5−) | +0.49, d_z +1.83, **p = 0.0001** (15+/0−) | +0.15, d_z +0.38, p = 0.28 (7+/3−) |
+| qwen3.8 | +0.10, d_z +0.63, p = 0.056 (11+/3−/1=) | +0.43, d_z +1.48, **p = 0.0006** (15+/0−) | +0.12, d_z +0.50, p = 0.12 (7+/3−) |
+
+**Reading.**
+1. **Documentation access is the effect (ΕΕ3).** B − A is positive in every
+   one of the 6 cells and in every one of the 30 model×story pairs, with
+   d_z 1.0–1.8. Without documentation the models cite almost no
+   project-specific identifiers (0.00–0.10); the few they do cite are
+   memorised (arm A's `unsup`, highest for Keycloak × qwen3.8 at 0.47
+   distinct per story — the contamination signal, small but real for the
+   most popular docs).
+2. **Hallucinated identifiers are rare.** In the retrieval arms the mean
+   number of cited identifiers that were *not* in the supplied documentation
+   is 0–0.27 per story; in Mastodon it is zero in every arm.
+3. **Extract-then-cite (C − B) is small and inconsistent.** Direction is
+   positive in 5 of 6 cells and 21 of 30 pairs, magnitude +0.06 to +0.16,
+   nothing significant per project, pooled p = 0.32 / 0.056. The May §12
+   lift was an artefact of leakage; the clean effect, if any, is modest.
+4. **Whole corpus vs retrieval depends on corpus size.** For Bitwarden
+   (≈ 22–28K tokens) pasting everything cites 2–3× more documented
+   identifiers than top-5 retrieval (D − B +0.24 / +0.44); for Mastodon
+   (≈ 55K tokens) it is equal or worse. Prompt cost 4–10× B; latency only
+   1.3–2× on this hardware.
+5. Model speed: gemma4 (MoE, 3.8B active) ≈ 25 s per story-arm vs
+   qwen3.8 ≈ 55 s; citation rates are similar.
+
+**Deviations from §14, recorded before human review.** (a) `format=json` not
+sent (addendum above). (b) The Keycloak/Bitwarden stories were run while
+still marked DRAFT; if George's review changes a story or fact sheet, that
+story's cells are re-run and this section is updated — no other tuning.
+(c) The pooled analysis above is exploratory and was added after the
+per-project results were read; it is reported as such. (d) Arm D for
+Keycloak was skipped as pre-specified (corpus ≈ 132K tokens).
+
+**Still to do for this chapter.** Blinded human review
+(`study2/review/review_sheet.md`, 60 items, key in `review_key.json`),
+content-quality judge over all records, semantic F1 on the 5 Mastodon
+stories, figures.

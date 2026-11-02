@@ -116,10 +116,15 @@ def analyze(project: str) -> dict:
             continue
         frozen_path = result_dir / "retrieval_frozen.json"
         frozen = json.loads(frozen_path.read_text()) if frozen_path.exists() else {}
+        # A record that errored and was later retried successfully (the §14
+        # single retry) leaves both lines in the JSONL; keep the last line per
+        # (story, arm, run) so a superseded error is not counted.
+        latest: dict[tuple, dict] = {}
         for line in records_path.read_text().splitlines():
-            if not line.strip():
-                continue
-            rec = json.loads(line)
+            if line.strip():
+                rec = json.loads(line)
+                latest[(rec["story_id"], rec["arm"], rec["run"])] = rec
+        for rec in latest.values():
             if rec.get("error"):
                 per_rec.append({**{k: rec[k] for k in ("model", "story_id", "arm", "run")}, "error": rec["error"]})
                 continue
