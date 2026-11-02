@@ -1441,3 +1441,14 @@ Keycloak and Bitwarden sheets are drafts until George has checked them against
 the docs (MASTER_PLAN Day 2). No new inference after Friday 6 Nov 2026.
 Deviations from this section are recorded below it, dated, before results are
 read.
+
+**Addendum 2026-11-03 (before any result was read).** The smoke test failed
+in every arm with Ollama `501 structured output is unavailable`: the pulled
+`qwen3.8:27b` and `gemma4:26b` are `nvfp4` quantisations served by Ollama
+0.40.11's MLX runner, which does not support grammar-constrained JSON. The
+May runs (GGUF, llama.cpp runner) had used `format=json`. Decision: Study 2
+sends no `format` option at all — generator, Stage-A extractor and code agent
+alike, in every arm — and relies on the templates' "respond only with valid
+JSON" instruction plus the existing parse-and-retry (3 attempts). Recorded
+in each manifest as `json_mode`. This applies equally to all arms, so the
+contrasts are unaffected; JSON failure counts are reported.

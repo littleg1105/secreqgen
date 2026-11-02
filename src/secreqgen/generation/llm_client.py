@@ -84,6 +84,7 @@ class OllamaClient:
         max_tokens: int = 4096,
         timeout: float = 120.0,
         num_ctx: Optional[int] = None,
+        structured_output: bool = True,
     ) -> None:
         """Initialize the Ollama client.
 
@@ -100,6 +101,11 @@ class OllamaClient:
                 leaves the server default (``OLLAMA_CONTEXT_LENGTH``, 16384 on
                 this host). Experiments must set it explicitly so the window
                 is part of the recorded configuration.
+            structured_output: If False, never send Ollama's ``format`` option
+                (grammar-constrained JSON). Needed on runners that reject it
+                (Ollama 0.40 MLX runner: ``501 structured output is
+                unavailable`` for nvfp4 models); callers then rely on the
+                prompt's JSON instruction plus parse-and-retry.
         """
         self.base_url = _resolve_base_url(base_url).rstrip("/")
         self.model_name = model_name
@@ -107,6 +113,7 @@ class OllamaClient:
         self.max_tokens = max_tokens
         self.timeout = timeout
         self.num_ctx = num_ctx
+        self.structured_output = structured_output
 
         # Initialize httpx client with timeout
         self._client = httpx.Client(timeout=httpx.Timeout(timeout))
@@ -210,7 +217,7 @@ class OllamaClient:
         if system_prompt:
             payload["system"] = system_prompt
 
-        if format:
+        if format and self.structured_output:
             payload["format"] = format
 
         # Track timing
@@ -299,7 +306,7 @@ class OllamaClient:
             },
         }
 
-        if format:
+        if format and self.structured_output:
             payload["format"] = format
 
         start_time = time.perf_counter()

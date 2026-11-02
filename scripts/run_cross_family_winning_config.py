@@ -143,6 +143,19 @@ def _make_pseudo_chunk(content: str, source: str, idx: int, score: float = 0.5) 
     )
 
 
+def _parse_agent_json(text: str) -> dict:
+    """Parse the agent's reply even when it wraps the JSON in ``` fences or
+    prose. Added 2026-11-03: with structured output unavailable on the MLX
+    runner the agent (gemma4) returns fenced JSON, which json.loads rejected
+    and silently cost idea 19 all of its code chunks."""
+    import re as _re
+    cleaned = _re.sub(r"```(?:json)?", "", text).strip()
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError(f"no JSON object in agent reply: {text[:120]!r}")
+    return json.loads(cleaned[start:end + 1])
+
+
 def _code_search(story: dict, project: str, agent_llm: OllamaClient,
                  max_hits_per_pattern: int = 3) -> list[QueryResult]:
     """Have mistral-small emit grep patterns; run them against repos/<project>/."""
@@ -160,7 +173,7 @@ def _code_search(story: dict, project: str, agent_llm: OllamaClient,
     )
     try:
         resp = agent_llm.generate(prompt=user_prompt, system_prompt=CODE_AGENT_SYSTEM, format="json")
-        obj = json.loads(resp.content.strip())
+        obj = _parse_agent_json(resp.content)
         patterns = [p for p in obj.get("patterns", []) if isinstance(p, str) and p.strip()]
     except Exception as e:
         print(f"    [code-agent error] {e}")

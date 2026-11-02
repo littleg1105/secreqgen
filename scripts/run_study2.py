@@ -246,7 +246,8 @@ def run_cell(project: str, model: str, stories: list[UserStory], dataset: dict,
             "num_ctx": num_ctx, "num_ctx_D": num_ctx_d,
             "temperature": cfg.llm.temperature, "max_tokens": cfg.llm.max_tokens,
             "top_k": cfg.retrieval.top_k, "similarity_threshold": cfg.retrieval.similarity_threshold,
-            "rerank_candidates": 30, "embedding_model": cfg.embedding.model_name,
+            "rerank_candidates": 30,
+            "json_mode": "prompt-only: Ollama 0.40.11 MLX runner returns 501 structured output unavailable for nvfp4 models, so format=json is not sent; parse-and-retry (3 attempts) applies to every arm", "embedding_model": cfg.embedding.model_name,
             "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
         },
         "ollama": {"version": ollama_version(cfg.llm.base_url),
@@ -267,17 +268,17 @@ def run_cell(project: str, model: str, stories: list[UserStory], dataset: dict,
     # Clients
     llm = RecordingOllamaClient(base_url=cfg.llm.base_url, model_name=model,
                                 temperature=cfg.llm.temperature, max_tokens=cfg.llm.max_tokens,
-                                timeout=900.0, num_ctx=num_ctx)
+                                timeout=900.0, num_ctx=num_ctx, structured_output=False)
     llm_d = RecordingOllamaClient(base_url=cfg.llm.base_url, model_name=model,
                                   temperature=cfg.llm.temperature, max_tokens=cfg.llm.max_tokens,
-                                  timeout=3600.0, num_ctx=num_ctx_d)
+                                  timeout=3600.0, num_ctx=num_ctx_d, structured_output=False)
     if not llm.check_health():
         print(f"  ! Ollama health check failed for {model}; SKIPPING cell")
         return
     agent_llm = OllamaClient(model_name=agent_model, temperature=0.1, max_tokens=400,
-                             timeout=600.0, num_ctx=num_ctx)
+                             timeout=600.0, num_ctx=num_ctx, structured_output=False)
     extractor_llm = RecordingOllamaClient(model_name=agent_model, temperature=0.1,
-                                          max_tokens=1200, timeout=600.0, num_ctx=num_ctx)
+                                          max_tokens=1200, timeout=600.0, num_ctx=num_ctx, structured_output=False)
 
     # Retrieval stack (idea 19) + freeze
     frozen_path = out_dir / "retrieval_frozen.json"
