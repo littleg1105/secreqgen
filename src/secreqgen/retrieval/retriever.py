@@ -4,6 +4,7 @@ Combines document embedder and vector store for semantic search,
 with similarity threshold filtering and context formatting for LLM injection.
 """
 
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -67,6 +68,8 @@ from secreqgen.ingestion.embedder import DocumentEmbedder
 from secreqgen.ingestion.metadata import DocumentType
 from secreqgen.retrieval.vectorstore import QueryResult, SecReqGenVectorStore
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class RetrievalResult:
@@ -105,7 +108,7 @@ class SimpleRetriever:
         vectorstore: SecReqGenVectorStore,
         embedder: DocumentEmbedder,
         top_k: int = 5,
-        similarity_threshold: float = 0.7,
+        similarity_threshold: float = 0.4,
         reranker: Optional["CrossEncoderReranker"] = None,
         rerank_candidates: int = 30,
     ) -> None:
@@ -116,7 +119,9 @@ class SimpleRetriever:
             embedder: The embedder for generating query embeddings.
             top_k: Maximum number of results to retrieve (default: 5).
             similarity_threshold: Minimum similarity score [0-1] to include
-                a result (default: 0.7). Lower = more results but less relevant.
+                a result (default: 0.4, the same as the config default; 0.7 was
+                the bug of the 2026-05-19 audit). Lower = more results but less
+                relevant.
             reranker: Optional CrossEncoderReranker. If provided, retrieval
                 runs two stages: dense retrieves ``rerank_candidates`` chunks,
                 cross-encoder reranks them, and the top-``top_k`` are returned.
@@ -181,6 +186,19 @@ class SimpleRetriever:
 
         # Filter by similarity threshold
         filtered = [r for r in results if r.similarity >= self.similarity_threshold]
+
+        # No chunk passed, so format_context() will give the fallback text.
+        # Log it: in May 2026 this case was silent (the audit bug).
+        if not filtered:
+            best = max((r.similarity for r in results), default=None)
+            logger.warning(
+                "Retrieval found no chunk that passes the similarity threshold "
+                "%s (%d candidates, best score %s). The formatted context will "
+                "be the fallback text.",
+                self.similarity_threshold,
+                len(results),
+                "none" if best is None else f"{best:.3f}",
+            )
 
         # Rerank stage: cross-encoder scores (query, chunk) pairs jointly
         # and reorders. Returns top-k by rerank score.

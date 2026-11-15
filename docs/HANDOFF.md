@@ -6,6 +6,19 @@ partially superseded by later updates.*
 
 ---
 
+# 2026-11-14: the final week started (read this block first)
+
+This block holds no result. The block below it holds Study 2 results: the author must not read it before his review labels are locked.
+
+- The plan of the week is `MASTER_PLAN_2026-11-14.md` at the thesis root. Day 0 was 14 November.
+- One analysis method is fixed in `thesis/analysis_lock.md` (committed on 14 November, before any review label). Each number of the thesis comes from `thesis/numbers/numbers.json`.
+- The blinded review has new sheets in `real_test_cases/study2/review_v2/`. The first sheet showed the study arm. The review now has two parts: the author and two AI raters label the names of each requirement (P, N, G); the two AI raters alone label its support (S, G, U). The changes from the registration are in the lab notebook, section 14, "Addendum 2026-11-14".
+- The fact sheets of Study 2 were checked on 14 November by AI models (GPT, Gemini, Claude): 86 corrections. The stories and fact sheets did not change. See `real_test_cases/study2/story_check/`.
+- Two runs are planned for the week: Study 2b (documents against instructions) and the threat agent mapping step. Each needs a dated note in the lab notebook (sections 16 and 17) before it starts.
+- A handoff for the next AI session is `final_week/handoff_for_claude_2026-11-15.md` at the thesis root. It gives the state of 15 November at 14:25 (no review label existed), the rules, and the steps for each part of the day. It holds no result.
+
+---
+
 # ⚠ 2026-11-03 — Study 2 is done; this is now the thesis's main result
 
 Study 2 (notebook §14 design, §15 results) ran 2026-11-02: 3 projects × 5

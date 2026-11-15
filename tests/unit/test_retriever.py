@@ -1,5 +1,9 @@
 """Unit tests for SimpleRetriever."""
 
+import inspect
+import json
+import logging
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -56,7 +60,8 @@ class TestSimpleRetrieverInit:
         assert retriever.vectorstore == mock_vectorstore
         assert retriever.embedder == mock_embedder
         assert retriever.top_k == 5
-        assert retriever.similarity_threshold == 0.7
+        # 0.7 was the audit bug of 2026-05-19; 0.4 is the locked value.
+        assert retriever.similarity_threshold == 0.4
 
     def test_custom_initialization(self):
         """Test custom retriever initialization."""
@@ -624,3 +629,148 @@ class TestRetrievalThresholdRegression:
             "password" in c.content.lower() or "authentication" in c.content.lower()
             for c in result.chunks
         ), "Retrieved chunks don't contain expected content for query."
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-11-14 guards (fast, no model). They close two gaps of the audit:
+# the constructor default was still 0.7, and an empty retrieval was silent.
+# ─────────────────────────────────────────────────────────────────────
+
+FALLBACK_TEXT = "No relevant security documentation found."
+RETRIEVER_LOGGER = "secreqgen.retrieval.retriever"
+
+
+class _FakeVectorStore:
+    """Returns a fixed list of results. No database, no model."""
+
+    def __init__(self, results: list[QueryResult]) -> None:
+        self.results = results
+
+    def query(self, query_embedding, doc_types, n_results):
+        return list(self.results)
+
+
+def _result(chunk_id: str, distance: float) -> QueryResult:
+    # similarity = 1 - distance / 2 (see TestSimilarityFormula)
+    return QueryResult(
+        chunk_id=chunk_id,
+        content="Passwords must be hashed with Argon2.",
+        source_document="/docs/auth.md",
+        section_hierarchy=["Authentication"],
+        distance=distance,
+    )
+
+
+def _retriever_with(results: list[QueryResult]) -> SimpleRetriever:
+    embedder = MagicMock()
+    embedder.embed_text.return_value = np.array([0.1, 0.2, 0.3])
+    return SimpleRetriever(
+        vectorstore=_FakeVectorStore(results),
+        embedder=embedder,
+        similarity_threshold=0.5,
+    )
+
+
+def _retriever_warnings(caplog) -> list[logging.LogRecord]:
+    return [
+        r for r in caplog.records
+        if r.name == RETRIEVER_LOGGER and r.levelno == logging.WARNING
+    ]
+
+
+class TestThresholdDefaultMatchesConfig:
+    """A script that builds SimpleRetriever with no threshold must get the
+    config value, not the 0.7 of the audit bug."""
+
+    def test_constructor_default_equals_config_default(self):
+        from secreqgen.config import RetrievalConfig
+
+        ctor_default = inspect.signature(SimpleRetriever.__init__).parameters[
+            "similarity_threshold"
+        ].default
+        config_default = RetrievalConfig.model_fields["similarity_threshold"].default
+        assert ctor_default == config_default
+
+
+class TestNoChunkPassesWarning:
+    """When no chunk passes the threshold, retrieve() logs one warning.
+    The return values do not change."""
+
+    def test_warning_when_no_chunk_passes(self, caplog):
+        # similarities 0.2 and 0.3, both below the threshold 0.5
+        retriever = _retriever_with([_result("a", 1.6), _result("b", 1.4)])
+        with caplog.at_level(logging.WARNING, logger=RETRIEVER_LOGGER):
+            result = retriever.retrieve("password storage")
+
+        warnings = _retriever_warnings(caplog)
+        assert len(warnings) == 1
+        message = warnings[0].getMessage()
+        assert "threshold 0.5" in message
+        assert "2 candidates" in message
+        assert "best score 0.300" in message
+        # Behaviour is unchanged: no chunk, and the prompt text is the fallback.
+        assert result.chunks == []
+        assert result.total_retrieved == 2
+        assert retriever.format_result_for_prompt(result) == FALLBACK_TEXT
+
+    def test_warning_when_store_returns_nothing(self, caplog):
+        retriever = _retriever_with([])
+        with caplog.at_level(logging.WARNING, logger=RETRIEVER_LOGGER):
+            retriever.retrieve("password storage")
+
+        warnings = _retriever_warnings(caplog)
+        assert len(warnings) == 1
+        assert "0 candidates" in warnings[0].getMessage()
+        assert "best score none" in warnings[0].getMessage()
+
+    def test_no_warning_when_a_chunk_passes(self, caplog):
+        # similarities 0.8 (passes) and 0.2 (does not pass)
+        retriever = _retriever_with([_result("a", 0.4), _result("b", 1.6)])
+        with caplog.at_level(logging.WARNING, logger=RETRIEVER_LOGGER):
+            result = retriever.retrieve("password storage")
+
+        assert _retriever_warnings(caplog) == []
+        assert [c.chunk_id for c in result.chunks] == ["a"]
+
+
+def _study2_dir() -> Path | None:
+    """Walk up from this file to the folder that holds the Study 2 data."""
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "coded_project" / "real_test_cases" / "study2"
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+class TestStudy2FrozenRetrieval:
+    """Data test on the frozen retrieval of Study 2 (plan check T7).
+
+    It turns the manual 41-character check of CLAUDE.md into a test. It reads
+    only the stored contexts and never prints one.
+    """
+
+    @pytest.mark.parametrize("model", ["gemma4_26b", "qwen3_8_27b"])
+    @pytest.mark.parametrize("project", ["mastodon", "keycloak", "bitwarden"])
+    def test_frozen_contexts_are_real_text(self, project, model):
+        study2 = _study2_dir()
+        if study2 is None:
+            pytest.skip("Study 2 data folder (real_test_cases/study2) not found")
+        path = study2 / project / "results" / model / "retrieval_frozen.json"
+        assert path.is_file(), f"missing frozen retrieval file: {project}/{model}"
+
+        frozen = json.loads(path.read_text())
+        contexts = {story: entry["context"] for story, entry in frozen.items()}
+        assert contexts, f"no stored context: {project}/{model}"
+
+        fallback_stories = sorted(
+            story for story, text in contexts.items()
+            if len(text) == len(FALLBACK_TEXT) or text.strip() == FALLBACK_TEXT
+        )
+        assert not fallback_stories, (
+            f"fallback context (41 characters) in {project}/{model}"
+        )
+        n_long = sum(1 for text in contexts.values() if len(text) > 200)
+        assert n_long >= 0.9 * len(contexts), (
+            f"fewer than 90 percent of contexts are longer than 200 characters "
+            f"in {project}/{model}"
+        )

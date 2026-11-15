@@ -24,14 +24,31 @@ def test_version() -> None:
 def test_help() -> None:
     """Test --help flag.
 
-    Note: This test may fail with Python 3.13 due to a known Typer/Click compatibility issue.
-    See: https://github.com/tiangolo/typer/issues/843
+    The test fails when --help crashes. Typer 0.15 crashed with Click 8.2 and
+    later (fixed on 2026-11-14 with typer 0.16).
     """
     result = runner.invoke(app, ["--help"])
-    # The help command may crash with Python 3.13 due to Typer/Click compatibility
-    # For now, we just check that the app is invocable
-    if result.exit_code == 0:
-        assert "SecReqGen" in result.stdout or "secreqgen" in result.stdout.lower()
+    assert result.exit_code == 0, result.output
+    assert "secreqgen" in result.stdout.lower()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["ingest"],
+        ["generate"],
+        ["evaluate"],
+        ["evaluate", "run"],
+        ["evaluate", "compare-runs"],
+        ["evaluate", "compare"],
+        ["evaluate", "report"],
+    ],
+    ids=" ".join,
+)
+def test_command_help(command: list[str]) -> None:
+    """The help of each command and sub-command exits with code 0."""
+    result = runner.invoke(app, [*command, "--help"])
+    assert result.exit_code == 0, result.output
 
 
 def test_config_command() -> None:

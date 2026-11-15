@@ -8,7 +8,7 @@ packages = [{include = "secreqgen", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11,<3.14"
-typer = {extras = ["all"], version = "^0.15.0"}
+typer = ">=0.16,<0.17"  # 0.16 is the first version that works with Click 8.2 (the --help crash, fixed 2026-11-14)
 langchain = "^0.2.0"
 langchain-community = "^0.2.0"
 chromadb = "^0.4.0"
@@ -54,3 +54,7 @@ disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+markers = [
+    "slow: needs a real model (embedder or Ollama); the fast run skips it with -m \"not slow\"",
+    "integration: needs a running Ollama server",
+]
