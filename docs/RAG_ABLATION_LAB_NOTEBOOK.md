@@ -1487,6 +1487,8 @@ contrasts are unaffected; JSON failure counts are reported.
 
 **Lock of the human labels (15 November 2026).** The author labelled the 60 items of part 1 on 15 November 2026. He started after 20:00 and reported the letters complete at 20:54. `score_study2_review.py lock` locked `labels_names_george.csv` at 2026-11-15T18:58:40Z (20:58:40 local time). SHA-256: `a519e6cc74632ed4505ab1db4c3c1d23f2ccff1ea9b9e0f88020697c075fd9b7`. Root commit: `410b3c8`. Before the lock he corrected 11 notes that held a comma. The AI gave him line numbers only and did not open his file. The rules that he used are version 4 of `names_rules.md` (SHA-256 `ffa5ae563324330e7628707b307d2ae7a84eee016baeb23baec9fdf67fa81134`). At 18:55 he said that version 3 was not clear, before his first label. The AI wrote version 4 in simpler English with the same decision rules, and model sessions that did not write it compared the two versions in four rounds. The dated line is in the analysis lock (root commit `1e64e1c`, 19:28:22, before any letter). The page itself is in root commit `eba7eaf` (21:26:21). Practice: he did not fill in `practice_labels.txt`. In chat, the AI showed him the practice items P1 and P4 step by step. He gave P2 and P3 correctly alone. For P5 he leaned to N (the answer is G). For P6 he found the row that was not found and asked what it means. The AI explained both with the question "who decides the name?". At 20:00 he answered two invented test cases correctly, and then he started the 60 items. The AI also gave him three memory words for the letters (present, not found, generic). They are now in section 7 of the rules page, which the AI raters do not get. Question to the author: "Did you read question 2 of `day1.md`, or the handoff file, before 15:20 on 15 November?" Until about that time both files gave one count from a sealed analysis, for all arms together. His answer was not given at 21:30 on 15 November. It follows as a dated line.
 
+**Answers of the author (15 November 2026).** At 21:35 he said: "I havent seen the results" (the results of Study 2). At 21:37 he said that he did not read that part of `day1.md` before 15:20: "I didn't read it".
+
 ---
 
 ## §15 — Study 2 results (run 2026-11-02 02:25 → 06:51; retry 07:0x)
@@ -1573,3 +1575,151 @@ Keycloak was skipped as pre-specified (corpus ≈ 132K tokens).
 (`study2/review/review_sheet.md`, 60 items, key in `review_key.json`),
 content-quality judge over all records, semantic F1 on the 5 Mastodon
 stories, figures.
+
+---
+
+## §16. Study 2b: documents and instructions (registered before the run)
+
+*Registered on 15 November 2026 (the commit gives the time), before the first generation of Study 2b. Drafted on 14 November 2026. It holds no result of Study 2. The method comes from plan section 6 and analysis lock section 8. Where a design report or a judge differs, the plan and the lock win.*
+
+### The question
+
+Did the documents make the models name real project settings, or did the instruction to cite them?
+
+### Why this run exists
+
+- The audit of 14 November found that arms B, C and D of Study 2 also received instructions to use and cite the documentation. Arm A did not.
+- So the registered contrast B minus A measures "documentation with instructions to use and cite it" (lock 1.4 d). It cannot say which of the two parts caused it.
+- Study 2b switches the documents and the instructions on and off, one at a time.
+
+### Statements that plan section 6 requires
+
+- This run breaks the rule "no new inference after 6 November". On 15 November 2026 the author ended that rule for the runs after this date (analysis lock, dated line, root commit `93f9167`). Each statement of this list stays in force for Study 2b.
+- The audit of 14 November caused it, not the size of any result.
+- It runs one time.
+- It is reported whatever the result.
+- Its unit is 15 stories for each model, because 5 stories cannot pass a test.
+- If the run has not started by Day 2 (16 November) at 22:30, this section gets a dated "not run" line, and the thesis keeps the wording of finding 3.
+
+### Design
+
+| | No instructions | With the "use and cite" instructions |
+|---|---|---|
+| No documents | Arm A (registered) | New arm I0 |
+| With documents | New arm N1 | Arm B (registered) |
+
+- Same 15 stories, same stored passages (`retrieval_frozen.json` of each project and model) and same two models (`qwen3.8:27b`, `gemma4:26b`). The generation settings are the same as in the registered run: temperature 0.1, up to 4,096 output tokens, a context window of 16,384 tokens, a 900 s timeout, no JSON format option and 3 parse attempts. There is no retrieval and no ingestion.
+- A and B are read from the registered records. They never run again as registered data.
+- N1: the arm A prompt plus the stored passages in one plain block. The block has a heading, one sentence that says where the passages come from, and the passages. It holds no instruction.
+- I0: the arm B prompt, with the passages replaced by one fixed line: "No project documentation was retrieved for this story." It is not the 41-character fallback string, so the 41-character check still means broken retrieval.
+- N0: N1 with each "cite" text removed, also from the system prompt (deletions S1, S2, S3, U0 and U1). It gives a strict lower limit. The prompt check confirms that "If the docs name a configuration key, cite that key by name" is gone.
+- Drift check: A and B run again on the same night, 1 run for each story and model, from byte copies of the registered prompt files. The records call them A2 and B2.
+- Runs: 3 for N1, I0 and N0; 1 for A2 and B2. That is 330 generations (90 + 90 + 90 + 60), about 3.7 hours.
+- Order: N1, B2, A2, I0, N0. Inside an arm the order is model, then run, then project, then story. So each arm is complete for both models before the next arm starts.
+- The run stops itself after 5 hours. It ends the generation in progress, writes its record and stops.
+- The run also stops at once after an HTTP error of the model server (Ollama), and after 4 failed generations in a row. In both cases the record is written first, and a later start gives that generation its second attempt. Reason: a model that cannot load must not use up the plan.
+- The real output folder accepts the full plan only (all five arms, both models, all three projects). A part of the plan runs only into a scratch folder.
+- Before the first generation, the script compares the A2 and B2 prompts with the prompts in the registered records of arms A and B. A difference stops the run.
+- Start: 15 November 2026 in the evening (the plan says 22:30), after each of the seven conditions passes. If not, 16 November at 22:30. There is no later start.
+- A failed generation gets one retry, as registered.
+- Output: `real_test_cases/study2b/<project>/<model>/`. Nothing is written under `real_test_cases/study2/`.
+
+### Outcome
+
+- The outcome is the registered one (lock section 4). The registered function `analyze()` of `scripts/analyze_study2.py` scores each record. Before the analysis reads a new record, it scores the registered arms A and B through the same path. It stops if one value differs from `analysis_2026-11-02.json`.
+- For a new arm, the non-documentation prompt is the exact prompt that was sent, with the exact passage text removed.
+- The outcome counts named fact-sheet identifiers. A small K1 means that the models do not name documented settings without the instruction. It does not mean that they ignore the documents.
+
+### Tests, bands and fixed sentences (analysis lock 8.2 to 8.5, without change)
+
+> K1 = N1 minus A (the effect of the documents). K2 = B minus N1 (the effect of the instructions). K1 plus K2 is the registered B minus A. For each model: 15 stories, the test of section 3. This pool of three projects is registered before the data exist, so it is not exploratory. Four tests, so each must pass 0.0125. A contrast "passes" when its mean is above zero and p is below 0.0125.
+>
+> The share S = mean K1 / mean registered B minus A, for each model. The bands are: 0.70 or more; 0.40 to below 0.70; below 0.40. Both models must be in the same band.
+>
+> S of 0.70 or more and K1 passes in both models: "the documents carry most of the gain". S below 0.40 and K2 passes in both models: "the instructions carry most of the gain; the documents were named mainly when the prompt demanded it". Otherwise "mixed", with both shares. I0 minus A and N0 are descriptive. Mean I0 minus A of 0.05 (5.0 pp) or less in both models: "the instructions alone produced almost no documented names".
+>
+> If repeat B differs from B by more than 0.08 (8.0 pp), or repeat A from A by more than 0.05 (5.0 pp), that model's contrasts are "indicative".
+
+The test is `stats.wilcoxon_exact`. The descriptive contrasts (I0 minus A, N0 minus A, N1 minus N0) get a mean, sign counts and d_z, and no p-value.
+
+### Three points that lock 8.6 asks this note to fix
+
+1. **How drift is measured.** For each model, take the mean, over the stories with a repeat value, of the repeat story value minus the registered story value. The registered value is the mean of its 3 runs. The repeat value is its 1 run. A repeat "differs by more than" the limit when the absolute value of this mean is above the limit. Two values closer than 1e-9 count as equal (lock 3.1). Drift gets no test. If B2 or A2 is not complete for a model, drift is "not measured", and the contrasts of that model are also "indicative".
+2. **What a complete arm is.** For one model, each of the 15 stories has each planned run (N1, I0, N0: 3; A2, B2: 1) with a parsed answer, or with a recorded failure after the one retry. A parsed answer with no requirement has the value 0, as registered. Only complete arms enter a table or a test. A story whose runs all failed has no value. It leaves each contrast with that arm (lock 4.7), and S then uses the same stories in its numerator and in its denominator.
+3. **When the registered B minus A mean of a model is not above zero.** S is not defined for that model, and it gets no band. The sentence is: "S is not defined for <model>: its registered B minus A mean is not above zero, so there is no gain to split between the documents and the instructions." Then the first two fixed sentences cannot apply. The result is "mixed", with "not defined" as the share of that model. K1 and K2 are still reported.
+
+### Residue: sentences that still ask for documentation
+
+`scripts/check_s2b_prompts.py` lists each line of N1 and N0 that holds must, cite, citation, prioritize, grounded, first, token, use or prefer. When documents are in the prompt, four parts of N1 can still tell the model to use or cite them:
+
+- the task sentence of the system prompt: "... AND the project-specific terminology that appears in the project's own documentation" (S1);
+- guideline 5 of the system prompt: "CITE sources - reference ASVS requirements, security standards, or provided documentation" (S2);
+- the "GROUNDED CITATION RULE" block. Most of it needs a token list, which N1 does not have, but "If the docs name a configuration key, cite that key by name" has no condition (S3);
+- line 3 of the user template: "AND how to cite project-specific tokens by name" and "replace them with the actual tokens from YOUR project's documentation when such documentation is provided". Arm A has no documentation, so this clause is not active there. In N1 it is active (U1).
+
+This is why N0 exists. N0 still has these parts: guideline 5 in the short form "CITE sources - reference ASVS requirements or security standards", "Use SPECIFIC values when available", and the two examples that cite invented settings by name. All arms have the examples, arm A too. So N0 means "no sentence that tells the model to use or cite the documents". It does not mean "no example of citing".
+
+### What the second model found (condition 3)
+
+A Sonnet model that did not write the prompts read each new prompt file and each difference on 14 November 2026 (`final_week/study2b_prompt_differences.md`).
+
+- It found no difference that the design does not explain.
+- In N0 it found one part that still pointed to citation: the heading of the examples said "AND project-specific citation". The design had four deletions (S1, S2, S3, U1). A fifth deletion, U0, now removes these words from the heading in N0. After U0, no sentence of N0 tells the model to use or cite the documents.
+- I0 is not a neutral prompt. It holds the order to use the documentation and, in the next line, the statement that none was retrieved. Several sentences of the template then point to text that is not there. So I0 measures "instructions with no documents".
+- The 30 stored passages hold no part of a prompt template (no token list, no "cite by name" text).
+
+### Limits
+
+- The AI agents that designed this study had read the registered Study 2 values. The author has not read them (his statement of 15 November 2026, 21:35). No Study 2b record exists.
+- Documents also make the prompt longer. This study cannot separate the length from the content.
+- Temperature 0.1 and no seed: a repeat does not give exactly the same text. The drift check measures this.
+
+### Conditions before the first generation (plan section 6)
+
+- [x] 1. A hash list of each registered Study 2 file is saved.
+- [x] 2. The author's 60 labels are locked.
+- [x] 3. The prompt check passes, and a second model has read the prompt differences and found no hidden instruction.
+- [x] 4. The 30 stored contexts (15 stories for each of the 2 models) are verified. None has 41 characters.
+- [x] 5. A small run of one story into a scratch folder passes. Nobody reads the generated text.
+- [x] 6. This note is committed with the author's approval.
+- [x] 7. The Ollama version and both model versions equal the registered manifests, or the difference is written in this note before the run. T5 to T8 have passed. No other script that calls a model or writes the vector store is running. A dry run writes nothing. The run stops itself after 5 hours, and the analysis uses complete arms only.
+
+`scripts/run_study2b.py --dry-run` checks 1, 2, 4 and 6, the prompt check of 3, and the parts of 7 that a script can check. A real run refuses to start while one of these fails. A person checks the rest.
+
+### Fingerprints (SHA-256)
+
+Prompt files in `data/winning_prompts_s2b/`:
+
+```
+814750d9ceeb8221622a8d079c3509212e696d78fd0fdae7697802f7428bdfca  n1/system_prompt.txt
+72f9ea78e4087092c399aad662be64ac1ee51c1458c0035f08450a72edcdb3f4  n1/zero_shot_user_prompt.txt
+54f84982e492593787dd8463de201532f8142195555baa78c99d64db70c5965f  n1/rag_user_prompt.txt
+814750d9ceeb8221622a8d079c3509212e696d78fd0fdae7697802f7428bdfca  i0/system_prompt.txt
+72f9ea78e4087092c399aad662be64ac1ee51c1458c0035f08450a72edcdb3f4  i0/zero_shot_user_prompt.txt
+bab4639429934b7fe8844aa94075f1d4edabb82e51a842415e2dae6f50e9ffc0  i0/rag_user_prompt.txt
+cc9b4988a922be07c30c3ebac0fed107015c13e13e3f4eeb6a94e84b2a94727a  n0/system_prompt.txt
+e27affac537475811a9aae1729e087fb311d7ef391a71165eceb8c96df972062  n0/zero_shot_user_prompt.txt
+1adae6f7ddb5a419cdeb06c1897e980e8f009f6e41c996d34b35de3768428393  n0/rag_user_prompt.txt
+814750d9ceeb8221622a8d079c3509212e696d78fd0fdae7697802f7428bdfca  rep/system_prompt.txt
+72f9ea78e4087092c399aad662be64ac1ee51c1458c0035f08450a72edcdb3f4  rep/zero_shot_user_prompt.txt
+bab4639429934b7fe8844aa94075f1d4edabb82e51a842415e2dae6f50e9ffc0  rep/rag_user_prompt.txt
+```
+
+Scripts in `scripts/`, and the test file:
+
+```
+25639f289f7b3f83a4e3bb0cd0a1b01d4d91acc72ac5967f5676f192b0995e9c  run_study2b.py
+fe13d794567ea5c57b637edeba3568d2e7cd6d676a53bd7cee8bde6712f189c0  check_s2b_prompts.py
+36e169ea92a7dfd138169833fd56be5e58ae664b8423c402c508c6d31c4e367e  analyze_study2b.py
+d99bf2901c43d007ae984905b828721b166b9b686026c5cb4878d92927ee8626  tests/unit/test_study2b.py
+f3330cea150d366e189480bbb3afff9a82bfa9e0ac3549bbd47a897bb7d769bb  run_study2.py (registered, imported, not changed)
+78e613b45b7d0c6310f8243a4f780e743e2f2025b82eb23790b237140df886d2  analyze_study2.py (registered, imported, not changed)
+```
+
+If a script changes before the approval, these lines change with it. After the approval they do not change.
+
+### Who built and checked this
+
+An Opus agent built the prompts, the scripts and the tests. A second Opus agent checked them against the plan and the lock, and corrected five faults (the largest: a model that cannot load would have used up the whole plan). A Sonnet agent read the prompt differences. The orchestrating model added the fifth deletion (U0). 42 tests of this study pass, with no call to a model. No generation of Study 2b exists.
+
+Approved by the author on 15 November 2026 at 21:24. He went through the note with the AI in chat: the question, the design, the outcome with its fixed sentences, and the statements that plan section 6 requires. He did not go through the parts on drift, residue, limits, conditions and fingerprints line by line.
