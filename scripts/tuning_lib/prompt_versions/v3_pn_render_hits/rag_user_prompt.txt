@@ -1,0 +1,38 @@
+## System Context
+$system_context
+
+## Project Documentation
+The passages below come from the documentation of the product. A passage that is marked as a code search hit shows lines of its source code.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Step 1. Read each passage and write one short note about it: which feature or part of the product it is about, and whether it fits this user story: "yes", "partly" or "no".
+
+Step 2. Write the security requirements that this user story needs.
+- Use only the passages with "yes" or "partly". From a passage with "partly", use only the part that is about this user story.
+- State only what a passage says, and only about the names that it describes.
+- Where no passage fits a point, write the requirement in general words. That is a correct answer.
+
+Write as many requirements as the story needs, and not more.
+
+## Output Format
+Respond with a JSON object with two keys, in this order: "passage_notes" and then "requirements".
+- passage_notes: array of objects, one for each passage, each with "passage" (its number), "about" (12 words at most) and "fits_story" ("yes", "partly" or "no")
+- requirements: array of objects. Each requirement must have:
+$json_schema
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.

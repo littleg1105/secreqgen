@@ -1,0 +1,50 @@
+## System Context
+$system_context
+
+## Project Documentation
+The passages below come from the documentation of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Example
+This example is invented. It is about a greenhouse controller, and it shows only how to handle the documentation. Do not copy its content.
+
+Documentation of the example:
+[1] Vent control. The setting vent.max_open_percent limits how far the roof vents open. The default is 40.
+[2] Heater settings: heater.safety_cutoff (a heading with no text)
+[3] A single line of source code: PUMP_LOCK_TIMEOUT = 30
+
+Three requirements and one unused line, in short form:
+- Supported by passage [1]: "The controller shall reject a remote command that opens a vent beyond the value of vent.max_open_percent. The documentation gives 40 as its default." The passage says both things, so the requirement can say them.
+- A name with no description, passage [2]: "The operator shall set heater.safety_cutoff, and the start-up check shall confirm that it is set." The passage only names the setting. So the requirement does not say what the setting does and gives no default.
+- No passage: "The controller shall authenticate each remote command." No passage is about authentication, so the requirement is general and names no setting.
+- PUMP_LOCK_TIMEOUT is only in a line of source code. The line does not say what it does, so no requirement uses it.
+
+## Task
+Write the security requirements that this user story needs. Handle the project documentation as the example shows:
+
+1. State about the product only what a passage says.
+2. A name from a heading or a list entry can be named as a thing to check. Do not say what it does or what its default is.
+3. Where no passage fits a point, write the requirement in general words. That is a correct answer.
+4. Use the full output format below for each requirement, not the short form of the example.
+
+Write as many requirements as the story needs, and not more.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.

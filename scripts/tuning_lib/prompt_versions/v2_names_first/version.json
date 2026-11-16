@@ -1,0 +1,8 @@
+{
+ "name": "v2_names_first",
+ "parent": "v0_old",
+ "description": "The short frame plus the design 'names first': the answer starts with a list of at most 10 usable names with the exact words of their passage or 'no description'; requirements use only these names.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

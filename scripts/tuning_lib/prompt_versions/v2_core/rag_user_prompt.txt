@@ -1,0 +1,31 @@
+## System Context
+$system_context
+
+## Project Documentation
+The passages below come from the documentation of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Write the security requirements that this user story needs. Use the project documentation above where it fits the story.
+
+Write as many requirements as the story needs, and not more.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.

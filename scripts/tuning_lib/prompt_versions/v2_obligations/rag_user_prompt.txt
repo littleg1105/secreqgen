@@ -1,0 +1,38 @@
+## System Context
+$system_context
+
+## Project Documentation
+The passages below come from the documentation of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Write the security requirements that this user story needs.
+
+A requirement says what the system shall do. It does not describe how the product works today. Keep the two apart:
+
+1. Write each sentence of the description as an obligation: "The system shall <response>". Use "When <trigger>, the system shall <response>" only for a trigger that the user story states.
+2. Do not write in any field how the product works now: no present default, and no statement about what a setting, a file or a class does or holds now. In the rationale, explain the threat.
+3. If a fact about the product is necessary, give it only in source_references, as one string for each fact: the number of the passage in square brackets, then the exact words of the passage, without backslashes.
+4. Name a setting, a command, an endpoint, a class or a file only if the documentation, the user story or the system context gives that name. Where they give none, write the requirement in general words. That is a correct answer.
+
+Write as many requirements as the story needs, and not more.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.

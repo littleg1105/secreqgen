@@ -1,0 +1,9 @@
+{
+ "name": "t_minimal_clean",
+ "parent": "v1_minimal",
+ "description": "Path test: the short prompt of v1_minimal with no code-search hits and with rendered template markup.",
+ "passage_changes": [
+  "drop_code_hits",
+  "render_markup"
+ ]
+}

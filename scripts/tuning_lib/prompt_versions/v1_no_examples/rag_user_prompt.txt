@@ -1,0 +1,42 @@
+## System Context
+$system_context
+
+## Project Security Documentation (CRITICAL - You MUST use this)
+The following security documentation is from the project's own documentation and standards.
+You MUST reference this documentation when generating requirements.
+
+$retrieved_context
+
+---
+
+## User Story to Analyze
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Generate security requirements for this user story. Prioritize requirements that are supported by the Project Security Documentation above.
+
+GROUNDED-CITATION INSTRUCTIONS:
+1. The section labeled "## PROJECT-SPECIFIC TOKENS (CITE BY NAME)" above lists configuration keys, environment variables, endpoint paths, class names, and named features that appear in the Project Security Documentation and are relevant to this user story.
+2. EVERY requirement MUST cite AT LEAST ONE token from that list BY ITS EXACT NAME — in the title, description, acceptance criteria, or implementation notes.
+3. Do NOT paraphrase a token into a generic phrase.
+4. Cite tokens only when materially relevant; do NOT enumerate every token. Each requirement should be about a real security concern, with the relevant token appearing naturally in the requirement's prose.
+5. If the token list is empty or contains only weakly related items, fall back to standard OWASP-grounded requirements without forced citations.
+
+GENERAL INSTRUCTIONS:
+1. FIRST, derive requirements from the security documentation above - use specific parameters mentioned (iteration counts, key sizes, algorithms)
+2. THEN, supplement with OWASP ASVS best practices for any gaps not covered by the documentation
+3. When documentation mentions HOW something works, derive requirements that ensure it is implemented SECURELY
+4. Use SPECIFIC values when available (e.g., "600,000 iterations" not "sufficient iterations")
+5. Generate 4-6 requirements per user story covering: authentication, authorization, cryptography, data protection
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.

@@ -1,0 +1,9 @@
+{
+ "name": "v3_pn_render_fact",
+ "parent": "v2_passage_notes",
+ "description": "v3_pn_render plus one sentence in the task: when a requirement uses a passage that fits, its rationale states what the passage says, as a fact, with the passage number.",
+ "passage_changes": [
+  "drop_code_hits",
+  "render_markup"
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "dev": [
+  "BW-S2-001",
+  "BW-S2-002",
+  "BW-S2-005",
+  "KC-S2-001",
+  "KC-S2-002",
+  "KC-S2-003",
+  "KC-S2-005",
+  "MT-ADV-002",
+  "MT-ADV-003",
+  "MT-ADV-004"
+ ],
+ "holdout": [
+  "BW-S2-003",
+  "BW-S2-004",
+  "KC-S2-004",
+  "MT-ADV-001",
+  "MT-ADV-005"
+ ],
+ "rule": "within each product the stories are sorted by the U share of the Study 2b check (with documents, final call); hold-out = positions 2 and 4 for bitwarden and mastodon, position 3 for keycloak; the other 10 are the development examples"
+}

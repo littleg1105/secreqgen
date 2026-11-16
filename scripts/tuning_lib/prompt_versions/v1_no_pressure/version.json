@@ -1,0 +1,6 @@
+{
+ "name": "v1_no_pressure",
+ "parent": "v0_old",
+ "description": "No fixed number of requirements, no fixed topics, no order to supplement from the standard, and no CRITICAL order to use the documentation.",
+ "passage_changes": []
+}

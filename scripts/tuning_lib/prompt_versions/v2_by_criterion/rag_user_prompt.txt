@@ -1,0 +1,36 @@
+## System Context
+$system_context
+
+## Project Documentation
+The passages below come from the documentation of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Write one security requirement for each acceptance criterion of the user story, in the order of the criteria. Do not write other requirements.
+
+For each criterion:
+1. Check if a passage of the documentation is about this criterion. A passage about a different feature does not count.
+2. If a passage is about it, write the requirement with the names and the values of that passage, and state only what the passage says.
+3. If no passage is about it, write the requirement in general words, with no name that is not in the user story or the system context. That is a correct answer.
+
+In the rationale, say which criterion the requirement serves.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.

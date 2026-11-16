@@ -1,0 +1,8 @@
+{
+ "name": "v2_core",
+ "parent": "v0_old",
+ "description": "The shared short frame alone: documents first, plain wording, the documentation as the only source of facts, two rules for the documentation, as many requirements as the story needs.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

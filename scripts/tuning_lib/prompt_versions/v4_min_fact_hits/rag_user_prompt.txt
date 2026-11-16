@@ -1,0 +1,29 @@
+## System Context
+$system_context
+
+## Project Documentation
+These passages come from the documentation and the source code of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Write the security requirements that this user story needs. Use the project documentation above where it is relevant.
+
+When a requirement uses a passage, write in its rationale what that passage says about the product, as a fact, with the number of the passage, for example: "The documentation states that ... (passage 3)." Use the names and the values of the passage. Do not write this for something that comes from the user story or from your memory.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.

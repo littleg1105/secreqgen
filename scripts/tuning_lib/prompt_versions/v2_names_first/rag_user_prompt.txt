@@ -1,0 +1,39 @@
+## System Context
+$system_context
+
+## Project Documentation
+The passages below come from the documentation of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Step 1. Before you write a requirement, list the names that you can use: at most 10. Go through the documentation and take each setting, command, endpoint, class or file that matters for this user story. For each name give: the name as the text of the documentation writes it, the number of its passage, and what the passage says about it, copied word for word (at most 25 words). If the passage only shows the name and does not describe it, write "no description".
+
+Step 2. Write the security requirements that this user story needs.
+- Use only names from your list, from the user story or from the system context.
+- For a name with a description, you can state what the description says, and nothing more.
+- For a name with "no description", you can say that it must be checked. Do not say what it does or what its default is.
+- Where your list has no name for a point, write the requirement in general words. That is a correct answer.
+
+Write as many requirements as the story needs, and not more.
+
+## Output Format
+Respond with a JSON object with two keys, in this order: "names" and then "requirements".
+- names: array of objects (at most 10), each with "name", "passage" (the number of the passage) and "says" (at most 25 words of the passage about this name, without backslashes, or "no description")
+- requirements: array of objects. Each requirement must have:
+$json_schema
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.

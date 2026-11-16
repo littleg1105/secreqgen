@@ -1,0 +1,9 @@
+{
+ "name": "v4_core_fact_hits",
+ "parent": "v2_core",
+ "description": "The short frame alone (no passage notes) plus the sentence about the documented fact in the rationale; the passage block of the best version of round 5.",
+ "passage_changes": [
+  "story_name_hits",
+  "render_markup"
+ ]
+}

@@ -1,0 +1,6 @@
+{
+ "name": "v1_minimal_rules",
+ "parent": "v0_old",
+ "description": "A short prompt with four rules: as many requirements as the story needs, names only from the given text, present-state statements only from the documentation, testable.",
+ "passage_changes": []
+}

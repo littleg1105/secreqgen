@@ -1,0 +1,8 @@
+{
+ "name": "v2_evidence_first",
+ "parent": "v0_old",
+ "description": "The short frame plus the design 'evidence first': each requirement starts with at most two exact quotes and their passage numbers, and is written from these quotes only.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

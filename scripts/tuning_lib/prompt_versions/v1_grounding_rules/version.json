@@ -1,0 +1,6 @@
+{
+ "name": "v1_grounding_rules",
+ "parent": "v0_old",
+ "description": "Four grounding rules added: present-state statements only from a passage, names only from the given text, a bare name proves only that it exists, a name is used for the feature of its passage.",
+ "passage_changes": []
+}

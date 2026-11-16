@@ -1,0 +1,9 @@
+{
+ "name": "v3_pn_render",
+ "parent": "v2_passage_notes",
+ "description": "The version v2_passage_notes with one change of the passage block: template markup of the documentation is written as the plain text of the published page.",
+ "passage_changes": [
+  "drop_code_hits",
+  "render_markup"
+ ]
+}

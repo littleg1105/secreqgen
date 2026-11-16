@@ -1,0 +1,8 @@
+{
+ "name": "v2_contrast_example",
+ "parent": "v0_old",
+ "description": "The short frame plus the design 'one contrast example': a short invented example from a far domain shows a supported statement, a name with no description, a point with no passage, and a code line that is not used.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

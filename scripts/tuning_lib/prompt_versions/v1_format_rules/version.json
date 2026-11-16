@@ -1,0 +1,6 @@
+{
+ "name": "v1_format_rules",
+ "parent": "v0_old",
+ "description": "Three rules about the raw form of the documentation: template markup is not a command, no guessed forms, a source-code name is not an operator setting.",
+ "passage_changes": []
+}

@@ -1,0 +1,8 @@
+{
+ "name": "v2_obligations",
+ "parent": "v0_old",
+ "description": "The short frame plus the design 'obligations and facts apart': each sentence of the description is an obligation in a shall form; facts about the product stand only in source_references as exact quotes.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

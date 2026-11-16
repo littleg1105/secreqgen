@@ -1,0 +1,8 @@
+{
+ "name": "v2_passage_notes",
+ "parent": "v0_old",
+ "description": "The short frame plus the design 'passage notes first': one note for each passage (what it is about; fits the story yes, partly or no); requirements use only passages that fit.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

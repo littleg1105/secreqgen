@@ -1,0 +1,6 @@
+{
+ "name": "v1_minimal",
+ "parent": "v0_old",
+ "description": "A short prompt: no examples, no rules, only the context, the documentation, the story and one task sentence.",
+ "passage_changes": []
+}

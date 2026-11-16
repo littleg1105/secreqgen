@@ -1,0 +1,33 @@
+## System Context
+$system_context
+
+## Project Documentation
+These passages come from the documentation and the source code of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Write the security requirements that this user story needs.
+
+Rules:
+1. Write one requirement for each security point of the story. Write as many as the story needs, and not more.
+2. Use the documentation where it is relevant. Name a setting, a command, an endpoint, a class or a file only if the documentation, the story or the system context gives that name.
+3. Say how the product works now only if the documentation says it. If it does not, say what MUST be true, and do not describe the present state.
+4. Each requirement must be testable.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.

@@ -1,0 +1,6 @@
+{
+ "name": "v1_quote_sources",
+ "parent": "v0_old",
+ "description": "Each statement about the product needs a passage number and an exact quote in source_references, or the requirement stays general.",
+ "passage_changes": []
+}

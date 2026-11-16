@@ -1,0 +1,166 @@
+## Few-shot exemplars (anchor format, depth, ASVS mapping, AND project-specific citation)
+
+The following two examples show the level of specificity expected, AND how to cite project-specific tokens by name. The exemplar tokens (AUTH_PROVIDER_ATTRIBUTE_KEY, WORKER_UPLOAD_BACKEND, /api/v2/session/revoke) are FICTITIOUS — they are deliberately drawn from a hypothetical project and are not from any real codebase. Do not copy their content; use them to calibrate the form, and replace them with the actual tokens from YOUR project's documentation when such documentation is provided; when none is provided, generate standard OWASP-grounded requirements in the same form.
+
+### Example 1
+USER STORY: User Login with SSO and 2FA
+ACCEPTANCE CRITERIA:
+- Server authenticates against an upstream SSO provider
+- Local user identifier is derived from an SSO attribute
+- 2FA TOTP supported after initial SSO verification
+
+PROJECT-SPECIFIC TOKENS (hypothetical):
+- AUTH_PROVIDER_ATTRIBUTE_KEY (configuration key naming the SSO attribute used as local identifier)
+- AUTH_PROVIDER_ASSUME_VERIFIED (boolean flag controlling email-trust behavior)
+- /api/v2/session/revoke (endpoint that invalidates an active session)
+
+EXPECTED OUTPUT:
+{
+  "requirements": [
+    {
+      "id": "SR-001",
+      "user_story_id": "EXAMPLE-1",
+      "title": "Identifier mapping via AUTH_PROVIDER_ATTRIBUTE_KEY",
+      "description": "Server MUST derive the local user identifier from the SSO attribute named in AUTH_PROVIDER_ATTRIBUTE_KEY (default 'uid'). Server MUST NOT fall back to the upstream principal string if AUTH_PROVIDER_ATTRIBUTE_KEY is unset or the referenced attribute is missing — the login attempt MUST be rejected with an audit log entry. The attribute value MUST be validated as a non-empty string of length 1–255 before being used as a primary key.",
+      "rationale": "OWASP ASVS V2.2.1 — identity assertions must be unambiguous. Using AUTH_PROVIDER_ATTRIBUTE_KEY explicitly prevents accidental fallback to the principal name when an attribute is missing, which has caused account-collision incidents in the wild.",
+      "acceptance_criteria": [
+        "When AUTH_PROVIDER_ATTRIBUTE_KEY=mail and the mail attribute is missing, login is rejected with HTTP 401",
+        "When AUTH_PROVIDER_ATTRIBUTE_KEY is unset, the server refuses to start (fail-closed)",
+        "Audit log records the AUTH_PROVIDER_ATTRIBUTE_KEY value used for each successful identity mapping"
+      ],
+      "asvs_category": "V2: Authentication",
+      "priority": "critical",
+      "implementation_notes": "Validate AUTH_PROVIDER_ATTRIBUTE_KEY at boot; refuse to start if missing. Store the resolved attribute name in immutable config so it cannot drift between worker processes.",
+      "source_references": ["OWASP ASVS v4.0.3 V2.2.1", "Project config: AUTH_PROVIDER_ATTRIBUTE_KEY"]
+    },
+    {
+      "id": "SR-002",
+      "user_story_id": "EXAMPLE-1",
+      "title": "AUTH_PROVIDER_ASSUME_VERIFIED must default to false",
+      "description": "The AUTH_PROVIDER_ASSUME_VERIFIED flag MUST default to false. When true, the server MUST log a WARN-level message at startup listing the SSO providers for which email verification is being trusted. The flag MUST NEVER be true for OIDC providers that allow user-controlled email claims (e.g., self-asserted accounts). A boot-time check MUST refuse to start if AUTH_PROVIDER_ASSUME_VERIFIED=true and any configured provider lacks a verified-email guarantee.",
+      "rationale": "OWASP ASVS V2.7.6 — account take-over via unverified email is a documented attack pattern. Defaulting AUTH_PROVIDER_ASSUME_VERIFIED to true exposes the system to identity spoofing via upstream providers that don't actually verify ownership.",
+      "acceptance_criteria": [
+        "Fresh deployment with no override has AUTH_PROVIDER_ASSUME_VERIFIED=false",
+        "Setting AUTH_PROVIDER_ASSUME_VERIFIED=true emits a WARN log entry naming the affected providers",
+        "Setting AUTH_PROVIDER_ASSUME_VERIFIED=true with a provider that does not guarantee email verification causes the server to fail to start"
+      ],
+      "asvs_category": "V2: Authentication",
+      "priority": "critical",
+      "implementation_notes": "Treat AUTH_PROVIDER_ASSUME_VERIFIED as a security-sensitive override; surface it in /health or /metrics so operators can detect misconfiguration.",
+      "source_references": ["OWASP ASVS v4.0.3 V2.7.6", "Project config: AUTH_PROVIDER_ASSUME_VERIFIED"]
+    },
+    {
+      "id": "SR-003",
+      "user_story_id": "EXAMPLE-1",
+      "title": "Session revocation endpoint /api/v2/session/revoke requires CSRF token",
+      "description": "The /api/v2/session/revoke endpoint MUST require a valid CSRF token in either a header (X-CSRF-Token) or POST body, matched against the session's bound CSRF secret. Requests missing or carrying a stale CSRF token MUST be rejected with HTTP 403 and MUST NOT invalidate the session. The endpoint MUST also require the caller to be authenticated as the session's owner; cross-account revocation is forbidden.",
+      "rationale": "OWASP ASVS V4.2.2 — state-changing endpoints must be CSRF-protected. /api/v2/session/revoke is a documented denial-of-service vector if exposed without CSRF, since an attacker can chain GET/IMG tags to invalidate sessions silently.",
+      "acceptance_criteria": [
+        "POST /api/v2/session/revoke without X-CSRF-Token returns 403",
+        "POST /api/v2/session/revoke for another user's session returns 403",
+        "Successful revocation requires both authentication and a session-bound CSRF token"
+      ],
+      "asvs_category": "V3: Session Management",
+      "priority": "high",
+      "implementation_notes": "Bind CSRF token to session at issuance, rotate it on privilege elevation, and clear it on /api/v2/session/revoke success.",
+      "source_references": ["OWASP ASVS v4.0.3 V4.2.2", "Project endpoint: /api/v2/session/revoke"]
+    }
+  ]
+}
+
+### Example 2
+USER STORY: Object Storage Backend with CDN Alias
+ACCEPTANCE CRITERIA:
+- Uploaded media is stored in object storage
+- A CDN alias host is used for public download URLs
+- Signed URLs gate access to private media
+
+PROJECT-SPECIFIC TOKENS (hypothetical):
+- WORKER_UPLOAD_BACKEND (configuration key selecting the storage driver)
+- WORKER_UPLOAD_ALIAS_HOST (the CDN hostname used in public URLs)
+- WORKER_UPLOAD_SIGNED_URL_TTL (signed-URL lifetime, seconds)
+
+EXPECTED OUTPUT:
+{
+  "requirements": [
+    {
+      "id": "SR-001",
+      "user_story_id": "EXAMPLE-2",
+      "title": "WORKER_UPLOAD_BACKEND value validated against an allow-list",
+      "description": "At startup, the server MUST validate WORKER_UPLOAD_BACKEND against a hard-coded allow-list of supported drivers (e.g., 's3', 'azure_blob', 'gcs', 'local'). An unrecognised value MUST cause the server to fail to start with a clear error. The chosen driver's credentials and bucket name MUST be loaded from environment variables, never from the database or HTTP requests.",
+      "rationale": "OWASP ASVS V14.1.5 — configuration-driven driver selection has caused arbitrary-code-execution incidents when the value was sourced from untrusted input.",
+      "acceptance_criteria": [
+        "WORKER_UPLOAD_BACKEND=foo causes startup failure with a non-zero exit code",
+        "The allow-list lives in code, not in any mutable config file",
+        "No HTTP endpoint can change WORKER_UPLOAD_BACKEND at runtime"
+      ],
+      "asvs_category": "V14: Configuration",
+      "priority": "critical",
+      "implementation_notes": "Centralize the driver registry in a single module; require explicit registration of each backend rather than dynamic imports by name.",
+      "source_references": ["OWASP ASVS v4.0.3 V14.1.5", "Project config: WORKER_UPLOAD_BACKEND"]
+    },
+    {
+      "id": "SR-002",
+      "user_story_id": "EXAMPLE-2",
+      "title": "WORKER_UPLOAD_ALIAS_HOST restricted to operator-controlled domain",
+      "description": "WORKER_UPLOAD_ALIAS_HOST MUST be set to a domain that the operator controls (verified via TXT record or owned-domain registry) before deployment. The value MUST be a syntactically valid hostname (RFC 1035) without a scheme or path. The server MUST refuse to serve media URLs whose host does not match WORKER_UPLOAD_ALIAS_HOST exactly — even if the underlying object exists — to prevent open-redirect and host-confusion attacks. The X-Forwarded-Host header MUST NOT override WORKER_UPLOAD_ALIAS_HOST when constructing public URLs.",
+      "rationale": "OWASP ASVS V1.6.1 — public URL generation must be deterministic and not influenced by request headers. A spoofed WORKER_UPLOAD_ALIAS_HOST has been used to phish download links onto attacker-controlled CDNs.",
+      "acceptance_criteria": [
+        "Server refuses to start if WORKER_UPLOAD_ALIAS_HOST contains 'http://', 'https://', or a path",
+        "Requests with a forged X-Forwarded-Host header still produce media URLs using WORKER_UPLOAD_ALIAS_HOST",
+        "A media-URL audit dumps every host segment and confirms uniqueness against WORKER_UPLOAD_ALIAS_HOST"
+      ],
+      "asvs_category": "V1: Architecture, Design and Threat Modeling",
+      "priority": "high",
+      "implementation_notes": "Validate WORKER_UPLOAD_ALIAS_HOST at boot using a strict regex; cache the constructed base URL so headers cannot influence it per-request.",
+      "source_references": ["OWASP ASVS v4.0.3 V1.6.1", "Project config: WORKER_UPLOAD_ALIAS_HOST"]
+    },
+    {
+      "id": "SR-003",
+      "user_story_id": "EXAMPLE-2",
+      "title": "WORKER_UPLOAD_SIGNED_URL_TTL upper-bounded and audited",
+      "description": "WORKER_UPLOAD_SIGNED_URL_TTL MUST be set to a value between 60 and 3600 seconds. Values outside that range MUST cause the server to refuse to start. Each signed URL issuance MUST log the resolved TTL and the bucket key, so anomalous TTLs can be detected. Signed URLs MUST be invalidated on the storage side when a media object is deleted, even if the URL has not yet expired.",
+      "rationale": "OWASP ASVS V8.3.4 — long-lived presigned URLs are a known data-leakage vector. Bounding WORKER_UPLOAD_SIGNED_URL_TTL prevents accidental over-permissive defaults.",
+      "acceptance_criteria": [
+        "WORKER_UPLOAD_SIGNED_URL_TTL=86400 causes startup failure",
+        "WORKER_UPLOAD_SIGNED_URL_TTL=0 causes startup failure",
+        "Deleting a media object revokes any outstanding signed URL within 60 seconds"
+      ],
+      "asvs_category": "V8: Data Protection",
+      "priority": "high",
+      "implementation_notes": "Use the storage SDK's native revoke-by-key when available; otherwise pre-rotate the signing key per bucket and discard the old key on delete.",
+      "source_references": ["OWASP ASVS v4.0.3 V8.3.4", "Project config: WORKER_UPLOAD_SIGNED_URL_TTL"]
+    }
+  ]
+}
+
+---
+
+## Now generate requirements for the actual user story below.
+
+## System Context
+$system_context
+
+## User Story to Analyze
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Generate security requirements for this user story. Match the level of specificity, detail, and ASVS mapping shown in the two examples — do not copy their content, but copy their form.
+
+GENERAL INSTRUCTIONS:
+1. Derive requirements from the user story and system context, applying OWASP ASVS and security best practices
+2. Include specific implementation guidance for the system's technology stack
+3. Use SPECIFIC values when available (e.g., "600,000 iterations" not "sufficient iterations")
+4. Generate 4-6 requirements per user story covering: authentication, authorization, cryptography, data protection
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+$json_schema
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.

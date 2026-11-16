@@ -1,0 +1,8 @@
+{
+ "name": "t_drop_hits",
+ "parent": "v0_old",
+ "description": "Mechanical test of the path: drop the code-search hits from the passage block, with no change of the template text.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

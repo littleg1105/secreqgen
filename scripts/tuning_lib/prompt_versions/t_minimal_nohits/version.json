@@ -1,0 +1,8 @@
+{
+ "name": "t_minimal_nohits",
+ "parent": "v1_minimal",
+ "description": "The short prompt of v1_minimal with no code-search hits in the passage block (the raw template markup stays).",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

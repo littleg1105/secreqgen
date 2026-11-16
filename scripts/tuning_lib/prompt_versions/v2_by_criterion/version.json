@@ -1,0 +1,8 @@
+{
+ "name": "v2_by_criterion",
+ "parent": "v0_old",
+ "description": "The short frame plus the design 'criterion by criterion': one requirement for each acceptance criterion, from a passage that is about it, or in general words when no passage is.",
+ "passage_changes": [
+  "drop_code_hits"
+ ]
+}

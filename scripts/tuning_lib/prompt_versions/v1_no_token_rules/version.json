@@ -1,0 +1,6 @@
+{
+ "name": "v1_no_token_rules",
+ "parent": "v0_old",
+ "description": "The rules about a token list are removed (the old tool gives no token list): the block in the system prompt and the block in the user prompt.",
+ "passage_changes": []
+}

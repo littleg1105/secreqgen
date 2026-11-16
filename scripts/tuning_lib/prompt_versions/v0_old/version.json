@@ -1,0 +1,6 @@
+{
+ "name": "v0_old",
+ "parent": null,
+ "description": "The old tool: a byte copy of data/winning_prompts_s2b/rep (arm B2 of Study 2b), with no passage change.",
+ "passage_changes": []
+}

@@ -1,0 +1,36 @@
+## System Context
+$system_context
+
+## Project Documentation
+The passages below come from the documentation of the product.
+
+$retrieved_context
+
+---
+
+## User Story
+**ID:** $story_id
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance Criteria:**
+$acceptance_criteria
+
+## Task
+Write the security requirements that this user story needs. For each requirement, work in this order:
+
+1. First choose the evidence. Copy at most two short parts of the passages that this requirement uses, word for word, with the number of their passage. A heading, a line of source code or a passage about a different feature is not evidence. If no passage fits, the evidence is an empty list.
+2. Then write the requirement from this evidence only. Name a setting, a command, an endpoint, a class or a file only if it is in your evidence, in the user story or in the system context. Say what such a thing does, or what its default is, only if your evidence says it.
+3. With an empty evidence list, write the requirement in general words. That is a correct answer.
+
+Write as many requirements as the story needs, and not more.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Write the keys of each requirement in this order: first "evidence", then the other keys.
+- evidence: array of objects, each with "passage" (the number of the passage) and "quote" (5 to 30 words copied exactly from that passage, without backslashes); an empty array if no passage fits
+$json_schema
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.

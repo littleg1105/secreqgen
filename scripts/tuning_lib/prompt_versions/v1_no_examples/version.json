@@ -1,0 +1,6 @@
+{
+ "name": "v1_no_examples",
+ "parent": "v0_old",
+ "description": "The two invented examples are removed from the user prompt.",
+ "passage_changes": []
+}
