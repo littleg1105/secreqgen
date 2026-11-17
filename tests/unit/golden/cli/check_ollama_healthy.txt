@@ -1,0 +1,8 @@
+exit=0
+Checking Ollama at: http://localhost:11434
+Model: llama3:8b
+✓ Ollama is running and model is available!
+Available models: gemma4:26b, llama3:8b
+
+--- calls
+OllamaClient(base_url='http://localhost:11434', model_name='llama3:8b')

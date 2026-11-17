@@ -1,0 +1,112 @@
+exit=1
+╭────────────────────────────────────────────────────────────────────────────────────── Generating Requirements ───────────────────────────────────────────────────────────────────────────────────────╮
+│ Title: T                                                                                                                                                                                             │
+│ Story: S                                                                                                                                                                                             │
+│ Mode: RAG                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+* Initializing...
+* Generating requirements...
+Generation Error: stand-in failure
+
+--- calls
+_ollama_client(tested_setup=False)
+DocumentEmbedder(device='cpu', model_name='all-mpnet-base-v2')
+SecReqGenVectorStore(collection_prefix='secreqgen', persist_directory=vectordb)
+SimpleRetriever(embedder=StandInEmbedder, similarity_threshold=0.4, top_k=5, vectorstore=StandInStore)
+SimpleRetriever.get_system_context()
+SimpleRetriever.retrieve_for_user_story(story='US-<ID>')
+SimpleRetriever.format_result_for_prompt(result=SimpleNamespace)
+--- prompts
+[1] stand-in generate(format='json')
+system_prompt:
+You are an expert Security Requirements Engineer with deep knowledge of:
+- OWASP Application Security Verification Standard (ASVS) v4.0
+- Secure Software Development Lifecycle (SSDLC) practices
+- Cloud security (AWS, Azure, GCP)
+- Common web application vulnerabilities and mitigations
+
+Your task is to generate specific, actionable, and testable security requirements based on user stories.
+
+Guidelines:
+1. Be SPECIFIC - avoid generic requirements; tailor to the system context
+2. Be ACTIONABLE - each requirement should have clear implementation guidance
+3. Be TESTABLE - include acceptance criteria that can be verified
+4. PRIORITIZE correctly - critical items affect authentication, authorization, or data protection
+5. CITE sources - reference ASVS requirements, security standards, or provided documentation
+6. Consider THREATS - think about who might attack this functionality and how
+
+Always respond with valid JSON matching the specified schema.
+prompt:
+## System Context
+name: StoredContext
+
+
+## Project Security Documentation (CRITICAL - You MUST use this)
+The following security documentation is from the project's own documentation and standards.
+You MUST reference this documentation when generating requirements.
+
+### [1] fixed.md
+A fixed passage of the stand-in retriever.
+
+---
+
+## User Story to Analyze
+**ID:** US-<ID>
+**Title:** T
+
+**Story:** S
+
+**Acceptance Criteria:**
+- No acceptance criteria provided
+
+## Task
+Generate security requirements for this user story. Prioritize requirements that are supported by the Project Security Documentation above.
+
+INSTRUCTIONS:
+1. FIRST, derive requirements from the security documentation above - use specific parameters mentioned (iteration counts, key sizes, algorithms)
+2. THEN, supplement with OWASP ASVS best practices for any gaps not covered by the documentation
+3. When documentation mentions HOW something works, derive requirements that ensure it is implemented SECURELY
+4. Use SPECIFIC values when available (e.g., "600,000 iterations" not "sufficient iterations")
+5. Generate 4-6 requirements per user story covering: authentication, authorization, cryptography, data protection
+
+EXAMPLES of documentation-derived requirements:
+- If docs say "master key derived using PBKDF2" → Require "PBKDF2-SHA256 with minimum 600,000 iterations"
+- If docs say "encrypted with AES-256" → Require "AES-256 encryption with authenticated mode (GCM/CBC-HMAC)"
+- If docs say "stored in Keychain" → Require "Platform-specific secure storage (Keychain/DPAPI/Keystore)"
+
+For gaps not covered by documentation, apply OWASP ASVS best practices for the feature area.
+
+## Output Format
+Respond with a JSON object containing a "requirements" array. Each requirement must have:
+
+- id: string (format: "SR-XXX" where XXX is a 3-digit number)
+- user_story_id: string (must match the input user story ID)
+- title: string (concise title, max 100 characters)
+- description: string (detailed requirement description)
+- rationale: string (why this requirement is necessary)
+- acceptance_criteria: array of strings (testable verification criteria)
+- asvs_category: string (one of the OWASP ASVS v4.0 categories)
+- priority: string (one of: "critical", "high", "medium", "low")
+- implementation_notes: string or null (specific implementation guidance)
+- source_references: array of strings (references to standards or documentation)
+
+Valid ASVS categories:
+- "V1: Architecture, Design and Threat Modeling"
+- "V2: Authentication"
+- "V3: Session Management"
+- "V4: Access Control"
+- "V5: Validation, Sanitization and Encoding"
+- "V6: Stored Cryptography"
+- "V7: Error Handling and Logging"
+- "V8: Data Protection"
+- "V9: Communication"
+- "V10: Malicious Code"
+- "V11: Business Logic"
+- "V12: Files and Resources"
+- "V13: API and Web Service"
+- "V14: Configuration"
+
+Valid priorities: "critical", "high", "medium", "low"
+
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.

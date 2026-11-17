@@ -1,0 +1,9 @@
+exit=1
+Checking Ollama at: http://localhost:11434
+Model: llama3:8b
+✗ Cannot connect to Ollama or model not available.
+Make sure Ollama is running: ollama serve
+And model is pulled: ollama pull llama3:8b
+
+--- calls
+OllamaClient(base_url='http://localhost:11434', model_name='llama3:8b')

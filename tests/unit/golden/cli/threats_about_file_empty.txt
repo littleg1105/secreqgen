@@ -1,0 +1,5 @@
+exit=1
+Error: The file has no text: about.txt
+
+--- calls
+_ollama_client(model_name='gemma4:26b', tested_setup=True)

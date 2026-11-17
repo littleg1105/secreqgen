@@ -1,0 +1,2 @@
+exit=1
+Error: the checker must be a different model than the model that writes the rows (writer: one-model, checker: one-model)

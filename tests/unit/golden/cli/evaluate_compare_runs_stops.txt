@@ -1,0 +1,25 @@
+exit=1
+╭─────────────────────────────────────────────────────────────────────────────────── Multi-Run Evaluation Pipeline ────────────────────────────────────────────────────────────────────────────────────╮
+│ Stories: stories.json                                                                                                                                                                                │
+│ Ground Truth: gt.json                                                                                                                                                                                │
+│ Output: docs/evaluation_results                                                                                                                                                                      │
+│ Runs: 3                                                                                                                                                                                              │
+│ Match Threshold: 0.85                                                                                                                                                                                │
+│ Partial Threshold: 0.7                                                                                                                                                                               │
+│ Model: llama3:8b                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+* Initializing components...
+✓ Components initialized
+
+Running 3 evaluations...
+
+* Multi-run evaluation                                            0%
+Generation Error: stand-in stop
+
+--- calls
+OllamaClient(base_url='http://localhost:11434', max_tokens=4096, model_name='llama3:8b', temperature=0.1)
+DocumentEmbedder(device='cpu', model_name='all-mpnet-base-v2')
+SecReqGenVectorStore(collection_prefix='secreqgen', persist_directory=vectordb)
+SimpleRetriever(embedder=StandInEmbedder, similarity_threshold=0.4, top_k=5, vectorstore=StandInStore)
+EvaluationPipeline(llm_client=StandInClient, match_threshold=0.85, partial_threshold=0.7, retriever=StandInRetriever, system_context=None)
+run_multi_evaluation(ground_truth_path=gt.json, n_runs=3, pipeline=StandInPipeline, progress_callback=function, stories_path=stories.json)
