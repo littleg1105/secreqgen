@@ -81,4 +81,7 @@ def render_markdown(model: dict) -> str:
                     out += _row(number, row, headers)
     out.append(f"Passages read: {len(model['passages'])} in {len(model['calls'])} model calls. Model: {model.get('model')}. "
                f"Time: {model['seconds']} s. Rows that the script removed: {len(model['dropped'])}.")
+    if model.get("about"):
+        out.append(f"The model that writes the rows also read one paragraph about the product from the user ({len(model['about'].split())} words). "
+                   "It is background and not a source: each row has its quote from a documentation passage.")
     return "\n".join(out) + "\n"

@@ -12,6 +12,10 @@ Method (tested on 17 November 2026, see the lab notes of that day):
    the story part is a copy of words of the story. The harm is kept for an attack row only.
 5. One call for a story names a threat actor and a STRIDE category for each row, from closed lists. They are the
    model's choice from the threat sentence. They have no source in the documentation.
+6. A script looks for the signs of a weak row (a rule row whose quote has no rule word, a threat sentence with
+   words that are not in the passage, a quote that is a fragment, no STRIDE category). Rows with no such sign come
+   first on the page; no row is removed. (A second model call that asked "is this sentence about the story?" was
+   tested and gave no gain on the local models, so it is not part of the tool.)
 7. Optional: a second local model checks each row with the passage in view. It names a fault only when it is sure
    (the sentence is about a different feature, or the threat says something that the passage does not say).
    Rows with no fault come first on the page; no row is removed. In the test of 17 November 2026 (279 judged rows
@@ -19,10 +23,18 @@ Method (tested on 17 November 2026, see the lab notes of that day):
    (22 of 100), and refused 83, 42 of them wrong; it refused 30 of 91 good rows. qwen3.8:27b as the checker of
    gemma4:26b accepted 65 of 92 rows, 7 wrong (11 of 100), and refused 27, 12 wrong; it refused 13 of 49 good rows.
    A first, stricter prompt (three yes/no questions, all must be yes) refused 2 of 3 good rows.
-6. A script looks for the signs of a weak row (a rule row whose quote has no rule word, a threat sentence with
-   words that are not in the passage, a quote that is a fragment, no STRIDE category). Rows with no such sign come
-   first on the page; no row is removed. (A second model call that asked "is this sentence about the story?" was
-   tested and gave no gain on the local models, so it is not part of the tool.)
+8. Optional: one paragraph about the product (ABOUT_MAX_WORDS words at most) stands before the passages in the
+   prompt of the writer. It is background and not a source: the prompt says so, and each row still needs a quote
+   from a passage. The checker does not get the paragraph: its prompt is the same in each run.
+   Test of 17 November 2026 (12 stories, local models, blind judges; in this test the paragraph was in both
+   prompts): it did not lower the number of wrong rows (gemma4:26b: 7 of 49 rows wrong without it, 7 of 62 with
+   it; qwen3.8:27b: 43 of 121 against 35 of 116, a difference that can be chance). gemma4:26b wrote more rows with
+   it (62 against 49, of them 44 against 33 supported; a repeat run with no paragraph gave 49 again).
+   Why the checker does not get it: the judged rows of that test were checked again, with and without the
+   paragraph. qwen3.8:27b as the checker accepted 51 of 62 rows with it (6 wrong) and 44 without it (4 wrong): of
+   the 7 rows that only the paragraph made it accept, 2 were wrong. gemma4:26b as the checker accepted 69 of 116
+   rows with it (19 wrong) and 70 without it (21 wrong): no difference. A repeat of the check with the paragraph
+   changed 2 of 62 and 7 of 116 verdicts.
 """
 
 from __future__ import annotations
@@ -66,6 +78,12 @@ EXTRA_SECTIONS = 5  # sections of the search pool with a risk word, in one more 
 EXTRA_TOKENS = 1000
 MAX_QUOTE_WORDS = 30  # the limit that the prompt names
 QUOTE_LIMIT = 60  # a longer quote is refused by the script
+ABOUT_MAX_WORDS = 120  # the optional paragraph about the product: one paragraph, no more
+ABOUT_WRITER = (
+    "## About the product\n"
+    "This paragraph helps you to understand the product. It is not a source: do not quote it, "
+    "and do not take a fact for a row from it.\n\n$about\n\n"
+)
 CHECK_PASSAGE_CHARS = 12000  # the most text of one passage in a check call (a passage has 2,000 tokens at most)
 MAX_JSON_ATTEMPTS = 3
 HARMS = (
@@ -123,10 +141,16 @@ class ThreatListGenerator:
         product: str | None = None,
         name_labels: bool = True,
         checker: Any = None,
+        about: str | None = None,
     ) -> None:
         self.llm = llm_client
         self.name_labels = name_labels
         self.checker = checker  # a client of a second local model that checks each row, or None
+        self.about = " ".join(about.split()) if about and about.strip() else None
+        if self.about and len(self.about.split()) > ABOUT_MAX_WORDS:
+            raise ThreatListError(
+                f"the paragraph about the product has {len(self.about.split())} words; the limit is {ABOUT_MAX_WORDS}"
+            )
         self.retriever = WordSearchRetriever(Path(docs_dir), product=product)
         try:
             self._system = (PROMPT_DIR / "system_prompt.txt").read_text(encoding="utf-8")
@@ -243,6 +267,8 @@ class ThreatListGenerator:
                 acceptance_criteria=criteria_lines,
                 max_quote_words=MAX_QUOTE_WORDS,
             )
+            if self.about:
+                prompt = string.Template(ABOUT_WRITER).substitute(about=self.about) + prompt
             answer = None
             attempts = 0
             t0 = time.time()
@@ -329,6 +355,7 @@ class ThreatListGenerator:
             "seconds": round(time.time() - start),
             "calls": calls,
             "label_step": self.name_labels,
+            "about": self.about,
             "checker": getattr(self.checker, "model_name", None) if self.checker is not None else None,
             "extra_passages": n_extra,
             "passages": passages,

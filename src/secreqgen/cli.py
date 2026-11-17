@@ -1030,6 +1030,17 @@ def generate_threats(
             help="A second local model that checks each row (for example gemma4:26b). Accepted rows come first",
         ),
     ] = None,
+    about_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--about-file",
+            help=(
+                "Text file with one paragraph about the product (120 words at "
+                "most). The model that writes the rows reads it as background, "
+                "not as a source"
+            ),
+        ),
+    ] = None,
     output: Annotated[
         Path,
         typer.Option("--output", "-o", help="Output folder"),
@@ -1113,8 +1124,31 @@ def generate_threats(
                     f"[red]Error:[/red] The checker model is not available in Ollama: {escape(checker_model)}"
                 )
                 raise typer.Exit(1)
+        about = None
+        if about_file is not None:
+            about_name = escape(str(about_file))
+            if not about_file.is_file():
+                problem = "Not a file" if about_file.exists() else "File not found"
+                console.print(f"[red]Error:[/red] {problem}: {about_name}")
+                raise typer.Exit(1)
+            try:
+                # utf-8-sig: a byte order mark at the start of the file is not text
+                about = about_file.read_text(encoding="utf-8-sig")
+            except (OSError, UnicodeError) as e:
+                console.print(
+                    f"[red]Error:[/red] Cannot read {about_name}: {escape(str(e))}"
+                )
+                raise typer.Exit(1)
+            if not about.strip():
+                console.print(f"[red]Error:[/red] The file has no text: {about_name}")
+                raise typer.Exit(1)
         generator = ThreatListGenerator(
-            llm_client, docs, product=product_name, name_labels=labels, checker=checker
+            llm_client,
+            docs,
+            product=product_name,
+            name_labels=labels,
+            checker=checker,
+            about=about,
         )
     except LLMConnectionError as e:
         console.print(f"[red]LLM Connection Error:[/red] {e}")

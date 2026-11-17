@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import string
 from pathlib import Path
 
 import pytest
@@ -382,6 +383,34 @@ def test_keep_or_drop_takes_the_last_verdict_word() -> None:
     assert checks.keep_or_drop("") == ""
 
 
+def test_the_paragraph_about_the_product_goes_to_the_writer_only_and_is_limited(docs: Path) -> None:
+    about = "ExampleApp is a web shop. It has sessions, a cart and a backup job."
+    llm, checker = StandIn(good_rows), Checker()
+    model = ThreatListGenerator(llm, docs, checker=checker, about=about).generate(STORY)
+    assert model["about"] == about and len(model["rows"]) == 2
+    # The paragraph is the only difference: each prompt is its text block plus the prompt of a run with no paragraph.
+    plain, plain_checker = StandIn(good_rows), Checker()
+    ThreatListGenerator(plain, docs, checker=plain_checker).generate(STORY)
+    assert plain.threat_prompts and len(plain_checker.prompts) == 2
+    assert all(p.startswith("## Documentation passages") for p in plain.threat_prompts)
+    assert all(p.startswith("User story:") for p in plain_checker.prompts)
+    writer_block = string.Template(pipeline.ABOUT_WRITER).substitute(about=about)
+    assert about in writer_block
+    assert llm.threat_prompts == [writer_block + p for p in plain.threat_prompts]
+    assert checker.prompts == plain_checker.prompts, "the checker does not get the paragraph"
+    assert all(about not in p for p in checker.prompts)
+    # The limit: 120 words are accepted, 121 are refused.
+    at_limit = ThreatListGenerator(StandIn(good_rows), docs, about="word " * pipeline.ABOUT_MAX_WORDS)
+    assert len(at_limit.about.split()) == pipeline.ABOUT_MAX_WORDS == 120
+    with pytest.raises(pipeline.ThreatListError):
+        ThreatListGenerator(StandIn(good_rows), docs, about="word " * (pipeline.ABOUT_MAX_WORDS + 1))
+    assert f"({len(about.split())} words)" in render_markdown(model) and "paragraph about the product" in render_markdown(model)
+    assert "paragraph about the product" not in render_markdown(ThreatListGenerator(StandIn(good_rows), docs).generate(STORY))
+    spaced = ThreatListGenerator(StandIn(good_rows), docs, about="  ExampleApp is\n\n a web   shop.  ")
+    assert spaced.about == "ExampleApp is a web shop.", "the text becomes one paragraph"
+    assert ThreatListGenerator(StandIn(good_rows), docs, about="  \n ").about is None
+
+
 # ---------------------------------------------------------------------------------------------- page
 def test_the_page_shows_rows_with_no_weak_sign_first_and_attacks_before_rules(docs: Path) -> None:
     model = ThreatListGenerator(StandIn(good_rows), docs).generate(STORY)
@@ -411,6 +440,7 @@ def test_the_command_line_has_the_threats_command() -> None:
     assert result.exit_code == 0, result.output
     text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--docs" in text and "--no-labels" in text and "--story-id" in text and "--checker-model" in text
+    assert "--about-file" in text
 
 
 def test_the_command_line_refuses_a_missing_documentation_folder(tmp_path: Path) -> None:
@@ -445,6 +475,35 @@ def test_the_command_line_refuses_a_checker_that_is_the_main_model(docs: Path, t
     result = CliRunner().invoke(cli.app, ["generate", "threats", str(stories), "--docs", str(docs), "--checker-model", main_model, "--output", str(tmp_path / "out")])
     assert result.exit_code == 1, result.output
     assert "must be a different model" in result.output and "Traceback" not in result.output
+
+
+def test_the_command_line_takes_a_paragraph_about_the_product_from_a_file(docs: Path, tmp_path: Path, monkeypatch) -> None:
+    import secreqgen.cli as cli
+    from typer.testing import CliRunner
+
+    monkeypatch.setattr(cli, "_ollama_client", lambda cfg, tested_setup, model_name=None: _Healthy())
+    stories = tmp_path / "stories.json"
+    stories.write_text(json.dumps({"project": "x", "user_stories": [{"id": "US-1", "title": "Session timeout", "story": "s", "acceptance_criteria": []}]}), encoding="utf-8")
+    base = ["generate", "threats", str(stories), "--docs", str(docs), "--output", str(tmp_path / "out")]
+    good = tmp_path / "about.txt"
+    good.write_text("\ufeffExampleApp is a web shop.\nIt has sessions and a cart.\n", encoding="utf-8")
+    result = CliRunner().invoke(cli.app, base + ["--about-file", str(good)])
+    assert result.exit_code == 0, result.output
+    saved = json.loads((tmp_path / "out" / "US-1" / "threats.json").read_text(encoding="utf-8"))
+    assert saved["about"] == "ExampleApp is a web shop. It has sessions and a cart."
+    for name, text, message in (("long.txt", "word " * 121, "the limit is 120"), ("empty.txt", " \n", "The file has no text"), ("mark.txt", "\ufeff", "The file has no text")):
+        bad = tmp_path / name
+        bad.write_text(text, encoding="utf-8")
+        result = CliRunner().invoke(cli.app, base + ["--about-file", str(bad)])
+        assert result.exit_code == 1 and message in result.output and "Traceback" not in result.output, result.output
+    result = CliRunner().invoke(cli.app, base + ["--about-file", str(tmp_path / "missing.txt")])
+    assert result.exit_code == 1 and "File not found" in result.output, result.output
+    result = CliRunner().invoke(cli.app, base + ["--about-file", str(tmp_path)])
+    assert result.exit_code == 1 and "Not a file" in result.output and "File not found" not in result.output, result.output
+    not_text = tmp_path / "bytes.txt"
+    not_text.write_bytes(b"\xff\xfe\xfa product")
+    result = CliRunner().invoke(cli.app, base + ["--about-file", str(not_text)])
+    assert result.exit_code == 1 and "Cannot read" in result.output and "Traceback" not in result.output, result.output
 
 
 def test_the_command_line_gives_each_story_its_own_folder(docs: Path, tmp_path: Path, monkeypatch) -> None:
