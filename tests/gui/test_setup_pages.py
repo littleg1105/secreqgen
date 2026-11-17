@@ -134,7 +134,9 @@ async def test_folder_without_markdown_shows_its_line(user, tmp_path):
     folder = tmp_path / "empty"
     folder.mkdir()
     await user.open(_url("/threats/new", _stories(tmp_path), folder))
-    await user.should_see("This folder has no Markdown files.")
+    await user.should_see(
+        "This folder has no Markdown files. The search reads .md files only."
+    )
     assert not _button(user, "Start threat list").enabled
 
 
@@ -337,3 +339,45 @@ async def test_the_example_stories_are_one_click_away(user):
     await user.should_see("Webhooks and Integrations")
     # The form asks for no product name: the stories fit any product.
     await user.should_see("Product name (optional)")
+
+
+def test_the_count_is_the_count_of_files_that_the_search_reads(tmp_path):
+    from secreqgen_gui.pages import _setup_parts as parts
+
+    docs = tmp_path / "docs"
+    (docs / "sub").mkdir(parents=True)
+    (docs / ".hidden").mkdir()
+    for name in ("a.md", "sub/e.md", ".hidden/f.md"):
+        (docs / name).write_text("# Page\n\nUsers must log in.\n", encoding="utf-8")
+    for name in ("b.rst", "c.rst", "d.txt", "page.mdx", "G.MD", "logo.png"):
+        (docs / name).write_text("text", encoding="utf-8")
+    markdown, others = parts.count_docs(docs)
+    # The search reads ".md" in small letters, also in a hidden folder.
+    assert markdown == 3
+    assert others == {".rst": 2, ".txt": 1, ".mdx": 1, ".MD": 1}
+    assert parts.count_markdown(docs) == 3
+    assert parts.not_read_text(others) == (
+        " 5 files of other types are not read (.rst, .MD, .mdx)."
+    )
+    assert parts.not_read_text({".rst": 1}) == (
+        " 1 file of another type is not read (.rst)."
+    )
+    assert parts.not_read_text({}) == ""
+
+
+async def test_the_form_says_which_files_it_does_not_read(user, tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "a.md").write_text("# Page\n\nUsers must log in.\n", encoding="utf-8")
+    (docs / "b.rst").write_text("Title\n=====\n", encoding="utf-8")
+    await user.open(f"/threats/new?docs={docs}")
+    await user.should_see(
+        "1 Markdown file found. 1 file of another type is not read (.rst)."
+    )
+    only_rst = tmp_path / "only_rst"
+    only_rst.mkdir()
+    (only_rst / "b.rst").write_text("Title\n=====\n", encoding="utf-8")
+    await user.open(f"/threats/new?docs={only_rst}")
+    await user.should_see(
+        "This folder has no Markdown files. The search reads .md files only."
+    )

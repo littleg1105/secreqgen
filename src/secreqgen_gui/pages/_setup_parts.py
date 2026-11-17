@@ -26,7 +26,21 @@ from secreqgen_gui.widgets import path_field
 
 TESTED_SET = "__tested__"
 FOLDER_MISSING = "Folder not found. Check the path or click Browse."
-FOLDER_EMPTY = "This folder has no Markdown files."
+FOLDER_EMPTY = "This folder has no Markdown files. The search reads .md files only."
+# Documentation files of other types. The search does not read them.
+OTHER_DOC_SUFFIXES = (
+    ".rst",
+    ".adoc",
+    ".asciidoc",
+    ".txt",
+    ".mdx",
+    ".markdown",
+    ".html",
+    ".htm",
+    ".org",
+    ".pdf",
+    ".docx",
+)
 WRONG_TYPE = "Use a .json, .yaml or .yml file."
 STORIES_HINT = "JSON or YAML, with a list named user_stories"
 EXAMPLES_HINT = "Eight generic stories that fit most products."
@@ -77,12 +91,42 @@ def set_message(label: ui.label, text: str, kind: str = "plain") -> None:
     label.set_visibility(bool(text))
 
 
-def count_markdown(folder: Path) -> int:
-    """Count the Markdown files in a folder and in the folders below it."""
-    total = 0
+def count_docs(folder: Path) -> tuple[int, dict[str, int]]:
+    """Count the files that the search reads, and the other documentation files.
+
+    The search reads each file whose name ends in ".md" (small letters), in
+    the folder and in every folder below it. It reads no other file. The
+    second value counts the files of other documentation types by suffix.
+    """
+    markdown = 0
+    others: dict[str, int] = {}
     for _root, _dirs, names in os.walk(folder):
-        total += sum(1 for n in names if n.lower().endswith(".md"))
-    return total
+        for name in names:
+            if name.endswith(".md"):
+                markdown += 1
+                continue
+            suffix = os.path.splitext(name)[1]
+            if suffix.lower() == ".md":
+                others[suffix] = others.get(suffix, 0) + 1  # for example ".MD"
+            elif suffix.lower() in OTHER_DOC_SUFFIXES:
+                others[suffix.lower()] = others.get(suffix.lower(), 0) + 1
+    return markdown, others
+
+
+def count_markdown(folder: Path) -> int:
+    """Count the Markdown files that the search reads."""
+    return count_docs(folder)[0]
+
+
+def not_read_text(others: dict[str, int]) -> str:
+    """Return one sentence about the files of other types, or an empty text."""
+    total = sum(others.values())
+    if not total:
+        return ""
+    kinds = ", ".join(sorted(others, key=lambda kind: (-others[kind], kind))[:3])
+    if total == 1:
+        return f" 1 file of another type is not read ({kinds})."
+    return f" {total} files of other types are not read ({kinds})."
 
 
 def prompt_set_choices(kind: str) -> dict[str, str]:
@@ -355,7 +399,9 @@ class DocsPart:
             return
         folder = expand_path(value)
         isdir = await run.io_bound(folder.is_dir)
-        count = await run.io_bound(count_markdown, folder) if isdir else 0
+        count, others = (
+            await run.io_bound(count_docs, folder) if isdir else (0, {})
+        )
         if token != self._token:
             return
         self.files = count
@@ -366,7 +412,8 @@ class DocsPart:
         else:
             set_message(
                 self.info,
-                f"{plural(count, 'Markdown file', 'Markdown files')} found.",
+                f"{plural(count, 'Markdown file', 'Markdown files')} found."
+                + not_read_text(others),
             )
         self.on_change()
 
