@@ -9,6 +9,7 @@ given. It has no default folder.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,7 @@ from secreqgen.application.errors import InputError, ModelServerError, NothingTo
 from secreqgen.application.events import ProgressCallback, ProgressEvent
 from secreqgen.application.inputs import (
     build_user_stories,
+    check_about,
     check_docs_folder,
     check_input_file,
     read_story_data,
@@ -137,6 +139,11 @@ class ThreatOptions:
     checker_model: str | None = None
     about: str | None = None  # the text itself, not a file
     output: Path | None = None  # None: write no file
+    # Options for a GUI. Each default keeps the behaviour of the command line.
+    strict_input: bool = False  # errors of the input become InputError
+    keep_finished: bool = False  # a story that raises ends the run, not the result
+    story_ids: tuple[str, ...] | None = None  # more than one story, in file order
+    prompts_dir: Path | None = None  # a folder of user prompt files
 
 
 @dataclass
@@ -158,6 +165,9 @@ class ThreatRun:
     lists: list[ThreatListOutcome] = field(default_factory=list)
     failures: list[tuple[str, Exception]] = field(default_factory=list)
     skipped: list[tuple[int, Exception]] = field(default_factory=list)
+    stopped: bool = False  # the stop request ended the run
+    aborted: Exception | None = None  # the error that ended the run
+    not_run: list[str] = field(default_factory=list)  # ids of stories not started
 
 
 def _checked_client(make_client, cfg, model_name: str, what: str):
@@ -171,12 +181,90 @@ def _checked_client(make_client, cfg, model_name: str, what: str):
     return client
 
 
+def _require_healthy(client, model_name: str, what: str) -> None:
+    """Raise ModelServerError when the client is not ready."""
+    if not client.check_health():
+        raise ModelServerError(
+            f"Ollama does not answer, or it does not have the {what} {model_name}.",
+            model=model_name,
+        )
+
+
+def _select_story_ids(stories: list, story_ids: tuple[str, ...]) -> list:
+    """Return the stories with these ids, in file order. An unknown id is an error."""
+    known = {story.id for story in stories}
+    for story_id in story_ids:
+        if story_id not in known:
+            raise InputError(f"Story not found in the input file: {story_id}")
+    wanted = set(story_ids)
+    return [story for story in stories if story.id in wanted]
+
+
+def _check_output_folder(folder: Path) -> None:
+    """Make the output folder and test it with one small file."""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".write_test"
+        probe.write_text("test", encoding="utf-8")
+        probe.unlink()
+    except OSError as e:
+        raise InputError(
+            f"Cannot write to the output folder: {folder}: {e.strerror or e}"
+        ) from e
+
+
+def _build_generator(options, llm_client, checker, product, about, strict):
+    """Build the threat list generator. A user prompt folder gives a subclass."""
+    from secreqgen.retrieval.word_search import SearchError
+    from secreqgen.threats import ThreatListError, ThreatListGenerator
+
+    arguments = {
+        "product": product,
+        "name_labels": options.labels,
+        "checker": checker,
+        "about": about,
+    }
+    try:
+        if options.prompts_dir is None:
+            return ThreatListGenerator(llm_client, options.docs, **arguments)
+        from secreqgen.application.prompt_sets import build_threat_generator_class
+
+        generator_class = build_threat_generator_class()
+        return generator_class(
+            llm_client,
+            options.docs,
+            prompts_dir=options.prompts_dir,
+            prompt_label=f"user:{options.prompts_dir.name}",
+            **arguments,
+        )
+    except (ThreatListError, SearchError) as e:
+        if not strict:
+            raise
+        raise InputError(str(e)) from e
+
+
+def _all_calls_failed(model: dict) -> bool:
+    """True when the story has model calls and none of them gave a valid answer."""
+    calls = model.get("calls") or []
+    return bool(calls) and not any(call.get("ok") for call in calls)
+
+
+def _server_answers(client) -> bool:
+    """True when the client reports a healthy model server. It never raises."""
+    try:
+        return bool(client.check_health())
+    except Exception:
+        return False
+
+
 def run_threat_lists(
     options: ThreatOptions,
     *,
     cfg: SecReqGenConfig | None = None,
     make_client: ClientFactory | None = None,
     on_progress: ProgressCallback | None = None,
+    should_stop: Callable[[], bool] | None = None,
+    on_story_start: Callable[[str, int, int], None] | None = None,
 ) -> ThreatRun:
     """Run the whole threat list pipeline.
 
@@ -184,11 +272,20 @@ def run_threat_lists(
     domain packages pass through, except the errors of one story: a
     ThreatListError, a SearchError or a GenerationError goes to the failures.
     No list gives an empty list, not an error.
+
+    The options strict_input and keep_finished are for a GUI. With
+    strict_input, the input errors before the first story are InputError. With
+    keep_finished, an error inside the story loop ends the loop and goes to
+    run.aborted, and the lists that are done stay in the result. should_stop is
+    asked before each story. on_story_start runs before each story.
     """
     from secreqgen.exceptions import GenerationError
     from secreqgen.retrieval.word_search import SearchError
-    from secreqgen.threats import ThreatListError, ThreatListGenerator
+    from secreqgen.threats import ThreatListError
 
+    strict = options.strict_input
+    if options.story_id is not None and options.story_ids is not None:
+        raise InputError("Use story_id or story_ids, not both.")
     check_input_file(options.input_file)
     check_docs_folder(options.docs)
     try:
@@ -205,6 +302,8 @@ def run_threat_lists(
             raise InputError(
                 f"Story not found in the input file: {options.story_id}"
             )
+    if options.story_ids is not None:
+        stories = _select_story_ids(stories, options.story_ids)
     if not stories:
         raise NothingToDoError("No user stories found in input file.")
 
@@ -218,45 +317,97 @@ def run_threat_lists(
 
         make_client = build_ollama_client
 
-    writer, checker_name = resolve_threat_models(
-        cfg, options.writer_model, options.checker_model, options.check
-    )
-    llm_client = _checked_client(make_client, cfg, writer, "model")
-    checker = None
-    if checker_name:
-        checker = _checked_client(make_client, cfg, checker_name, "checker model")
-    generator = ThreatListGenerator(
-        llm_client,
-        options.docs,
-        product=product,
-        name_labels=options.labels,
-        checker=checker,
-        about=options.about,
-    )
+    about = options.about
+    if options.prompts_dir is not None:
+        from secreqgen.application.prompt_sets import check_prompt_folder
+
+        check_prompt_folder("threats", options.prompts_dir)
+    try:
+        writer, checker_name = resolve_threat_models(
+            cfg, options.writer_model, options.checker_model, options.check
+        )
+    except ThreatListError as e:
+        if not strict:
+            raise
+        raise InputError(str(e)) from e
+    if strict:
+        # The cheap input checks come before the checks of the model server.
+        about = check_about(options.about)
+        if options.output is not None:
+            _check_output_folder(options.output)
+        llm_client = make_client(cfg, tested_setup=True, model_name=writer)
+        checker = None
+        if checker_name:
+            checker = make_client(cfg, tested_setup=True, model_name=checker_name)
+        generator = _build_generator(
+            options, llm_client, checker, product, about, strict
+        )
+        _require_healthy(llm_client, writer, "model")
+        if checker is not None:
+            _require_healthy(checker, checker_name, "checker model")
+    else:
+        llm_client = _checked_client(make_client, cfg, writer, "model")
+        checker = None
+        if checker_name:
+            checker = _checked_client(
+                make_client, cfg, checker_name, "checker model"
+            )
+        generator = _build_generator(
+            options, llm_client, checker, product, about, strict
+        )
 
     run = ThreatRun(writer=writer, checker=checker_name, skipped=skipped)
     used_names: set[str] = set()
     total = len(stories)
     for done, story in enumerate(stories, start=1):
+        if should_stop is not None and should_stop():
+            run.stopped = True
+            run.not_run = [s.id for s in stories[done - 1 :]]
+            break
+        if on_story_start is not None:
+            on_story_start(story.id, done, total)
         error: Exception | None = None
+        outcome: ThreatListOutcome | None = None
         try:
-            model = generator.generate(story)
-        except (ThreatListError, SearchError, GenerationError) as e:
-            run.failures.append((story.id, e))
-            error = e
-        else:
-            folder = None
-            if options.output is not None:
-                folder = options.output / threat_folder_name(story.id, used_names)
-                write_threat_files(folder, model)
-            run.lists.append(
-                ThreatListOutcome(
+            try:
+                model = generator.generate(story)
+            except (ThreatListError, SearchError, GenerationError) as e:
+                run.failures.append((story.id, e))
+                error = e
+            else:
+                folder = None
+                if options.output is not None:
+                    folder = options.output / threat_folder_name(story.id, used_names)
+                    write_threat_files(folder, model)
+                outcome = ThreatListOutcome(
                     story_id=story.id,
                     model=model,
                     summary=summarise_threat_list(model),
                     folder=folder,
                 )
-            )
+                run.lists.append(outcome)
+        except Exception as e:
+            if not options.keep_finished:
+                raise
+            # The story that raised counts as failed. The rest did not run.
+            run.failures.append((story.id, e))
+            run.aborted = e
+            run.not_run = [s.id for s in stories[done:]]
+            if on_progress is not None:
+                on_progress(ProgressEvent(done, total, story.id, e))
+            break
         if on_progress is not None:
-            on_progress(ProgressEvent(done, total, story.id, error))
+            on_progress(ProgressEvent(done, total, story.id, error, outcome))
+        if (
+            options.keep_finished
+            and outcome is not None
+            and _all_calls_failed(outcome.model)
+            and not _server_answers(llm_client)
+        ):
+            run.aborted = ModelServerError(
+                f"The model server stopped answering during story {story.id}.",
+                model=writer,
+            )
+            run.not_run = [s.id for s in stories[done:]]
+            break
     return run

@@ -5,10 +5,19 @@ The functions raise errors. They never print.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from secreqgen.application.errors import InputError
+from secreqgen.application.errors import InputError, NothingToDoError
+
+if TYPE_CHECKING:
+    from secreqgen.generation.schemas import UserStory
+
+# The limit of the paragraph about the product (the same as the threat list
+# pipeline has). It is a copy, so that this module loads no domain package.
+ABOUT_MAX_WORDS = 120
+UPLOAD_EXTENSIONS = (".json", ".yaml", ".yml")
 
 
 def check_input_file(path: Path) -> None:
@@ -76,3 +85,71 @@ def build_user_stories(items: list) -> tuple[list, list[tuple[int, Exception]]]:
         except Exception as e:
             skipped.append((i + 1, e))
     return stories, skipped
+
+
+@dataclass(frozen=True)
+class StoryFile:
+    """The content of a story file, read with the parser of the run."""
+
+    project: str | None
+    stories: list[UserStory]
+    skipped: list[tuple[int, str]]  # position from 1, message
+
+
+def read_story_file(path: Path) -> StoryFile:
+    """Read a story file and return its product name and its stories.
+
+    It uses the same parser as the run functions. It raises InputError when
+    the file is missing, cannot be parsed or is not an object. It raises
+    NothingToDoError when the file has no stories.
+    """
+    from secreqgen.application.threats import threat_product_name
+
+    check_input_file(path)
+    try:
+        data = read_story_data(path, encoding="utf-8", require_object=True)
+        items = data.get("user_stories", []) or []
+        if not isinstance(items, list):
+            raise ValueError("user_stories must be a list")
+    except Exception as e:
+        raise InputError(f"Error parsing input file: {e}") from e
+    stories, skipped = build_user_stories(items)
+    if not stories:
+        raise NothingToDoError("No user stories found in input file.")
+    return StoryFile(
+        project=threat_product_name(None, data),
+        stories=stories,
+        skipped=[(position, str(error)) for position, error in skipped],
+    )
+
+
+def check_about(text: str | None) -> str | None:
+    """Check the paragraph about the product.
+
+    Return the text with its white space folded. Return None when the text is
+    empty or blank. Raise InputError when it has more than 120 words.
+    """
+    if text is None or not text.strip():
+        return None
+    folded = " ".join(text.split())
+    words = len(folded.split())
+    if words > ABOUT_MAX_WORDS:
+        raise InputError(
+            f"The paragraph about the product has {words} words. "
+            f"The limit is {ABOUT_MAX_WORDS}."
+        )
+    return folded
+
+
+def check_story_upload(name: str, size: int, max_bytes: int = 1_000_000) -> None:
+    """Check the name and the size of an uploaded story file.
+
+    Raise InputError for an extension other than .json, .yaml or .yml, or for
+    a file that is larger than max_bytes.
+    """
+    if Path(name).suffix.lower() not in UPLOAD_EXTENSIONS:
+        raise InputError("The file must be a .json, .yaml or .yml file.")
+    if size > max_bytes:
+        raise InputError(
+            f"The file is too large: {size} bytes. The limit is {max_bytes} bytes."
+        )
