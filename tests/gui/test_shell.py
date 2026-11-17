@@ -119,3 +119,13 @@ def test_start_file_starts_a_run(tmp_path, monkeypatch):
 async def test_rail_shows_the_model_server_state(user):
     await user.open("/")
     await user.should_see("Model server answers")
+
+
+async def test_the_health_address_answers_without_a_page(user) -> None:
+    from nicegui import app
+    from secreqgen_gui import app as shell
+
+    app.add_api_route("/healthz", shell.healthz, methods=["GET"])
+    response = await user.http_client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}

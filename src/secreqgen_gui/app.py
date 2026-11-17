@@ -69,6 +69,15 @@ ROUTES = {
 }
 
 
+def healthz() -> dict:
+    """Answer a plain check that the server runs (the address /healthz).
+
+    A script or a container asks this address, not a page. A page request
+    with no browser behind it makes timers that never get a connection.
+    """
+    return {"ok": True}
+
+
 def _is_active(label: str, prefixes: tuple[str, ...], path: str) -> bool:
     path = path.split("?")[0].split("#")[0].rstrip("/") or "/"
     if label == "Home":
@@ -159,4 +168,5 @@ def _on_startup() -> None:
 def setup() -> None:
     """Set the colours and the start hooks. Call it before ui.run."""
     theme.apply_app()
+    app.add_api_route("/healthz", healthz, methods=["GET"])
     app.on_startup(_on_startup)

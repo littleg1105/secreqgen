@@ -62,8 +62,11 @@ TEXTS: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "second_model": (
             "The second model checks each row",
-            "The second model reads each row beside its passage. It answers OK or "
-            "FAULT. A row with a fault stays in the list, in a group of its own.",
+            "The second model reads each row beside its passage. It looks for two "
+            "clear faults: the quote is about a different feature than the story, "
+            "or the threat says something that the passage does not say. It "
+            "answers OK or FAULT. A row with a fault stays in the list, in a group "
+            "of its own.",
         ),
         "weak_signs": (
             "The tool code marks weak signs",
