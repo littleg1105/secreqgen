@@ -1,0 +1,2 @@
+exit=1
+Error: Documentation folder not found: nodocs

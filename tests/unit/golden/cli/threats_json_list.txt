@@ -1,0 +1,2 @@
+exit=1
+Error parsing input file: the file must hold an object

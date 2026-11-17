@@ -1,0 +1,2 @@
+exit=1
+Error: File must be YAML (.yaml or .yml): ctx.txt

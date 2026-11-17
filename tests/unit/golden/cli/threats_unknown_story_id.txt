@@ -1,0 +1,2 @@
+exit=1
+Error: Story not found in the input file: NOPE

@@ -1,0 +1,2 @@
+exit=1
+Error: Stories file not found: no.json

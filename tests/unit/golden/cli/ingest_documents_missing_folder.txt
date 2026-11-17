@@ -1,0 +1,2 @@
+exit=1
+Error: Directory not found: nodocs

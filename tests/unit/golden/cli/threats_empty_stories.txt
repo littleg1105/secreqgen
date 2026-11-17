@@ -1,0 +1,2 @@
+exit=0
+No user stories found in input file.

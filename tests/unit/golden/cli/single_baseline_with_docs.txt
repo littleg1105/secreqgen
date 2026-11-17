@@ -1,0 +1,2 @@
+exit=1
+Error: --baseline cannot be used with --docs.

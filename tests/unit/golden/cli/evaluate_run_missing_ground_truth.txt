@@ -1,0 +1,2 @@
+exit=1
+Error: Ground truth file not found: no.json

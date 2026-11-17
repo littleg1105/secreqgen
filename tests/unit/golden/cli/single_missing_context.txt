@@ -1,0 +1,2 @@
+exit=1
+Error: Context file not found: no.yaml

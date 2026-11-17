@@ -1,0 +1,16 @@
+exit=1
+╭────────────────────────────────────────────────────────────────────────────────── Generating Security Requirements ──────────────────────────────────────────────────────────────────────────────────╮
+│ Input: bad.yaml                                                                                                                                                                                      │
+│ Mode: RAG-enhanced                                                                                                                                                                                   │
+│ Format: markdown                                                                                                                                                                                     │
+│ Output: stdout                                                                                                                                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Error parsing input file: while parsing a flow sequence
+  in "<unicode string>", line 1, column 4:
+    a: [1, 2
+       ^
+expected ',' or ']', but got ':'
+  in "<unicode string>", line 2, column 2:
+    b: : :
+     ^
+* Loading user stories...

@@ -1,0 +1,2 @@
+exit=0
+Vector store not initialized yet.

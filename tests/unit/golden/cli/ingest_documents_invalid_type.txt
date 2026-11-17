@@ -1,0 +1,3 @@
+exit=1
+Error: Invalid document type: invalid
+Valid types: policies, architecture, standards
