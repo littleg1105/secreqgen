@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from types import SimpleNamespace
@@ -332,3 +333,40 @@ async def test_the_threat_result_shows_the_numbers_of_the_steps(user):
     links = {e.text: e.props["href"] for e in user.find(kind=ui.link).elements}
     address = f"/how-it-works?kind=threats&run={run_id}&story=S-1"
     assert links["Replay the steps"] == address
+
+
+async def test_a_step_report_does_not_build_the_head_again(user, monkeypatch):
+    from secreqgen_gui.pages import run as run_page
+
+    progress = pipeline_boards.new_progress("threats", "S-2")
+    event = StepEvent("S-2", "write", "start", 2, 3, {"attempt": 1, "passages": 5})
+    pipeline_boards.apply_event(progress, event)
+    state = _live_state(progress)
+    monkeypatch.setattr(jobs, "manager", StandIn(state))
+    heads = []
+    original = run_page._head
+
+    def counting_head(view):
+        heads.append(view.version)
+        original(view)
+
+    monkeypatch.setattr(run_page, "_head", counting_head)
+    await user.open(f"/runs/{state.id}")
+    await user.should_see("Group 2 of 3.")
+    before = len(heads)
+    assert before >= 1
+    next_event = StepEvent("S-2", "write", "start", 3, 3, {"attempt": 1, "passages": 5})
+    pipeline_boards.apply_event(state.progress, next_event)
+    state.version = 2
+    await user.should_see("Group 3 of 3.", retries=20)
+    assert len(heads) == before
+    # A change of the story list builds the head again.
+    state.version = 3
+    state.story_version = 1
+    state.message = "Running again"
+    await user.should_see("Group 3 of 3.")
+    for _ in range(20):
+        if len(heads) > before:
+            break
+        await asyncio.sleep(0.2)
+    assert len(heads) > before

@@ -69,8 +69,10 @@ async def test_home_lines_say_ready(user, monkeypatch):
     await user.open("/")
     await user.should_see("gemma4:26b: ready")
     await user.should_see("qwen3.8:27b: ready")
-    await user.should_see("2 models.")
-    await user.should_see("The model server answers at http://localhost:11434.")
+    await user.should_see(
+        "The model server answers at http://localhost:11434. "
+        "It holds 2 models. This tool uses:"
+    )
 
 
 async def test_home_server_down_names_the_address(user, monkeypatch):
@@ -183,7 +185,8 @@ async def test_settings_check_shows_lines(user, monkeypatch):
     await user.open("/settings")
     user.find("Check the model server").click()
     await user.should_see(
-        "The model server answers at http://localhost:11434. 1 model."
+        "The model server answers at http://localhost:11434. "
+        "It holds 1 model. This tool uses:"
     )
     await user.should_see("qwen3.8:27b is missing. Run: ollama pull qwen3.8:27b")
 

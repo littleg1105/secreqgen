@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from nicegui import run as nice_run
 from nicegui import ui
@@ -57,6 +58,14 @@ def _entry_story_id(entry: dict) -> str:
     return found if isinstance(found, str) else ""
 
 
+def _manifest_seconds(manifest: dict, story_id: str) -> Any:
+    """Return the seconds that the run manifest holds for one story."""
+    for item in manifest.get("per_story") or []:
+        if isinstance(item, dict) and item.get("story_id") == story_id:
+            return item.get("seconds")
+    return None
+
+
 def _stored(kind: str, run_id: str, story_id: str | None) -> dict | None:
     """Return the stored data of a story, or None when there is none."""
     manifest = storage.read_manifest(run_id)
@@ -77,11 +86,15 @@ def _stored(kind: str, run_id: str, story_id: str | None) -> dict | None:
     entry = _requirements_entry(run_id, story_id)
     if entry is None:
         return None
+    found_id = _entry_story_id(entry)
+    trace = requirements_trace(entry)
+    if trace.get("seconds") is None:
+        trace["seconds"] = _manifest_seconds(manifest, found_id)
     return {
         "run_id": run_id,
-        "story_id": _entry_story_id(entry),
+        "story_id": found_id,
         "manifest": manifest,
-        "trace": requirements_trace(entry),
+        "trace": trace,
         "verdicts": {},
     }
 
@@ -179,7 +192,10 @@ def _source_line(kind: str, data: dict) -> None:
                 text += f" The real run of this story took {seconds}."
             ui.label(text).classes("sr-small")
             if kind == "threats":
-                target = f"/runs/{data['run_id']}/stories/{data['story_id']}"
+                target = (
+                    f"/runs/{data['run_id']}"
+                    f"/stories/{quote(data['story_id'], safe='')}"
+                )
             else:
                 target = f"/runs/{data['run_id']}/requirements"
             ui.link("Open the result", target).classes("sr-link text-sm")
@@ -198,34 +214,42 @@ def _source_line(kind: str, data: dict) -> None:
 
 def _parts(kind: str, address: str) -> None:
     with section("The parts"):
-        lines = [
-            (
-                "You",
-                "you give the story and the documentation. "
-                "You decide about each row.",
-            ),
-            (
-                "Tool code",
-                "fixed rules, no AI. It searches the documentation, "
-                "checks each quote and builds the page.",
-            ),
-        ]
         if kind == "threats":
-            lines.append(
+            lines = [
+                (
+                    "You",
+                    "you give the story and the documentation. "
+                    "You decide about each row.",
+                ),
+                (
+                    "Tool code",
+                    "fixed rules, no AI. It searches the documentation, "
+                    "checks each quote and builds the page.",
+                ),
                 (
                     "Models",
-                    "local language models. They answer through the model "
+                    "language models. They answer through the model "
                     f"server at {address}.",
-                )
-            )
+                ),
+            ]
         else:
-            lines.append(
+            lines = [
+                (
+                    "You",
+                    "you give the story and the documentation. "
+                    "You read the requirements.",
+                ),
+                (
+                    "Tool code",
+                    "fixed rules, no AI. It searches the documentation and "
+                    "puts the answer of the model into the fixed form.",
+                ),
                 (
                     "Model",
-                    "a local language model. It answers through the model "
+                    "a language model. It answers through the model "
                     f"server at {address}.",
-                )
-            )
+                ),
+            ]
         for name, rest in lines:
             with ui.row().classes("w-full gap-0 no-wrap items-baseline"):
                 ui.label(f"{name}:").classes("font-semibold mr-1 shrink-0")

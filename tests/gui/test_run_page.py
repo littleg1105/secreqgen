@@ -181,6 +181,7 @@ async def test_page_follows_the_version(user, monkeypatch):
     value.stories[1].summary = "4 rows"
     value.stories[2].state = "running"
     value.version += 1
+    value.story_version += 1
     await asyncio.sleep(0.8)
     await user.should_see("Running: story 3 of 3")
     await user.should_see("4 rows")

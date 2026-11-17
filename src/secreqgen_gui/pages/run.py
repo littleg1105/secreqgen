@@ -44,6 +44,7 @@ class View:
     finished: float | None = None
     stop_requested: bool = False
     version: int = 0
+    story_version: int = 0
     live: bool = False
     product: str = ""
     writer: str = ""
@@ -185,6 +186,7 @@ def _from_state(state: jobs.RunState, manifest: dict | None) -> View:
         finished=state.finished,
         stop_requested=state.stop_requested,
         version=state.version,
+        story_version=getattr(state, "story_version", 0),
         live=state.state in ACTIVE,
         progress=getattr(state, "progress", None),
     )
@@ -497,6 +499,10 @@ def page(run_id: str) -> None:
             manifest = await run.io_bound(storage.read_manifest, run_id)
             new = _from_state(state, manifest)
             holder["view"] = new
+            if state.story_version == view.story_version and new.live:
+                # Only the steps changed. Keep the head and the story list.
+                show_steps(new)
+                return
             head_view.refresh()
             stories_view.refresh()
             if new.live:

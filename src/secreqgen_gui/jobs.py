@@ -55,6 +55,8 @@ class RunState:
     finished: float | None = None
     stop_requested: bool = False
     version: int = 0
+    # Changes only when the head or the story list shows something new.
+    story_version: int = 0
     # The progress of the story in work (see pipeline_boards.new_progress).
     progress: dict | None = None
 
@@ -272,6 +274,12 @@ class JobManager:
     def _bump(self) -> None:
         if self._state is not None:
             self._state.version += 1
+            self._state.story_version += 1
+
+    def _bump_steps(self) -> None:
+        """Change the version only. The head and the story list stay."""
+        if self._state is not None:
+            self._state.version += 1
 
     # the worker
 
@@ -486,7 +494,7 @@ class JobManager:
                             run.kind, story_id
                         )
                     pipeline_boards.apply_event(run.progress, event)
-                    self._bump()
+                    self._bump_steps()
             except Exception:  # noqa: BLE001 - the run never depends on the view
                 pass
 

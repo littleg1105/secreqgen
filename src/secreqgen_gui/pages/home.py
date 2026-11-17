@@ -62,7 +62,8 @@ def show_server_result(status, names: list[str], address: str) -> None:
             count = len(status.models)
             word = "model" if count == 1 else "models"
             ui.label(
-                f"The model server answers at {address}. {count} {word}."
+                f"The model server answers at {address}. "
+                f"It holds {count} {word}. This tool uses:"
             ).classes("sr-ok")
             for name in names:
                 if model_available(status, name):

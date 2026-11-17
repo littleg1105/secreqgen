@@ -134,7 +134,11 @@ async def test_requirements_kind_has_five_steps(user):
     await user.open("/how-it-works?kind=requirements")
     await user.should_see("Step 1 of 5")
     await user.should_see("Start requirements")
-    await user.should_see("a local language model. It answers through")
+    await user.should_see("a language model. It answers through")
+    await user.should_see("You read the requirements.")
+    await user.should_see("puts the answer of the model into the fixed form.")
+    await user.should_not_see("checks each quote")
+    await user.should_not_see("decide about each row")
 
 
 async def test_story_without_a_result_says_so(user):
@@ -158,6 +162,59 @@ async def test_parts_and_rail_entry_show(user):
     await user.open("/how-it-works")
     await user.should_see("The parts")
     await user.should_see("fixed rules, no AI.")
+    await user.should_see("You decide about each row.")
+    await user.should_see("checks each quote and builds the page.")
+    await user.should_see("language models. They answer through the model server")
     await user.should_see("http://localhost:11434")
     await user.should_see("How it works", kind=ui.label, retries=3)
     assert _texts(user).count("How it works") >= 2
+
+
+async def test_the_link_quotes_a_story_id_with_a_slash(user):
+    from secreqgen_gui import storage
+
+    slashed = "MM/US 7"
+    run_id = _store()
+    manifest = storage.read_manifest(run_id)
+    manifest["per_story"][0]["story_id"] = slashed
+    storage.write_manifest(run_id, manifest)
+    model = _model()
+    model["story"]["id"] = slashed
+    folder = storage.run_dir(run_id) / "stories" / STORY
+    (folder / "threats.json").write_text(json.dumps(model), encoding="utf-8")
+    await user.open(f"/how-it-works?run={run_id}&story=MM%2FUS%207")
+    await user.should_see("Open the result")
+    links = [e for e in user.find(kind=ui.link).elements if e.text == "Open the result"]
+    assert links[0].props["href"] == f"/runs/{run_id}/stories/MM%2FUS%207"
+
+
+async def test_a_requirements_replay_takes_its_time_from_the_manifest(user):
+    from secreqgen_gui import storage
+
+    run_id = "20261117-214500-requirements"
+    folder = storage.run_dir(run_id)
+    folder.mkdir(parents=True)
+    result = {
+        "user_story": {"id": "MM-US-007", "title": "Bot", "story": "As a user."},
+        "requirements": [],
+        "passages": [],
+    }
+    (folder / "requirements.json").write_text(
+        json.dumps({"results": [result], "model": "gemma4:26b"}), encoding="utf-8"
+    )
+    storage.write_manifest(
+        run_id,
+        {
+            "run_id": run_id,
+            "kind": "requirements",
+            "status": "finished",
+            "created_at": "2026-11-17T21:45:00Z",
+            "model": "gemma4:26b",
+            "per_story": [
+                {"story_id": "OTHER", "status": "ok", "seconds": 9},
+                {"story_id": "MM-US-007", "status": "ok", "seconds": 37.4},
+            ],
+        },
+    )
+    await user.open("/how-it-works?kind=requirements")
+    await user.should_see("The real run of this story took 37 seconds.")

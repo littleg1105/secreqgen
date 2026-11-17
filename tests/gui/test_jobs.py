@@ -14,6 +14,7 @@ from secreqgen_gui import storage  # noqa: E402
 from secreqgen_gui.jobs import (  # noqa: E402
     JobManager,
     RequirementsRunSpec,
+    RunState,
     ThreatRunSpec,
 )
 
@@ -245,3 +246,12 @@ def test_server_status_never_raises():
 
     status = JobManager(check_server=broken).server_status("http://x")
     assert status.reachable is False
+
+
+def test_a_step_report_changes_only_the_version():
+    manager = JobManager()
+    manager._state = RunState("r1", "threats", "running", "Running")
+    manager._bump()
+    manager._bump_steps()
+    assert manager._state.version == 2
+    assert manager._state.story_version == 1

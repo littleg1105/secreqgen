@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from nicegui import run, ui
 
-from secreqgen_gui import storage
+from secreqgen_gui import jobs, storage
 from secreqgen_gui.widgets import confirm, empty_state, page_title
 
 KIND_WORDS = {"threats": "Threat list", "requirements": "Requirements"}
@@ -36,6 +36,21 @@ ACTION_SLOT = """
          @click.stop="$parent.$emit('delete', props.row)" />
 </q-td>
 """
+
+
+IN_WORK = "This run is in work. Stop it first."
+
+
+def _in_work(run_id: str) -> bool:
+    """Return True when the run is checking or running now."""
+    state = jobs.manager.get(run_id)
+    if state is not None and state.state in ("checking", "running"):
+        return True
+    try:
+        manifest = storage.read_manifest(run_id)
+    except ValueError:
+        return False
+    return isinstance(manifest, dict) and manifest.get("status") == "running"
 
 
 def format_date(item: dict) -> str:
@@ -120,11 +135,17 @@ def _table(rows: list[dict], reload) -> None:
 
     def ask(event) -> None:
         row = event.args
-        if not isinstance(row, dict) or row.get("busy"):
+        if not isinstance(row, dict) or not isinstance(row.get("id"), str):
             return
         run_id = row["id"]
+        if _in_work(run_id):
+            ui.notify(IN_WORK, type="warning")
+            return
 
         def delete() -> None:
+            if _in_work(run_id):
+                ui.notify(IN_WORK, type="warning")
+                return
             try:
                 storage.delete_run(run_id)
             except (ValueError, OSError):

@@ -250,3 +250,16 @@ async def test_history_without_runs_shows_the_empty_state(user):
     await user.open("/history")
     await user.should_see("No runs yet.")
     await user.should_see("Start a threat list")
+
+
+async def test_a_flag_from_the_browser_does_not_unlock_a_run_in_work(user):
+    from nicegui import ui
+    from secreqgen_gui import storage
+
+    storage.run_dir(OLD).mkdir(parents=True)
+    storage.write_manifest(OLD, {"kind": "threats", "status": "running"})
+    await user.open("/history")
+    user.find(kind=ui.table).trigger("delete", args={"id": OLD, "busy": False})
+    await user.should_see("This run is in work. Stop it first.")
+    await user.should_not_see("Delete this run and its files?")
+    assert storage.run_dir(OLD).exists()
