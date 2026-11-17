@@ -611,3 +611,33 @@ def result_board(
         facts=board.facts,
         lane_notes=board.lane_notes,
     )
+
+
+# ---------------------------------------------------------------- no story
+
+
+def plain_frames(kind: str) -> list[tuple[str, int]]:
+    """Return one frame for each step of a flow, for a page with no story."""
+    return [(step.key, 0) for step in FLOWS[kind].steps]
+
+
+def plain_board(
+    kind: str, frame: tuple[str, int], *, notes: Mapping[str, str] | None = None
+) -> Board:
+    """Return a board with no numbers: the steps before the frame are done."""
+    flow = FLOWS[kind]
+    here = flow.index(frame[0])
+    views = {
+        step.key: StepView("done" if position < here else "active")
+        for position, step in enumerate(flow.steps)
+        if position <= here
+    }
+    title, text = TEXTS[kind][frame[0]]
+    return Board(
+        kind=kind,
+        steps=views,
+        active=frame[0],
+        title=title,
+        text=text,
+        lane_notes=dict(notes or {}),
+    )

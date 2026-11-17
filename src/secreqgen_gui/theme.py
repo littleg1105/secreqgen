@@ -158,6 +158,14 @@ body {{
   padding: 32px 0;
   color: var(--sr-slate);
 }}
+.sr-steps {{ max-width: 1160px; }}
+.sr-step-title {{
+  font-size: var(--sr-size-section);
+  font-weight: 600;
+  margin-top: 12px;
+}}
+.sr-step-facts {{ font-weight: 600; margin-top: 2px; }}
+.sr-step-text {{ color: var(--sr-slate); max-width: 84ch; margin-top: 2px; }}
 """
 
 
