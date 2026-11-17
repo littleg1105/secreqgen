@@ -359,6 +359,3 @@ def ingest_clear(
 
     vector_store.clear()
     console.print("[green]✓[/green] Vector store cleared.")
-
-
-# Generate commands

@@ -110,7 +110,7 @@ Read the evidence of each row, then write "keep" or "delete" as your verdict.
 - Requirement: Keep the Secure flag on the session cookie.
 - Your verdict: 
 
-Passages read: 2 in 1 model calls. Model: gemma4:26b. Time: 0 s. Rows that the script removed: 0.
+Passages read: 2 in 1 model calls. Model: gemma4:26b. Time: <N> s. Rows that the script removed: 0.
 The model that writes the rows also read one paragraph about the product from the user (10 words). It is background and not a source: each row has its quote from a documentation passage.
 
 --- calls

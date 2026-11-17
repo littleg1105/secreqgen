@@ -73,6 +73,8 @@ RANDOM_ID_RE = re.compile(r"US-[0-9A-F]{6}")
 RUN_TIME_RE = re.compile(r", \d+(?:\.\d+)? s$", re.MULTILINE)
 # The JSON field "seconds" holds a run time.
 SECONDS_RE = re.compile(r'("seconds": )[0-9.]+')
+# The page threats.md states the run time of the story.
+PAGE_TIME_RE = re.compile(r"Time: \d+ s\.")
 
 
 def normalise(text: str) -> str:
@@ -81,6 +83,7 @@ def normalise(text: str) -> str:
     text = RANDOM_ID_RE.sub("US-<ID>", text)
     text = RUN_TIME_RE.sub(", <N> s", text)
     text = SECONDS_RE.sub(r"\1<N>", text)
+    text = PAGE_TIME_RE.sub("Time: <N> s.", text)
     return TIME_RE.sub("<TIME>", text)
 
 
@@ -1070,4 +1073,11 @@ def test_evaluate_compare_runs_stops(monkeypatch):
     run_case(
         "evaluate_compare_runs_stops",
         ["evaluate", "compare-runs", "stories.json", "gt.json", "--runs", "3"],
+    )
+
+
+def test_normalise_hides_the_page_run_time() -> None:
+    assert (
+        normalise("Model: m. Time: 3 s. Rows that the script removed: 0.")
+        == "Model: m. Time: <N> s. Rows that the script removed: 0."
     )

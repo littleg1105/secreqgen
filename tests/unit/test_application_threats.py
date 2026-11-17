@@ -27,6 +27,7 @@ from secreqgen.generation.llm_client import LLMResponse
 from secreqgen.threats import ThreatListError
 
 SECONDS_RE = re.compile(r'("seconds": )[0-9.]+')
+PAGE_TIME_RE = re.compile(r"Time: \d+ s\.")
 
 WARNING = (
     "An attacker who steals the session cookie can use the session until the "
@@ -195,8 +196,9 @@ def options(workdir: Path, **kwargs) -> ThreatOptions:
 def read_tree(folder: Path) -> dict[str, str]:
     """The text of each file below the folder. The run times are removed."""
     return {
-        str(path.relative_to(folder)): SECONDS_RE.sub(
-            r"\1<N>", path.read_text(encoding="utf-8")
+        str(path.relative_to(folder)): PAGE_TIME_RE.sub(
+            "Time: <N> s.",
+            SECONDS_RE.sub(r"\1<N>", path.read_text(encoding="utf-8")),
         )
         for path in sorted(folder.rglob("*"))
         if path.is_file()

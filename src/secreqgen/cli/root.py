@@ -40,6 +40,3 @@ def config() -> None:
     table.add_row("Similarity Threshold", str(cfg.retrieval.similarity_threshold))
 
     console.print(table)
-
-
-# Ingest commands

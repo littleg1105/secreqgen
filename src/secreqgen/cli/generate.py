@@ -679,6 +679,3 @@ def generate_threats(
         console.print("[red]No threat list was written.[/red]")
         raise typer.Exit(1)
     console.print(f"\n[bold]{DRAFT_NOTICE}[/bold]")
-
-
-# Evaluate commands

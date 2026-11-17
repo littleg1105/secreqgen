@@ -111,7 +111,7 @@ Read the evidence of each row, then write "keep" or "delete" as your verdict.
 - Requirement: Keep the Secure flag on the session cookie.
 - Your verdict: 
 
-Passages read: 2 in 1 model calls. Model: gemma4:26b. Time: 0 s. Rows that the script removed: 0.
+Passages read: 2 in 1 model calls. Model: gemma4:26b. Time: <N> s. Rows that the script removed: 0.
 
 --- file out/A_1_2/threats.json
 {
@@ -219,7 +219,7 @@ Read the evidence of each row, then write "keep" or "delete" as your verdict.
 - Requirement: Keep the Secure flag on the session cookie.
 - Your verdict: 
 
-Passages read: 2 in 1 model calls. Model: gemma4:26b. Time: 0 s. Rows that the script removed: 0.
+Passages read: 2 in 1 model calls. Model: gemma4:26b. Time: <N> s. Rows that the script removed: 0.
 
 --- calls
 _ollama_client(model_name='gemma4:26b', tested_setup=True)
