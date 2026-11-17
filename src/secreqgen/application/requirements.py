@@ -225,6 +225,9 @@ class RequirementsOptions:
     model: str | None = None  # None: the model of the settings
     prompts_dir: Path | None = None  # a folder of user prompt files
     story_ids: tuple[str, ...] | None = None  # these stories only, in file order
+    # Other file types in the documentation folder (outside the tested setup).
+    other_formats: bool = False
+    docs_cache: Path | None = None  # a folder that keeps the mirror between runs
 
 
 @dataclass
@@ -242,6 +245,7 @@ class RequirementsRun:
     model: str = ""  # the model that wrote the requirements
     prompt_set: str = ""  # the name of the prompt set
     tested_prompts: bool = True  # False when a user prompt set differs
+    docs_report: Any = None  # the MirrorReport of converted files, else None
 
 
 def run_requirements(
@@ -310,83 +314,98 @@ def run_requirements(
         from secreqgen.application.clients import build_ollama_client
 
         make_client = build_ollama_client
-    mode = GenerationMode.ZERO_SHOT if options.baseline else GenerationMode.RAG
+    prepared = None
+    if options.other_formats and options.docs is not None:
+        from secreqgen.application.documentation import prepare_documentation
 
-    tested_setup = options.docs is not None
-    if options.model is None:
-        llm_client = make_client(cfg, tested_setup=tested_setup)
-    else:
-        llm_client = make_client(
-            cfg, tested_setup=tested_setup, model_name=options.model.strip()
+        prepared = prepare_documentation(
+            options.docs,
+            other_formats=True,
+            cache_dir=options.docs_cache,
         )
+    docs = options.docs if prepared is None else prepared.folder
+    try:
+        mode = GenerationMode.ZERO_SHOT if options.baseline else GenerationMode.RAG
 
-    def check_server() -> None:
-        if not llm_client.check_health():
-            raise ModelServerError(
-                "Cannot connect to Ollama.",
-                model=getattr(llm_client, "model_name", None),
+        tested_setup = options.docs is not None
+        if options.model is None:
+            llm_client = make_client(cfg, tested_setup=tested_setup)
+        else:
+            llm_client = make_client(
+                cfg, tested_setup=tested_setup, model_name=options.model.strip()
             )
 
-    if options.strict_input:
-        # The cheap input checks come before the check of the model server.
-        try:
+        def check_server() -> None:
+            if not llm_client.check_health():
+                raise ModelServerError(
+                    "Cannot connect to Ollama.",
+                    model=getattr(llm_client, "model_name", None),
+                )
+
+        if options.strict_input:
+            # The cheap input checks come before the check of the model server.
+            try:
+                retriever = build_requirements_retriever(
+                    cfg, mode, docs=docs, product=product
+                )
+            except SearchError as e:
+                raise InputError(str(e)) from e
+            check_server()
+        else:
+            check_server()
             retriever = build_requirements_retriever(
-                cfg, mode, docs=options.docs, product=product
+                cfg, mode, docs=docs, product=product
             )
-        except SearchError as e:
-            raise InputError(str(e)) from e
-        check_server()
-    else:
-        check_server()
-        retriever = build_requirements_retriever(
-            cfg, mode, docs=options.docs, product=product
+
+        prompt_set = ""
+        tested_prompts = True
+        if options.prompts_dir is None:
+            prompt_builder = requirements_prompt_builder(options.docs)
+            if options.docs is not None:
+                from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
+
+                prompt_set = Path(TESTED_PROMPT_SET).name
+        else:
+            from secreqgen.application.prompt_sets import is_tested
+            from secreqgen.generation import SecurityRequirementsPromptBuilder
+
+            prompt_builder = SecurityRequirementsPromptBuilder(
+                prompts_dir=options.prompts_dir
+            )
+            prompt_set = f"user:{options.prompts_dir.name}"
+            tested_prompts = is_tested("requirements", options.prompts_dir)
+        generator = build_requirements_generator(llm_client, retriever, prompt_builder)
+        if on_step is not None:
+            from secreqgen.application.steps import watch_requirements_generator
+
+            generator = watch_requirements_generator(generator, on_step)
+
+        loop = generate_stories_stoppable(
+            generator,
+            stories,
+            mode,
+            options.system_context,
+            on_progress,
+            on_story_start=on_story_start,
+            should_stop=should_stop,
+            keep_finished=options.keep_finished,
         )
-
-    prompt_set = ""
-    tested_prompts = True
-    if options.prompts_dir is None:
-        prompt_builder = requirements_prompt_builder(options.docs)
-        if options.docs is not None:
-            from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
-
-            prompt_set = Path(TESTED_PROMPT_SET).name
-    else:
-        from secreqgen.application.prompt_sets import is_tested
-        from secreqgen.generation import SecurityRequirementsPromptBuilder
-
-        prompt_builder = SecurityRequirementsPromptBuilder(
-            prompts_dir=options.prompts_dir
+        results, failures = loop.results, loop.failures
+        text = format_requirements(results, output_format) if results else None
+        return RequirementsRun(
+            results=results,
+            failures=failures,
+            skipped=skipped,
+            text=text,
+            output_format=output_format,
+            stopped=loop.stopped,
+            aborted=loop.aborted,
+            not_run=loop.not_run,
+            model=str(getattr(llm_client, "model_name", None) or options.model or ""),
+            prompt_set=prompt_set,
+            tested_prompts=tested_prompts,
+            docs_report=None if prepared is None else prepared.report,
         )
-        prompt_set = f"user:{options.prompts_dir.name}"
-        tested_prompts = is_tested("requirements", options.prompts_dir)
-    generator = build_requirements_generator(llm_client, retriever, prompt_builder)
-    if on_step is not None:
-        from secreqgen.application.steps import watch_requirements_generator
-
-        generator = watch_requirements_generator(generator, on_step)
-
-    loop = generate_stories_stoppable(
-        generator,
-        stories,
-        mode,
-        options.system_context,
-        on_progress,
-        on_story_start=on_story_start,
-        should_stop=should_stop,
-        keep_finished=options.keep_finished,
-    )
-    results, failures = loop.results, loop.failures
-    text = format_requirements(results, output_format) if results else None
-    return RequirementsRun(
-        results=results,
-        failures=failures,
-        skipped=skipped,
-        text=text,
-        output_format=output_format,
-        stopped=loop.stopped,
-        aborted=loop.aborted,
-        not_run=loop.not_run,
-        model=str(getattr(llm_client, "model_name", None) or options.model or ""),
-        prompt_set=prompt_set,
-        tested_prompts=tested_prompts,
-    )
+    finally:
+        if prepared is not None:
+            prepared.close()

@@ -32,6 +32,12 @@ def check_docs_folder(docs: Path) -> None:
         raise InputError(f"Documentation folder not found: {docs}")
 
 
+def check_codebase_folder(folder: Path) -> None:
+    """Raise InputError when the codebase folder is not a folder."""
+    if not folder.is_dir():
+        raise InputError(f"Codebase folder not found: {folder}")
+
+
 def check_docs_option(docs: Path | None, baseline: bool) -> None:
     """Check the --docs option and its use with --baseline.
 
