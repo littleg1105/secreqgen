@@ -71,6 +71,38 @@ secreqgen generate single --title "Session timeout" \
 - The unit test `tests/unit/test_word_search.py` checks that the search, the passage edits and the whole prompt
   equal the lab code and the stored lab prompts.
 
+### Draft threat list of a user story
+
+`secreqgen generate threats` writes a draft threat list for each user story. It uses the word search
+of `--docs` above. Each row comes from one sentence of the documentation: an attack that the
+documentation describes, or the breach of a security rule that it states. A row holds the exact quote,
+the threat, a requirement, a threat actor and a STRIDE category. A script checks that each quote is in
+its passage. The list is a draft for a person to check. It holds only what the documentation states,
+so it is not a complete threat model.
+
+```bash
+secreqgen generate threats stories.json --docs path/to/product/docs --output threat_lists
+```
+
+- Output: one folder for each story, with `threats.md` (the review page) and `threats.json`.
+- Default setup (the tested one): `gemma4:26b` writes the rows, and `qwen3.8:27b` checks each row with
+  its passage in view. The rows that the second model accepts come first on the page. No row is removed.
+  Ollama must have the two models.
+- `--model NAME` changes the model that writes. Without it, the setting `SECREQGEN_LLM_MODEL_NAME`
+  applies when you set it. `--checker-model NAME` changes the second model. `--no-check` runs with
+  no second model; then the page puts the rows with no weak sign first (signs that a script finds).
+- `--about-file FILE` gives the model that writes the rows one paragraph about the product (120 words
+  at most) as background. It is not a source: each row still needs a quote from a passage. The second
+  model does not get it. In the test the paragraph did not lower the number of wrong rows, so it is an
+  option only.
+- `--no-labels` leaves out the call that names the threat actor and the STRIDE category. The two
+  labels are the model's choice from the threat sentence. They have no source in the documentation.
+- Measured on 17 November 2026 (16 stories of 5 products; 4 of them fully new, 12 used before to choose
+  a prompt version; two language-model judges that did not know the setup of a row, and a third
+  reading where they differed). Default setup: of the 61 rows in the first group of the page, 41 were
+  specific and supported by the documentation, 13 were general advice and 7 were wrong. With
+  `qwen3.8:27b` as the writer and `gemma4:26b` as the checker: 30 of 102 rows in the first group were wrong.
+
 ## Development
 
 ```bash

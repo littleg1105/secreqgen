@@ -39,7 +39,8 @@ def render_markdown(model: dict) -> str:
         first_title = f"## Rows that the second model ({checker}) accepts ({len(first)})"
         second_title = f"## Rows where the second model sees a fault ({len(second)})"
         second_note = ("The second model read the passage and named a fault in these rows (a different feature than the story, or a threat "
-                       "that says more than the passage). In the tests about half of such rows were wrong. Read them with more care.")
+                       "that says more than the passage). In the tests such rows were wrong more often than the rows above. "
+                       "Read them with more care.")
     else:
         first = [r for r in rows if not r.get("weak_signs")]
         second = [r for r in rows if r.get("weak_signs")]

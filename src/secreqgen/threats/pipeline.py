@@ -16,12 +16,15 @@ Method (tested on 17 November 2026, see the lab notes of that day):
    words that are not in the passage, a quote that is a fragment, no STRIDE category). Rows with no such sign come
    first on the page; no row is removed. (A second model call that asked "is this sentence about the story?" was
    tested and gave no gain on the local models, so it is not part of the tool.)
-7. Optional: a second local model checks each row with the passage in view. It names a fault only when it is sure
-   (the sentence is about a different feature, or the threat says something that the passage does not say).
-   Rows with no fault come first on the page; no row is removed. In the test of 17 November 2026 (279 judged rows
-   of the local models): gemma4:26b as the checker of qwen3.8:27b accepted 104 of 187 rows, 23 of them wrong
-   (22 of 100), and refused 83, 42 of them wrong; it refused 30 of 91 good rows. qwen3.8:27b as the checker of
-   gemma4:26b accepted 65 of 92 rows, 7 wrong (11 of 100), and refused 27, 12 wrong; it refused 13 of 49 good rows.
+7. A second local model checks each row with the passage in view (the command switches it off with --no-check).
+   It names a fault only when it is sure (the sentence is about a different feature, or the threat says something
+   that the passage does not say). Rows with no fault come first on the page; no row is removed.
+   The default pair is the tested one: TESTED_WRITER writes, TESTED_CHECKER checks (see choose_models).
+   Check of 17 November 2026 on 16 stories of 5 products, blind judges (4 stories fully new, 12 used before to
+   choose a prompt version): gemma4:26b writes and qwen3.8:27b checks: 61 rows accepted, 7 of them wrong
+   (11 of 100), 41 supported; 19 rows with a fault named, 5 of them wrong. qwen3.8:27b writes and gemma4:26b checks:
+   102 rows accepted, 30 of them wrong (29 of 100); 73 rows with a fault named, 35 of them wrong.
+   The same check on the 279 rows that shaped the check prompt had given 7 wrong of 65 and 23 wrong of 104.
    A first, stricter prompt (three yes/no questions, all must be yes) refused 2 of 3 good rows.
 8. Optional: one paragraph about the product (ABOUT_MAX_WORDS words at most) stands before the passages in the
    prompt of the writer. It is background and not a source: the prompt says so, and each row still needs a quote
@@ -78,6 +81,8 @@ EXTRA_SECTIONS = 5  # sections of the search pool with a risk word, in one more 
 EXTRA_TOKENS = 1000
 MAX_QUOTE_WORDS = 30  # the limit that the prompt names
 QUOTE_LIMIT = 60  # a longer quote is refused by the script
+TESTED_WRITER = "gemma4:26b"  # the default model that writes the rows (the tested setup, see step 7)
+TESTED_CHECKER = "qwen3.8:27b"  # the default second model that checks them
 ABOUT_MAX_WORDS = 120  # the optional paragraph about the product: one paragraph, no more
 ABOUT_WRITER = (
     "## About the product\n"
@@ -102,6 +107,44 @@ DRAFT_NOTICE = (
 
 class ThreatListError(Exception):
     """The threat list of a story could not be made."""
+
+
+def _same_model(a: str, b: str) -> bool:
+    """True when two names can be the same Ollama model: equal names (the letter case does not count), or one name
+    is the other name with no tag ("gemma4" and "gemma4:26b")."""
+    a, b = a.strip().lower(), b.strip().lower()
+    return a == b or a == b.split(":")[0] or b == a.split(":")[0]
+
+
+def choose_models(
+    writer: str | None = None,
+    settings_model: str | None = None,
+    checker: str | None = None,
+    check: bool = True,
+) -> tuple[str, str | None]:
+    """The model that writes the rows, and the model that checks them (None: no check).
+
+    Writer: the model that the caller names; with no name, the model name that the user set in the settings; with
+    neither, TESTED_WRITER.
+    Checker: None when the check is off. Else the model that the caller names. With no name it is TESTED_CHECKER,
+    or TESTED_WRITER when TESTED_CHECKER writes the rows: a model does not check its own rows.
+    Two names count as the same model when they are equal (the letter case does not count) or when one is the
+    other with no tag.
+    """
+    writer_name = (writer or "").strip() or (settings_model or "").strip() or TESTED_WRITER
+    checker_name = (checker or "").strip()
+    if not check:
+        if checker_name:
+            raise ThreatListError("name a checker model or switch the check off, not both")
+        return writer_name, None
+    if not checker_name:
+        checker_name = TESTED_WRITER if _same_model(writer_name, TESTED_CHECKER) else TESTED_CHECKER
+    if _same_model(checker_name, writer_name):
+        raise ThreatListError(
+            "the checker must be a different model than the model that writes the rows "
+            f"(writer: {writer_name}, checker: {checker_name})"
+        )
+    return writer_name, checker_name
 
 
 def _text(value: Any) -> str:

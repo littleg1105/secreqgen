@@ -11,7 +11,13 @@ from pathlib import Path
 
 import pytest
 from secreqgen.generation.schemas import UserStory
-from secreqgen.threats import ThreatListGenerator, checks, pipeline, render_markdown
+from secreqgen.threats import (
+    ThreatListGenerator,
+    checks,
+    choose_models,
+    pipeline,
+    render_markdown,
+)
 
 PROMPT_HASHES = {
     "system_prompt.txt": "79b5b822179c49c56d9612eb427145e57cc760a18229a6bd295f5ddd2e614700",
@@ -441,6 +447,10 @@ def test_the_command_line_has_the_threats_command() -> None:
     text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     assert "--docs" in text and "--no-labels" in text and "--story-id" in text and "--checker-model" in text
     assert "--about-file" in text
+    assert "--model" in text and "--no-check" in text
+    flat = " ".join(text.replace("│", " ").split())
+    assert f"else {pipeline.TESTED_WRITER}" in flat, "the help of --model names the default writer"
+    assert f"Default: {pipeline.TESTED_CHECKER}" in flat, "the help of --checker-model names the default checker"
 
 
 def test_the_command_line_refuses_a_missing_documentation_folder(tmp_path: Path) -> None:
@@ -471,10 +481,162 @@ def test_the_command_line_refuses_a_checker_that_is_the_main_model(docs: Path, t
     monkeypatch.setattr(cli, "_ollama_client", lambda cfg, tested_setup, model_name=None: _Healthy())
     stories = tmp_path / "stories.json"
     stories.write_text(json.dumps({"project": 2024, "user_stories": [{"id": "US-1", "title": "Session timeout", "story": "s", "acceptance_criteria": []}]}), encoding="utf-8")
-    main_model = cli.get_config().llm.model_name
-    result = CliRunner().invoke(cli.app, ["generate", "threats", str(stories), "--docs", str(docs), "--checker-model", main_model, "--output", str(tmp_path / "out")])
+    base = ["generate", "threats", str(stories), "--docs", str(docs), "--output", str(tmp_path / "out")]
+    result = CliRunner().invoke(cli.app, base + ["--model", "one-model", "--checker-model", "one-model"])
     assert result.exit_code == 1, result.output
     assert "must be a different model" in result.output and "Traceback" not in result.output
+    # with no --model the writer is the default writer, so the default writer cannot be the checker
+    monkeypatch.delenv("SECREQGEN_LLM_MODEL_NAME", raising=False)
+    result = CliRunner().invoke(cli.app, base + ["--checker-model", pipeline.TESTED_WRITER])
+    assert result.exit_code == 1 and "must be a different model" in result.output, result.output
+    result = CliRunner().invoke(cli.app, base + ["--no-check", "--checker-model", "other-model"])
+    assert result.exit_code == 1 and "not both" in result.output and "Traceback" not in result.output, result.output
+    assert not (tmp_path / "out").exists(), "a refused command writes nothing"
+
+
+# ---------------------------------------------------------------------------------------------- the two models
+def test_the_default_pair_is_the_tested_one() -> None:
+    assert (pipeline.TESTED_WRITER, pipeline.TESTED_CHECKER) == ("gemma4:26b", "qwen3.8:27b")
+    assert choose_models() == ("gemma4:26b", "qwen3.8:27b")
+    assert choose_models(None, None, None, True) == ("gemma4:26b", "qwen3.8:27b")
+    assert choose_models("", "  ", " ") == ("gemma4:26b", "qwen3.8:27b"), "an empty name is no name"
+
+
+def test_the_writer_is_the_named_model_then_the_model_of_the_settings() -> None:
+    assert choose_models(settings_model="mistral-small3.2:24b") == ("mistral-small3.2:24b", "qwen3.8:27b")
+    assert choose_models("gemma4:26b", "mistral-small3.2:24b")[0] == "gemma4:26b", "the option wins over the settings"
+    assert choose_models(" llama3:8b ") == ("llama3:8b", "qwen3.8:27b")
+
+
+def test_a_model_does_not_check_its_own_rows() -> None:
+    assert choose_models("qwen3.8:27b") == ("qwen3.8:27b", "gemma4:26b"), "the tested pair, the other way round"
+    assert choose_models(settings_model="qwen3.8:27b") == ("qwen3.8:27b", "gemma4:26b")
+    assert choose_models("gemma4:26b", checker="llama3:8b") == ("gemma4:26b", "llama3:8b")
+    for writer, checker in (("gemma4:26b", "gemma4:26b"), (None, "gemma4:26b"), ("qwen3.8:27b", " qwen3.8:27b ")):
+        with pytest.raises(pipeline.ThreatListError, match="different model"):
+            choose_models(writer, None, checker)
+    # two names of one model: another letter case, or the name with no tag
+    for writer, checker in (("gemma4", "gemma4:26b"), ("gemma4:26b", "gemma4"), ("Gemma4:26B", "gemma4:26b")):
+        with pytest.raises(pipeline.ThreatListError, match="different model"):
+            choose_models(writer, None, checker)
+    assert choose_models("qwen3.8") == ("qwen3.8", "gemma4:26b"), "the default checker is not the writer with a tag"
+    assert choose_models("QWEN3.8:27B") == ("QWEN3.8:27B", "gemma4:26b")
+    assert choose_models("gemma4:12b", checker="gemma4:26b") == ("gemma4:12b", "gemma4:26b"), "two sizes are two models"
+
+
+def test_the_check_can_be_switched_off() -> None:
+    assert choose_models(check=False) == ("gemma4:26b", None)
+    assert choose_models("qwen3.8:27b", check=False) == ("qwen3.8:27b", None)
+    with pytest.raises(pipeline.ThreatListError, match="not both"):
+        choose_models(checker="qwen3.8:27b", check=False)
+
+
+class _Named:
+    """A stand-in client that knows its model name. Some names are not in the stand-in server."""
+
+    made: list[str] = []
+    missing: set[str] = set()
+    tested_setup: list[bool] = []
+
+    def __init__(self, model_name: str, tested_setup: bool = True) -> None:
+        self.model_name = model_name
+        _Named.made.append(model_name)
+        _Named.tested_setup.append(tested_setup)
+
+    def check_health(self) -> bool:
+        return self.model_name not in _Named.missing
+
+    def generate(self, prompt, system_prompt=None, format=None):
+        return Reply('{"passages": [], "rows": []}')
+
+
+@pytest.fixture
+def named_clients(monkeypatch):
+    import secreqgen.cli as cli
+
+    _Named.made, _Named.missing, _Named.tested_setup = [], set(), []
+    for name in ("SECREQGEN_LLM_MODEL_NAME", "SECREQGEN_LLM__MODEL_NAME"):  # the two spellings that the settings read
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        cli,
+        "_ollama_client",
+        lambda cfg, tested_setup, model_name=None: _Named(model_name or cfg.llm.model_name, tested_setup),
+    )
+    return _Named
+
+
+def _one_story_file(tmp_path: Path) -> Path:
+    stories = tmp_path / "stories.json"
+    stories.write_text(json.dumps({"project": "x", "user_stories": [{"id": "US-1", "title": "Session timeout", "story": "s", "acceptance_criteria": []}]}), encoding="utf-8")
+    return stories
+
+
+def test_the_command_line_runs_the_tested_pair_by_default(docs: Path, tmp_path: Path, named_clients, monkeypatch) -> None:
+    import secreqgen.cli as cli
+    from typer.testing import CliRunner
+
+    base = ["generate", "threats", str(_one_story_file(tmp_path)), "--docs", str(docs), "--output", str(tmp_path / "out")]
+    result = CliRunner().invoke(cli.app, base)
+    assert result.exit_code == 0, result.output
+    assert named_clients.made == ["gemma4:26b", "qwen3.8:27b"], "writer first, then the checker"
+    assert named_clients.tested_setup == [True, True], "the two clients get the call values of the tested runs"
+    assert "Writer: gemma4:26b. Checker: qwen3.8:27b." in result.output
+    saved = json.loads((tmp_path / "out" / "US-1" / "threats.json").read_text(encoding="utf-8"))
+    assert saved["model"] == "gemma4:26b" and saved["checker"] == "qwen3.8:27b"
+
+    named_clients.made = []
+    result = CliRunner().invoke(cli.app, base + ["--no-check"])
+    assert result.exit_code == 0, result.output
+    assert named_clients.made == ["gemma4:26b"] and "Checker: none (--no-check)." in result.output
+    saved = json.loads((tmp_path / "out" / "US-1" / "threats.json").read_text(encoding="utf-8"))
+    assert saved["checker"] is None
+
+    named_clients.made = []
+    result = CliRunner().invoke(cli.app, base + ["--model", "qwen3.8:27b"])
+    assert result.exit_code == 0 and named_clients.made == ["qwen3.8:27b", "gemma4:26b"], result.output
+
+    # a model name that the user set in the settings is the writer; the option --model wins over it
+    monkeypatch.setenv("SECREQGEN_LLM_MODEL_NAME", "mistral-small3.2:24b")
+    named_clients.made = []
+    result = CliRunner().invoke(cli.app, base)
+    assert result.exit_code == 0 and named_clients.made == ["mistral-small3.2:24b", "qwen3.8:27b"], result.output
+    named_clients.made = []
+    result = CliRunner().invoke(cli.app, base + ["-m", "gemma4:26b", "--checker-model", "llama3:8b"])
+    assert result.exit_code == 0 and named_clients.made == ["gemma4:26b", "llama3:8b"], result.output
+
+
+def test_the_command_line_says_how_to_get_a_missing_model(docs: Path, tmp_path: Path, named_clients) -> None:
+    import secreqgen.cli as cli
+    from typer.testing import CliRunner
+
+    base = ["generate", "threats", str(_one_story_file(tmp_path)), "--docs", str(docs), "--output", str(tmp_path / "out")]
+    named_clients.missing = {"qwen3.8:27b"}
+    result = CliRunner().invoke(cli.app, base)
+    text = " ".join(result.output.split())
+    assert result.exit_code == 1 and "Traceback" not in text, result.output
+    assert "checker model qwen3.8:27b" in text and "ollama pull qwen3.8:27b" in text and "--no-check" in text
+    assert not (tmp_path / "out").exists(), "no list is written with half of the setup"
+    result = CliRunner().invoke(cli.app, base + ["--no-check"])
+    assert result.exit_code == 0, "with no check the missing checker model does not matter"
+
+    for missing, options in (({"gemma4:26b"}, []), ({"gemma4:26b"}, ["--no-check"]), ({"gemma4:26b", "qwen3.8:27b"}, [])):
+        named_clients.missing = missing
+        out = tmp_path / f"out_{len(missing)}_{len(options)}"
+        result = CliRunner().invoke(cli.app, base[:-1] + [str(out)] + options)
+        text = " ".join(result.output.split())
+        assert result.exit_code == 1 and "Traceback" not in text, result.output
+        assert "the model gemma4:26b" in text and "ollama pull gemma4:26b" in text and "ollama serve" in text
+        assert not out.exists(), "no list is written when the writer is missing"
+
+
+def test_the_real_client_takes_the_named_model_and_the_tested_call_values() -> None:
+    import secreqgen.cli as cli
+
+    cfg = cli.get_config()
+    client = cli._ollama_client(cfg, tested_setup=True, model_name="qwen3.8:27b")
+    assert client.model_name == "qwen3.8:27b"
+    assert client.num_ctx == (cfg.llm.num_ctx or cli.WORD_SEARCH_NUM_CTX)
+    assert cli._ollama_client(cfg, tested_setup=True).model_name == cfg.llm.model_name
 
 
 def test_the_command_line_takes_a_paragraph_about_the_product_from_a_file(docs: Path, tmp_path: Path, monkeypatch) -> None:

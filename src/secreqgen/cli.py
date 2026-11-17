@@ -1023,11 +1023,35 @@ def generate_threats(
             help="One short call for each story: a threat actor and a STRIDE category for each row",
         ),
     ] = True,
+    writer_model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model",
+            "-m",
+            help=(
+                "The model that writes the rows. Default: the setting "
+                "SECREQGEN_LLM_MODEL_NAME when it is set, else gemma4:26b"
+            ),
+        ),
+    ] = None,
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check/--no-check",
+            help=(
+                "A second local model checks each row. "
+                "The rows that it accepts come first on the page"
+            ),
+        ),
+    ] = True,
     checker_model: Annotated[
         Optional[str],
         typer.Option(
             "--checker-model",
-            help="A second local model that checks each row (for example gemma4:26b). Accepted rows come first",
+            help=(
+                "The second model. Default: qwen3.8:27b "
+                "(gemma4:26b when qwen3.8:27b writes the rows)"
+            ),
         ),
     ] = None,
     about_file: Annotated[
@@ -1046,7 +1070,12 @@ def generate_threats(
         typer.Option("--output", "-o", help="Output folder"),
     ] = Path("threat_lists"),
 ) -> None:
-    """Write a DRAFT threat list for each user story: the attacks and the security rules that the documentation states."""
+    """Write a DRAFT threat list for each user story, from the documentation.
+
+    The list holds the attacks and the security rules that the documentation
+    states. Default setup (the tested one): gemma4:26b writes the rows and
+    qwen3.8:27b checks them.
+    """
     import json
     import re
 
@@ -1056,7 +1085,12 @@ def generate_threats(
     from secreqgen.exceptions import GenerationError, LLMConnectionError
     from secreqgen.generation.schemas import UserStory
     from secreqgen.retrieval.word_search import SearchError
-    from secreqgen.threats import ThreatListError, ThreatListGenerator, render_markdown
+    from secreqgen.threats import (
+        ThreatListError,
+        ThreatListGenerator,
+        choose_models,
+        render_markdown,
+    )
     from secreqgen.threats.pipeline import DRAFT_NOTICE
 
     if not input_file.exists():
@@ -1103,25 +1137,37 @@ def generate_threats(
     if product_name is not None and not isinstance(product_name, str):
         product_name = str(product_name) if isinstance(product_name, (int, float)) else None
     cfg = get_config()
+    # A model name in the settings counts only when the user set it. The value
+    # that the settings have with no user input (llama3:8b) was never tested here.
+    settings_model = (
+        cfg.llm.model_name if "model_name" in cfg.llm.model_fields_set else None
+    )
     try:
-        llm_client = _ollama_client(cfg, tested_setup=True)
+        writer_name, checker_name = choose_models(
+            writer_model, settings_model, checker_model, check
+        )
+    except ThreatListError as e:
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+    try:
+        llm_client = _ollama_client(cfg, tested_setup=True, model_name=writer_name)
         if not llm_client.check_health():
             console.print(
-                "[red]Error:[/red] Cannot connect to Ollama.\n"
-                "Make sure Ollama is running: [cyan]ollama serve[/cyan]"
+                "[red]Error:[/red] Ollama does not answer, or it does not have "
+                f"the model {escape(writer_name)}.\n"
+                "Start Ollama: [cyan]ollama serve[/cyan]. Get the model: "
+                f"[cyan]ollama pull {escape(writer_name)}[/cyan]"
             )
             raise typer.Exit(1)
         checker = None
-        if checker_model:
-            if checker_model == cfg.llm.model_name:
-                console.print(
-                    "[red]Error:[/red] --checker-model must be a different model than the model that writes the rows."
-                )
-                raise typer.Exit(1)
-            checker = _ollama_client(cfg, tested_setup=True, model_name=checker_model)
+        if checker_name:
+            checker = _ollama_client(cfg, tested_setup=True, model_name=checker_name)
             if not checker.check_health():
                 console.print(
-                    f"[red]Error:[/red] The checker model is not available in Ollama: {escape(checker_model)}"
+                    "[red]Error:[/red] Ollama does not have the checker model "
+                    f"{escape(checker_name)}.\n"
+                    f"Get it: [cyan]ollama pull {escape(checker_name)}[/cyan]. "
+                    "Or run with [cyan]--no-check[/cyan] (no second model)."
                 )
                 raise typer.Exit(1)
         about = None
@@ -1157,6 +1203,10 @@ def generate_threats(
         console.print(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(1)
 
+    console.print(
+        f"Writer: {escape(writer_name)}. Checker: "
+        f"{escape(checker_name) if checker_name else 'none (--no-check)'}."
+    )
     written = 0
     used_names: set[str] = set()
     for story in user_stories:
@@ -1192,7 +1242,7 @@ def generate_threats(
         attacks = sum(1 for r in rows if r["type"] == "attack")
         clean = sum(1 for r in rows if not r.get("weak_signs"))
         accepted = sum(1 for r in rows if r.get("second_model") == "accepts")
-        checked = f", {accepted} accepted by {checker_model}" if checker_model else ""
+        checked = f", {accepted} accepted by {checker_name}" if checker_name else ""
         console.print(
             f"[green]✓[/green] {escape(story.id)}: {len(rows)} rows ({attacks} attacks, "
             f"{len(rows) - attacks} rules), {clean} with no weak sign{checked}, "
