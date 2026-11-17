@@ -422,7 +422,13 @@ def test_command_order():
     ]
     expected = {
         "ingest": ["documents", "system-context", "stats", "clear"],
-        "generate": ["check-ollama", "requirements", "single", "threats"],
+        "generate": [
+            "check-ollama",
+            "requirements",
+            "single",
+            "threats",
+            "context",
+        ],
         "evaluate": ["run", "compare-runs", "compare", "report"],
     }
     for name, order in expected.items():

@@ -31,6 +31,7 @@ from secreqgen.cli.evaluate import (
 )
 from secreqgen.cli.generate import (
     check_ollama,
+    generate_context,
     generate_requirements,
     generate_single,
     generate_threats,
@@ -73,6 +74,7 @@ __all__ = [
     "evaluate_report",
     "evaluate_run",
     "generate_app",
+    "generate_context",
     "generate_requirements",
     "generate_single",
     "generate_threats",

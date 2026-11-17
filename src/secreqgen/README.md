@@ -15,7 +15,7 @@ src/secreqgen/
     _app.py                  the apps, the console and `DOC_TYPE_MAP`
     root.py                  `version` and `config`
     ingest.py                `ingest` commands (older path)
-    generate.py              `generate` commands (`requirements`, `single`, `threats`, `check-ollama`)
+    generate.py              `generate` commands (`requirements`, `single`, `threats`, `context`, `check-ollama`)
     evaluate.py              `evaluate` commands (older path)
     __main__.py              entry for `python -m secreqgen.cli`
   application/               use cases; no Typer, no Rich, no print, no `sys.exit`
@@ -27,10 +27,14 @@ src/secreqgen/
     inputs.py                checks and readers for input files
     requirements.py          stages, `RequirementsOptions`, `RequirementsRun`, `run_requirements`
     threats.py               stages, `ThreatOptions`, `ThreatRun`, `run_threat_lists`
+    documentation.py         `prepare_documentation`, `PreparedDocs`, `docs_note` (other file types)
+    system_context.py        `ContextOptions`, `ContextRun`, `run_system_context`
   generation/                prompts, Ollama client, generator, schemas, `prompt_sets/`
   retrieval/                 `__init__.py` loads names on first use; vector store, retriever,
                              reranker, `word_search.py`, `passage_edits.py`
   threats/                   threat list: `actors.py`, `checks.py`, `pipeline.py`, `render.py`, `prompts/`
+  documents/                 other file types to Markdown: `formats.py`, `mirror.py`
+  context/                   system context of a codebase: `scan.py`, `checks.py`, `pipeline.py`, `render.py`, `prompts/`
   ingestion/                 loader, chunker, embedder, metadata
   evaluation/                baseline, metrics, semantic matcher, `multi_run.py`, pipeline, report
   output/                    formatter and exporter
@@ -90,6 +94,8 @@ Patch the package-level name, not the defining module. The builders import at ca
 ## Golden tests
 
 `tests/unit/test_cli_golden.py` pins the console text, exit codes, written files, stand-in constructor calls and the prompts sent. The expected text of each case is a file in `tests/unit/golden/cli/`.
+
+`tests/unit/test_cli_golden_plan2.py` adds the cases of the option `--other-formats` and of `generate context`. It imports the helpers of the first file. Its golden files start with `context_`, `threats_other_formats_` or `requirements_other_formats_`.
 
 - A new case needs a new golden file. A changed console line needs a new recording.
 - Record again only for a change that you intend: `GOLDEN_RECORD=1` and run that one test file.

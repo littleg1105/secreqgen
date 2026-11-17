@@ -73,6 +73,28 @@ secreqgen generate single --title "Session timeout" \
   The command line has no code search. In the final test, no prompt of the new tool held such a hit (0 of 222).
 - The unit test `tests/unit/test_word_search.py` checks that the search, the passage edits and the whole prompt
   equal the lab code and the stored lab prompts.
+- `--other-formats` (on `generate requirements` and `generate threats`) lets the search also read `.rst`, `.adoc`,
+  `.txt`, `.mdx`, `.html`, `.pdf` and `.docx` files. The tool converts each file to Markdown in a temporary folder
+  and removes the folder at the end. Only the markup changes: no word of the text is added or removed. The
+  `.md` files are used as they are. The command prints one note with the number of converted files. This is
+  outside the tested setup, because the final test read `.md` files only. A folder with `.md` files only
+  gives the same run as without the option.
+
+### A system context for a new codebase
+
+`secreqgen generate context FOLDER` writes a draft system context file for a codebase. Plain code
+collects the facts of the folder: the file tree, the README, the manifests and the container files.
+The writer model reads these facts and writes the context. Plain code then removes each item that has
+no source in the files. The file is a draft for a person to check before use. The tool never reads a
+secret file (for example `.env` or a key file).
+
+```bash
+secreqgen generate context path/to/codebase --output system_context.yaml
+```
+
+- Without `--output` the YAML text goes to the console.
+- `--model NAME` changes the writer. `--product NAME` gives the name of the product.
+- A run that uses a context of this kind is outside the tested setup.
 
 ### Draft threat list of a user story
 
@@ -117,9 +139,10 @@ secreqgen generate threats stories.json --docs path/to/product/docs --output thr
 | `ingest stats` | Shows statistics of the vector store. |
 | `ingest clear` | Removes all data from the vector store. |
 | `generate check-ollama` | Checks that Ollama runs and has the model. |
-| `generate requirements INPUT_FILE` | Writes requirements for the user stories of a file. Options `--docs`, `--product`, `--context`, `--baseline`, `--format`, `--output`. |
+| `generate requirements INPUT_FILE` | Writes requirements for the user stories of a file. Options `--docs`, `--other-formats`, `--product`, `--context`, `--baseline`, `--format`, `--output`. |
 | `generate single` | Writes requirements for one story. Options `--title`, `--story`, `--ac`, `--docs`, `--product`, `--context`, `--baseline`, `--format`. |
-| `generate threats INPUT_FILE` | Writes a draft threat list for each story. Needs `--docs`. Other options: `--product`, `--story-id`, `--labels`/`--no-labels`, `--model`, `--check`/`--no-check`, `--checker-model`, `--about-file`, `--output`. |
+| `generate threats INPUT_FILE` | Writes a draft threat list for each story. Needs `--docs`. Other options: `--product`, `--story-id`, `--labels`/`--no-labels`, `--model`, `--check`/`--no-check`, `--checker-model`, `--about-file`, `--other-formats`, `--output`. |
+| `generate context FOLDER` | Writes a draft system context file for a codebase. Options `--output`, `--model`, `--product`. |
 | `evaluate run STORIES GROUND_TRUTH` | Runs the older RAG against zero-shot comparison. |
 | `evaluate compare-runs STORIES GROUND_TRUTH` | Repeats that comparison `--runs` times (default 20) and reports totals. Option `--pilot` runs 10. |
 | `evaluate compare GENERATED GROUND_TRUTH` | Matches a file of generated requirements against a ground truth file. |

@@ -1,0 +1,7 @@
+exit=1
+Writing a system context for shop with gemma4:26b
+Error: Ollama does not answer, or it does not have the model gemma4:26b.
+Start Ollama: ollama serve. Get the model: ollama pull gemma4:26b
+
+--- calls
+_ollama_client(model_name='gemma4:26b', tested_setup=True)

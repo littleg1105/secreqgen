@@ -1,0 +1,3 @@
+exit=1
+Writing a system context for nofolder with gemma4:26b
+Error: Codebase folder not found: nofolder

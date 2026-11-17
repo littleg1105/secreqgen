@@ -108,6 +108,16 @@ def generate_requirements(
             ),
         ),
     ] = None,
+    other_formats: Annotated[
+        bool,
+        typer.Option(
+            "--other-formats",
+            help=(
+                "Also read .rst, .adoc, .txt, .mdx, .html, .pdf and .docx files "
+                "(converted to Markdown). Outside the tested setup."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Generate security requirements from user stories.
 
@@ -118,6 +128,8 @@ def generate_requirements(
       ]
     }
     """
+    from rich.markup import escape
+
     from secreqgen.application.errors import InputError
     from secreqgen.application.inputs import (
         build_user_stories,
@@ -141,6 +153,8 @@ def generate_requirements(
     try:
         check_input_file(input_file)
         check_docs_option(docs, baseline)
+        if other_formats and docs is None:
+            raise InputError("--other-formats needs --docs.")
     except InputError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
@@ -214,91 +228,116 @@ def generate_requirements(
             "The tested runs had one."
         )
 
-    # Initialize components
+    # Documentation of other types: a temporary mirror, outside the tested setup.
+    prepared = None
+    search_docs = docs
+    if other_formats and docs is not None:
+        from secreqgen.application.documentation import (
+            docs_note,
+            prepare_documentation,
+        )
+
+        try:
+            prepared = prepare_documentation(docs, other_formats=True)
+        except InputError as e:
+            console.print(f"[red]Error:[/red] {escape(str(e))}")
+            raise typer.Exit(1)
+        search_docs = prepared.folder
+        note = docs_note(prepared.report)
+        if note:
+            console.print(f"[yellow]Note:[/yellow] {escape(note)}")
+
     try:
+        # Initialize components
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                progress.add_task("Initializing components...", total=None)
+
+                # Initialize LLM client
+                llm_client = _client(cfg, tested_setup=docs is not None)
+
+                # Check Ollama connection
+                if not llm_client.check_health():
+                    console.print(
+                        "[red]Error:[/red] Cannot connect to Ollama.\n"
+                        f"Make sure Ollama is running: [cyan]ollama serve[/cyan]"
+                    )
+                    raise typer.Exit(1)
+
+                # Initialize retriever for RAG mode.
+                # The tested setup: word search over the documentation folder.
+                # The product name comes from --product, or from the key
+                # "project" of the input file.
+                product_name = product
+                if product_name is None and isinstance(data, dict):
+                    product_name = data.get("project")
+                retriever = build_requirements_retriever(
+                    cfg, mode, docs=search_docs, product=product_name
+                )
+
+                # Initialize generator. With --docs the prompt is the tested prompt set.
+                prompt_builder = requirements_prompt_builder(docs)
+                generator = build_requirements_generator(
+                    llm_client, retriever, prompt_builder
+                )
+
+            console.print("[green]✓[/green] Components initialized")
+
+        except LLMConnectionError as e:
+            console.print(f"[red]LLM Connection Error:[/red] {e}")
+            raise typer.Exit(1)
+        except SearchError as e:
+            console.print(f"[red]Documentation Error:[/red] {e}")
+            raise typer.Exit(1)
+
+        # Generate requirements
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
             console=console,
         ) as progress:
-            progress.add_task("Initializing components...", total=None)
-
-            # Initialize LLM client
-            llm_client = _client(cfg, tested_setup=docs is not None)
-
-            # Check Ollama connection
-            if not llm_client.check_health():
-                console.print(
-                    "[red]Error:[/red] Cannot connect to Ollama.\n"
-                    f"Make sure Ollama is running: [cyan]ollama serve[/cyan]"
-                )
-                raise typer.Exit(1)
-
-            # Initialize retriever for RAG mode.
-            # The tested setup: word search over the documentation folder.
-            # The product name comes from --product, or from the key
-            # "project" of the input file.
-            product_name = product
-            if product_name is None and isinstance(data, dict):
-                product_name = data.get("project")
-            retriever = build_requirements_retriever(
-                cfg, mode, docs=docs, product=product_name
+            task = progress.add_task(
+                "Generating requirements...", total=len(user_stories)
             )
 
-            # Initialize generator. With --docs the prompt is the tested prompt set.
-            prompt_builder = requirements_prompt_builder(docs)
-            generator = build_requirements_generator(
-                llm_client, retriever, prompt_builder
+            def on_progress(event) -> None:
+                if event.error is not None:
+                    console.print(
+                        f"[yellow]Warning: Failed to generate for {event.story_id}: "
+                        f"{event.error}[/yellow]"
+                    )
+                progress.advance(task)
+
+            results, _failures = generate_for_stories(
+                generator, user_stories, mode, system_context, on_progress
             )
 
-        console.print("[green]✓[/green] Components initialized")
+        if not results:
+            console.print("[red]No requirements generated.[/red]")
+            raise typer.Exit(1)
 
-    except LLMConnectionError as e:
-        console.print(f"[red]LLM Connection Error:[/red] {e}")
-        raise typer.Exit(1)
-    except SearchError as e:
-        console.print(f"[red]Documentation Error:[/red] {e}")
-        raise typer.Exit(1)
+        total_reqs = sum(len(r.requirements) for r in results)
+        console.print(f"[green]✓[/green] Generated {total_reqs} requirements from {len(results)} stories")
 
-    # Generate requirements
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Generating requirements...", total=len(user_stories))
+        # Format output
+        formatted_output = format_requirements(results, output_format)
 
-        def on_progress(event) -> None:
-            if event.error is not None:
-                console.print(
-                    f"[yellow]Warning: Failed to generate for {event.story_id}: "
-                    f"{event.error}[/yellow]"
-                )
-            progress.advance(task)
-
-        results, _failures = generate_for_stories(
-            generator, user_stories, mode, system_context, on_progress
-        )
-
-    if not results:
-        console.print("[red]No requirements generated.[/red]")
-        raise typer.Exit(1)
-
-    total_reqs = sum(len(r.requirements) for r in results)
-    console.print(f"[green]✓[/green] Generated {total_reqs} requirements from {len(results)} stories")
-
-    # Format output
-    formatted_output = format_requirements(results, output_format)
-
-    # Output
-    if output:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(formatted_output, encoding="utf-8")
-        console.print(f"[green]✓[/green] Written to {output}")
-    else:
-        console.print("\n" + formatted_output)
+        # Output
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(formatted_output, encoding="utf-8")
+            console.print(f"[green]✓[/green] Written to {output}")
+        else:
+            console.print("\n" + formatted_output)
+    finally:
+        if prepared is not None:
+            prepared.close()
 
 
 @generate_app.command("single")
@@ -520,6 +559,16 @@ def generate_threats(
             ),
         ),
     ] = None,
+    other_formats: Annotated[
+        bool,
+        typer.Option(
+            "--other-formats",
+            help=(
+                "Also read .rst, .adoc, .txt, .mdx, .html, .pdf and .docx files "
+                "(converted to Markdown). Outside the tested setup."
+            ),
+        ),
+    ] = False,
     output: Annotated[
         Path,
         typer.Option("--output", "-o", help="Output folder"),
@@ -586,96 +635,248 @@ def generate_threats(
     except ThreatListError as e:
         console.print(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(1)
-    try:
-        llm_client = _client(cfg, tested_setup=True, model_name=writer_name)
-        if not llm_client.check_health():
-            console.print(
-                "[red]Error:[/red] Ollama does not answer, or it does not have "
-                f"the model {escape(writer_name)}.\n"
-                "Start Ollama: [cyan]ollama serve[/cyan]. Get the model: "
-                f"[cyan]ollama pull {escape(writer_name)}[/cyan]"
-            )
-            raise typer.Exit(1)
-        checker = None
-        if checker_name:
-            checker = _client(cfg, tested_setup=True, model_name=checker_name)
-            if not checker.check_health():
-                console.print(
-                    "[red]Error:[/red] Ollama does not have the checker model "
-                    f"{escape(checker_name)}.\n"
-                    f"Get it: [cyan]ollama pull {escape(checker_name)}[/cyan]. "
-                    "Or run with [cyan]--no-check[/cyan] (no second model)."
-                )
-                raise typer.Exit(1)
-        about = None
-        if about_file is not None:
-            about_name = escape(str(about_file))
-            if not about_file.is_file():
-                problem = "Not a file" if about_file.exists() else "File not found"
-                console.print(f"[red]Error:[/red] {problem}: {about_name}")
-                raise typer.Exit(1)
-            try:
-                # utf-8-sig: a byte order mark at the start of the file is not text
-                about = about_file.read_text(encoding="utf-8-sig")
-            except (OSError, UnicodeError) as e:
-                console.print(
-                    f"[red]Error:[/red] Cannot read {about_name}: {escape(str(e))}"
-                )
-                raise typer.Exit(1)
-            if not about.strip():
-                console.print(f"[red]Error:[/red] The file has no text: {about_name}")
-                raise typer.Exit(1)
-        generator = ThreatListGenerator(
-            llm_client,
-            docs,
-            product=product_name,
-            name_labels=labels,
-            checker=checker,
-            about=about,
+    # Documentation of other types: a temporary mirror, outside the tested setup.
+    prepared = None
+    search_docs = docs
+    if other_formats:
+        from secreqgen.application.documentation import (
+            docs_note,
+            prepare_documentation,
         )
-    except LLMConnectionError as e:
-        console.print(f"[red]LLM Connection Error:[/red] {e}")
-        raise typer.Exit(1)
-    except (SearchError, ThreatListError) as e:
+
+        try:
+            prepared = prepare_documentation(docs, other_formats=True)
+        except InputError as e:
+            console.print(f"[red]Error:[/red] {escape(str(e))}")
+            raise typer.Exit(1)
+        search_docs = prepared.folder
+        note = docs_note(prepared.report)
+        if note:
+            console.print(f"[yellow]Note:[/yellow] {escape(note)}")
+
+    try:
+        try:
+            llm_client = _client(cfg, tested_setup=True, model_name=writer_name)
+            if not llm_client.check_health():
+                console.print(
+                    "[red]Error:[/red] Ollama does not answer, or it does not have "
+                    f"the model {escape(writer_name)}.\n"
+                    "Start Ollama: [cyan]ollama serve[/cyan]. Get the model: "
+                    f"[cyan]ollama pull {escape(writer_name)}[/cyan]"
+                )
+                raise typer.Exit(1)
+            checker = None
+            if checker_name:
+                checker = _client(cfg, tested_setup=True, model_name=checker_name)
+                if not checker.check_health():
+                    console.print(
+                        "[red]Error:[/red] Ollama does not have the checker model "
+                        f"{escape(checker_name)}.\n"
+                        f"Get it: [cyan]ollama pull {escape(checker_name)}[/cyan]. "
+                        "Or run with [cyan]--no-check[/cyan] (no second model)."
+                    )
+                    raise typer.Exit(1)
+            about = None
+            if about_file is not None:
+                about_name = escape(str(about_file))
+                if not about_file.is_file():
+                    problem = "Not a file" if about_file.exists() else "File not found"
+                    console.print(f"[red]Error:[/red] {problem}: {about_name}")
+                    raise typer.Exit(1)
+                try:
+                    # utf-8-sig: a byte order mark at the start of the file is not text
+                    about = about_file.read_text(encoding="utf-8-sig")
+                except (OSError, UnicodeError) as e:
+                    console.print(
+                        f"[red]Error:[/red] Cannot read {about_name}: {escape(str(e))}"
+                    )
+                    raise typer.Exit(1)
+                if not about.strip():
+                    console.print(
+                        f"[red]Error:[/red] The file has no text: {about_name}"
+                    )
+                    raise typer.Exit(1)
+            generator = ThreatListGenerator(
+                llm_client,
+                search_docs,
+                product=product_name,
+                name_labels=labels,
+                checker=checker,
+                about=about,
+            )
+        except LLMConnectionError as e:
+            console.print(f"[red]LLM Connection Error:[/red] {e}")
+            raise typer.Exit(1)
+        except (SearchError, ThreatListError) as e:
+            console.print(f"[red]Error:[/red] {escape(str(e))}")
+            raise typer.Exit(1)
+
+        console.print(
+            f"Writer: {escape(writer_name)}. Checker: "
+            f"{escape(checker_name) if checker_name else 'none (--no-check)'}."
+        )
+        written = 0
+        used_names: set[str] = set()
+        for story in user_stories:
+            try:
+                model = generator.generate(story)
+            except LLMConnectionError as e:
+                console.print(f"[red]LLM Connection Error:[/red] {escape(str(e))}")
+                raise typer.Exit(1)
+            except (ThreatListError, SearchError, GenerationError) as e:
+                console.print(
+                    f"[yellow]Warning: no threat list for {escape(story.id)}: {escape(str(e))}[/yellow]"
+                )
+                continue
+            # Two story ids can give the same folder name ("A/1" and "A_1"): the second one gets a number.
+            folder = output / threat_folder_name(story.id, used_names)
+            try:
+                write_threat_files(folder, model)
+            except OSError as e:
+                console.print(f"[red]Error:[/red] Cannot write to {escape(str(folder))}: {escape(str(e))}")
+                raise typer.Exit(1)
+            written += 1
+            summary = summarise_threat_list(model)
+            checked = (
+                f", {summary.accepted} accepted by {checker_name}"
+                if checker_name
+                else ""
+            )
+            console.print(
+                f"[green]✓[/green] {escape(story.id)}: {summary.rows} rows ({summary.attacks} attacks, "
+                f"{summary.rules} rules), {summary.clean} with no weak sign{checked}, "
+                f"{summary.dropped} removed by the script, {summary.calls} calls, {summary.seconds} s"
+            )
+
+        if written == 0:
+            console.print("[red]No threat list was written.[/red]")
+            raise typer.Exit(1)
+        console.print(f"\n[bold]{DRAFT_NOTICE}[/bold]")
+    finally:
+        if prepared is not None:
+            prepared.close()
+
+
+
+MAX_DROPPED_LINES = 10
+
+
+@generate_app.command(
+    "context",
+    help=(
+        "Write a draft system context file for a codebase. "
+        "A person must check it before use."
+    ),
+)
+def generate_context(
+    folder: Annotated[Path, typer.Argument(help="The folder of the codebase")],
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help=(
+                "Write the YAML text to this file. "
+                "Without it the text goes to the console."
+            ),
+        ),
+    ] = None,
+    writer_model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help="The model that writes (default: the tested writer).",
+        ),
+    ] = None,
+    product: Annotated[
+        str | None,
+        typer.Option(
+            "--product",
+            "-p",
+            help="The name of the product, if the files do not say it.",
+        ),
+    ] = None,
+) -> None:
+    """Write a draft system context file for a codebase."""
+    from rich.markup import escape
+
+    from secreqgen.application.errors import InputError, ModelServerError
+    from secreqgen.application.system_context import (
+        ContextOptions,
+        resolve_context_model,
+        run_system_context,
+    )
+    from secreqgen.context import DRAFT_NOTICE, ContextError
+    from secreqgen.exceptions import LLMConnectionError
+
+    cfg = get_config()
+    try:
+        writer_name = resolve_context_model(cfg, writer_model)
+    except InputError as e:
         console.print(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(1)
-
     console.print(
-        f"Writer: {escape(writer_name)}. Checker: "
-        f"{escape(checker_name) if checker_name else 'none (--no-check)'}."
+        f"Writing a system context for {escape(folder.name or str(folder))} "
+        f"with {escape(writer_name)}"
     )
-    written = 0
-    used_names: set[str] = set()
-    for story in user_stories:
-        try:
-            model = generator.generate(story)
-        except LLMConnectionError as e:
-            console.print(f"[red]LLM Connection Error:[/red] {escape(str(e))}")
-            raise typer.Exit(1)
-        except (ThreatListError, SearchError, GenerationError) as e:
-            console.print(
-                f"[yellow]Warning: no threat list for {escape(story.id)}: {escape(str(e))}[/yellow]"
-            )
-            continue
-        # Two story ids can give the same folder name ("A/1" and "A_1"): the second one gets a number.
-        folder = output / threat_folder_name(story.id, used_names)
-        try:
-            write_threat_files(folder, model)
-        except OSError as e:
-            console.print(f"[red]Error:[/red] Cannot write to {escape(str(folder))}: {escape(str(e))}")
-            raise typer.Exit(1)
-        written += 1
-        summary = summarise_threat_list(model)
-        checked = (
-            f", {summary.accepted} accepted by {checker_name}" if checker_name else ""
-        )
-        console.print(
-            f"[green]✓[/green] {escape(story.id)}: {summary.rows} rows ({summary.attacks} attacks, "
-            f"{summary.rules} rules), {summary.clean} with no weak sign{checked}, "
-            f"{summary.dropped} removed by the script, {summary.calls} calls, {summary.seconds} s"
-        )
-
-    if written == 0:
-        console.print("[red]No threat list was written.[/red]")
+    options = ContextOptions(
+        folder=folder, product=product, writer_model=writer_model, output=output
+    )
+    try:
+        run = run_system_context(options, cfg=cfg, make_client=_client)
+    except InputError as e:
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(1)
+    except ModelServerError as e:
+        console.print(
+            f"[red]Error:[/red] {escape(str(e))}\n"
+            "Start Ollama: [cyan]ollama serve[/cyan]. Get the model: "
+            f"[cyan]ollama pull {escape(writer_name)}[/cyan]"
+        )
+        raise typer.Exit(1)
+    except LLMConnectionError as e:
+        console.print(f"[red]LLM Connection Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+    except ContextError as e:
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+    except OSError as e:
+        console.print(
+            f"[red]Error:[/red] Cannot write to {escape(str(output))}: "
+            f"{escape(str(e))}"
+        )
+        raise typer.Exit(1)
+
+    result = run.result
+    facts = result["facts"]
+    def count(number: int, one: str, many: str) -> str:
+        return f"{number} {one if number == 1 else many}"
+
+    scanned = (
+        f"{count(facts['files_seen'], 'file', 'files')} scanned. "
+        f"{count(len(facts['parts']), 'part', 'parts')} read."
+    )
+    secret = facts["secret_files_skipped"]
+    if secret:
+        scanned += f" {count(secret, 'secret file', 'secret files')} not read."
+    console.print(scanned)
+    context = result["context"]
+    features = sum(len(g["items"]) for g in context["features"])
+    data_kinds = sum(len(v) for v in context["data_sensitivity"].values())
+    console.print(
+        f"Kept: {count(len(context['tech_stack']), 'technology', 'technologies')}, "
+        f"{count(features, 'feature', 'features')} in "
+        f"{count(len(context['features']), 'group', 'groups')}, "
+        f"{count(data_kinds, 'kind of data', 'kinds of data')}."
+    )
+    dropped = result["dropped"]
+    if dropped:
+        console.print(f"Dropped: {count(len(dropped), 'item', 'items')}.")
+        for item in dropped[:MAX_DROPPED_LINES]:
+            console.print(f"- {escape(str(item['what']))}: {escape(str(item['why']))}")
+    if run.output is not None:
+        console.print(f"Wrote {escape(str(run.output))}")
+    else:
+        console.print(result["yaml"], markup=False, highlight=False)
     console.print(f"\n[bold]{DRAFT_NOTICE}[/bold]")

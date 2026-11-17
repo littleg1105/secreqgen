@@ -1,0 +1,27 @@
+exit=0
+Writing a system context for shop with gemma4:26b
+2 files scanned. 3 parts read.
+Kept: 1 technology, 1 feature in 1 group, 1 kind of data.
+Dropped: 2 items.
+- tech_stack: Kubernetes: not in the files
+- feature: Refunds: unknown source name
+project:
+  name: Shop
+  description: A web shop for small stores.
+  tech_stack:
+  - framework: Express
+  security_profile: Medium - holds orders
+features:
+  orders:
+  - Orders
+data_sensitivity:
+  critical:
+  - Passwords
+
+
+DRAFT for a person to check. A model wrote this system context from the files of the product. Check each line against its source before you use it.
+
+--- calls
+_ollama_client(model_name='gemma4:26b', tested_setup=True)
+--- prompts
+[1] stand-in generate
