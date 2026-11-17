@@ -20,6 +20,13 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+# The tested setup (word search) calls the model as the runs of Study 2 did
+# (scripts/run_study2.py): a context window that holds the documentation, the
+# prompt and the answer, a long time limit, and no JSON-mode option.
+WORD_SEARCH_NUM_CTX = 16384
+WORD_SEARCH_TIMEOUT_S = 900.0
+DEFAULT_TIMEOUT_S = 120.0
+
 # Sub-apps
 ingest_app = typer.Typer(help="Ingest documents and system context")
 generate_app = typer.Typer(help="Generate security requirements")
@@ -40,6 +47,35 @@ DOC_TYPE_MAP = {
     "standards": "STANDARD",
     "standard": "STANDARD",
 }
+
+
+def _ollama_client(cfg, tested_setup: bool):
+    """Build the Ollama client of a generate command.
+
+    A value in the settings (SECREQGEN_LLM_NUM_CTX, SECREQGEN_LLM_TIMEOUT,
+    SECREQGEN_LLM_STRUCTURED_OUTPUT) wins. Without one, the word search uses
+    the values of the tested runs, and the vector store path keeps the
+    behaviour that it had before.
+    """
+    from secreqgen.generation import OllamaClient
+
+    num_ctx = cfg.llm.num_ctx
+    timeout = cfg.llm.timeout
+    structured_output = cfg.llm.structured_output
+    if tested_setup:
+        num_ctx = num_ctx or WORD_SEARCH_NUM_CTX
+        timeout = timeout or WORD_SEARCH_TIMEOUT_S
+        if structured_output is None:
+            structured_output = False
+    return OllamaClient(
+        base_url=cfg.llm.base_url,
+        model_name=cfg.llm.model_name,
+        temperature=cfg.llm.temperature,
+        max_tokens=cfg.llm.max_tokens,
+        timeout=timeout or DEFAULT_TIMEOUT_S,
+        num_ctx=num_ctx,
+        structured_output=True if structured_output is None else structured_output,
+    )
 
 
 @app.command()
@@ -510,6 +546,26 @@ def generate_requirements(
             help="Optional system context YAML file (overrides stored context)",
         ),
     ] = None,
+    docs: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--docs",
+            help=(
+                "Documentation folder for the word search (the tested setup). "
+                "With this option the tool uses no vector store and no embedding model."
+            ),
+        ),
+    ] = None,
+    product: Annotated[
+        Optional[str],
+        typer.Option(
+            "--product",
+            help=(
+                "Name of the product. 'keycloak' switches on the cleaning "
+                "of Keycloak template text."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Generate security requirements from user stories.
 
@@ -526,7 +582,6 @@ def generate_requirements(
     from secreqgen.exceptions import GenerationError, LLMConnectionError
     from secreqgen.generation import (
         GenerationMode,
-        OllamaClient,
         SecurityRequirementsGenerator,
         SecurityRequirementsPromptBuilder,
     )
@@ -534,10 +589,19 @@ def generate_requirements(
     from secreqgen.ingestion import DocumentEmbedder
     from secreqgen.output import OutputFormat, RequirementsExporter, RequirementsFormatter
     from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
+    from secreqgen.retrieval.word_search import SearchError
 
     # Validate input file
     if not input_file.exists():
         console.print(f"[red]Error:[/red] Input file not found: {input_file}")
+        raise typer.Exit(1)
+    if docs is not None and not docs.is_dir():
+        console.print(f"[red]Error:[/red] Documentation folder not found: {docs}")
+        raise typer.Exit(1)
+    if docs is not None and baseline:
+        # The tested setup has no zero-shot mode.
+        # No test ran its prompt without the passages.
+        console.print("[red]Error:[/red] --baseline cannot be used with --docs.")
         raise typer.Exit(1)
 
     # Validate format
@@ -560,10 +624,16 @@ def generate_requirements(
     cfg = get_config()
     mode = GenerationMode.ZERO_SHOT if baseline else GenerationMode.RAG
 
+    # The line "Search" is shown only for the word search.
+    # Without --docs the screen is as before.
+    search_line = ""
+    if docs is not None:
+        search_line = f"[cyan]Search:[/cyan] word search over {docs}\n"
     console.print(
         Panel(
             f"[cyan]Input:[/cyan] {input_file}\n"
             f"[cyan]Mode:[/cyan] {'Baseline (zero-shot)' if baseline else 'RAG-enhanced'}\n"
+            f"{search_line}"
             f"[cyan]Format:[/cyan] {output_format.value}\n"
             f"[cyan]Output:[/cyan] {output or 'stdout'}",
             title="Generating Security Requirements",
@@ -617,6 +687,11 @@ def generate_requirements(
             raise typer.Exit(1)
         system_context = context.read_text()
         console.print(f"[green]✓[/green] Loaded system context from {context.name}")
+    elif docs is not None:
+        console.print(
+            "[yellow]Note:[/yellow] no system context file (--context). "
+            "The tested runs had one."
+        )
 
     # Initialize components
     try:
@@ -628,12 +703,7 @@ def generate_requirements(
             progress.add_task("Initializing components...", total=None)
 
             # Initialize LLM client
-            llm_client = OllamaClient(
-                base_url=cfg.llm.base_url,
-                model_name=cfg.llm.model_name,
-                temperature=cfg.llm.temperature,
-                max_tokens=cfg.llm.max_tokens,
-            )
+            llm_client = _ollama_client(cfg, tested_setup=docs is not None)
 
             # Check Ollama connection
             if not llm_client.check_health():
@@ -645,7 +715,17 @@ def generate_requirements(
 
             # Initialize retriever for RAG mode
             retriever = None
-            if mode == GenerationMode.RAG:
+            if mode == GenerationMode.RAG and docs is not None:
+                # The tested setup: word search over the documentation folder.
+                # The product name comes from --product, or from the key
+                # "project" of the input file.
+                from secreqgen.retrieval.word_search import WordSearchRetriever
+
+                product_name = product
+                if product_name is None and isinstance(data, dict):
+                    product_name = data.get("project")
+                retriever = WordSearchRetriever(docs, product=product_name)
+            elif mode == GenerationMode.RAG:
                 embedder = DocumentEmbedder(
                     model_name=cfg.embedding.model_name,
                     device=cfg.embedding.device,
@@ -661,17 +741,27 @@ def generate_requirements(
                     similarity_threshold=cfg.retrieval.similarity_threshold,
                 )
 
-            # Initialize generator
+            # Initialize generator. With --docs the prompt is the tested prompt set.
+            prompts_dir = None
+            if docs is not None:
+                from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
+
+                prompts_dir = TESTED_PROMPT_SET
             generator = SecurityRequirementsGenerator(
                 llm_client=llm_client,
                 retriever=retriever,
-                prompt_builder=SecurityRequirementsPromptBuilder(),
+                prompt_builder=SecurityRequirementsPromptBuilder(
+                    prompts_dir=prompts_dir
+                ),
             )
 
         console.print("[green]✓[/green] Components initialized")
 
     except LLMConnectionError as e:
         console.print(f"[red]LLM Connection Error:[/red] {e}")
+        raise typer.Exit(1)
+    except SearchError as e:
+        console.print(f"[red]Documentation Error:[/red] {e}")
         raise typer.Exit(1)
 
     # Generate requirements
@@ -694,7 +784,7 @@ def generate_requirements(
                 )
                 results.append(result)
                 progress.advance(task)
-            except GenerationError as e:
+            except (GenerationError, SearchError) as e:
                 console.print(f"[yellow]Warning: Failed to generate for {story.id}: {e}[/yellow]")
                 progress.advance(task)
 
@@ -743,6 +833,30 @@ def generate_single(
         str,
         typer.Option("--format", "-f", help="Output format: json, yaml, markdown"),
     ] = "markdown",
+    docs: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--docs",
+            help=(
+                "Documentation folder for the word search (the tested setup). "
+                "With this option the tool uses no vector store and no embedding model."
+            ),
+        ),
+    ] = None,
+    product: Annotated[
+        Optional[str],
+        typer.Option(
+            "--product",
+            help=(
+                "Name of the product. 'keycloak' switches on the cleaning "
+                "of Keycloak template text."
+            ),
+        ),
+    ] = None,
+    context: Annotated[
+        Optional[Path],
+        typer.Option("--context", "-c", help="Optional system context YAML file"),
+    ] = None,
 ) -> None:
     """Generate requirements for a single user story (interactive mode)."""
     import uuid
@@ -750,7 +864,6 @@ def generate_single(
     from secreqgen.exceptions import GenerationError, LLMConnectionError
     from secreqgen.generation import (
         GenerationMode,
-        OllamaClient,
         SecurityRequirementsGenerator,
         SecurityRequirementsPromptBuilder,
     )
@@ -758,6 +871,7 @@ def generate_single(
     from secreqgen.ingestion import DocumentEmbedder
     from secreqgen.output import OutputFormat, RequirementsFormatter
     from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
+    from secreqgen.retrieval.word_search import SearchError
 
     # Validate format
     format_map = {
@@ -769,6 +883,18 @@ def generate_single(
     output_format = format_map.get(format.lower())
     if output_format is None:
         console.print(f"[red]Error:[/red] Invalid format: {format}")
+        raise typer.Exit(1)
+
+    if docs is not None and not docs.is_dir():
+        console.print(f"[red]Error:[/red] Documentation folder not found: {docs}")
+        raise typer.Exit(1)
+    if docs is not None and baseline:
+        # The tested setup has no zero-shot mode.
+        # No test ran its prompt without the passages.
+        console.print("[red]Error:[/red] --baseline cannot be used with --docs.")
+        raise typer.Exit(1)
+    if context is not None and not context.is_file():
+        console.print(f"[red]Error:[/red] Context file not found: {context}")
         raise typer.Exit(1)
 
     cfg = get_config()
@@ -799,19 +925,29 @@ def generate_single(
         ) as progress:
             progress.add_task("Initializing...", total=None)
 
-            llm_client = OllamaClient(
-                base_url=cfg.llm.base_url,
-                model_name=cfg.llm.model_name,
-                temperature=cfg.llm.temperature,
-                max_tokens=cfg.llm.max_tokens,
-            )
+            llm_client = _ollama_client(cfg, tested_setup=docs is not None)
 
             if not llm_client.check_health():
                 console.print("[red]Cannot connect to Ollama.[/red]")
                 raise typer.Exit(1)
 
             retriever = None
-            if mode == GenerationMode.RAG:
+            prompt_builder = None
+            if docs is not None:
+                # The tested setup: word search over the documentation folder,
+                # and the tested prompt set.
+                from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
+
+                prompt_builder = SecurityRequirementsPromptBuilder(
+                    prompts_dir=TESTED_PROMPT_SET
+                )
+            if mode == GenerationMode.RAG and docs is not None:
+                from secreqgen.retrieval.word_search import WordSearchRetriever
+
+                retriever = WordSearchRetriever(
+                    docs, product=product, system_context_file=context
+                )
+            elif mode == GenerationMode.RAG:
                 embedder = DocumentEmbedder(
                     model_name=cfg.embedding.model_name,
                     device=cfg.embedding.device,
@@ -830,6 +966,7 @@ def generate_single(
             generator = SecurityRequirementsGenerator(
                 llm_client=llm_client,
                 retriever=retriever,
+                prompt_builder=prompt_builder,
             )
 
         with Progress(
@@ -838,7 +975,12 @@ def generate_single(
             console=console,
         ) as progress:
             progress.add_task("Generating requirements...", total=None)
-            result = generator.generate(user_story=user_story, mode=mode)
+            single_context = None
+            if context is not None:
+                single_context = context.read_text(encoding="utf-8")
+            result = generator.generate(
+                user_story=user_story, mode=mode, system_context=single_context
+            )
 
         console.print(f"[green]✓[/green] Generated {len(result.requirements)} requirements")
 
@@ -848,6 +990,9 @@ def generate_single(
 
     except LLMConnectionError as e:
         console.print(f"[red]LLM Connection Error:[/red] {e}")
+        raise typer.Exit(1)
+    except SearchError as e:
+        console.print(f"[red]Documentation Error:[/red] {e}")
         raise typer.Exit(1)
     except GenerationError as e:
         console.print(f"[red]Generation Error:[/red] {e}")

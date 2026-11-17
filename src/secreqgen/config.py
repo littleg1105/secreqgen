@@ -50,6 +50,19 @@ class LLMConfig(BaseSettings):
     temperature: float = 0.1
     max_tokens: int = 4096
 
+    # How the command line calls Ollama. None = the default of the mode:
+    #   word search (--docs, the tested setup): context window 16384 tokens,
+    #   time limit 900 s and no JSON-mode option, as the runs of Study 2
+    #   (scripts/run_study2.py);
+    #   vector store: the default window of the server, 120 s and the
+    #   JSON-mode option (the behaviour before the word search).
+    # Some Ollama runners refuse the JSON-mode option with error 501
+    # ("structured output is unavailable"). Then set structured_output to
+    # false (SECREQGEN_LLM_STRUCTURED_OUTPUT=false).
+    num_ctx: Optional[int] = None
+    timeout: Optional[float] = None
+    structured_output: Optional[bool] = None
+
     @property
     def judge_model(self) -> str:
         """Get the model to use for verification/judging."""
