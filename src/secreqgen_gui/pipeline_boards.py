@@ -513,9 +513,11 @@ def _threat_frame(trace: Mapping, frame: tuple[str, int], verdicts) -> tuple:
             decided = sum(1 for v in verdicts.values() if v in ("keep", "delete"))
             lines = (f"{decided} of {kept_all} decided",)
             kept_rows = sum(1 for v in verdicts.values() if v == "keep")
-            text = (
-                f" You decided {decided} of {plural(kept_all, 'row')}: "
-                f"{kept_rows} kept, {decided - kept_rows} deleted."
+            text = f" You decided {decided} of {plural(kept_all, 'row')}"
+            text += (
+                f": {kept_rows} kept, {decided - kept_rows} deleted."
+                if decided
+                else "."
             )
         views["read"] = StepView("active", lines)
     loop_used = (in_loop and group_no > 1) or (after_loop and total > 1)

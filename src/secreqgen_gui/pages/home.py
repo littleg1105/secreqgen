@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime
 
 from nicegui import run, ui
 from secreqgen.application.server import check_model_server, model_available
@@ -85,20 +84,7 @@ def _run_line(run_data: dict) -> str:
 
 def when_text(run_data: dict) -> str:
     """Return the date and time of a run, in the local time zone."""
-    stamp = run_data.get("created_at")
-    if isinstance(stamp, str):
-        try:
-            moment = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-            return moment.astimezone().strftime("%Y-%m-%d %H:%M")
-        except ValueError:
-            pass
-    name = str(run_data.get("id", ""))
-    try:
-        return datetime.strptime(name[:15], "%Y%m%d-%H%M%S").strftime(
-            "%Y-%m-%d %H:%M"
-        )
-    except ValueError:
-        return name
+    return storage.run_date_text(run_data) or str(run_data.get("id", ""))
 
 
 def stories_text(run_data: dict) -> str:

@@ -22,6 +22,10 @@ PURPOSE = "The parts of the tool and the steps of one story."
 NO_RUN = "No finished run yet. The diagram shows the steps with no numbers."
 NO_RESULT = "This story has no stored result."
 CSS = ".sr-link { color: #1D3A6B; }"
+KEYS_HINT = (
+    "Arrow right: next step. Arrow left: previous step. Space: play or pause. "
+    "Esc: leave the full screen."
+)
 
 
 def _pick_threat_story(run_id: str, manifest: dict) -> str | None:
@@ -268,13 +272,15 @@ async def page(
         page_title("How it works", PURPOSE)
         _kind_links(kind)
         _source_line(kind, data)
-        with ui.column().classes("w-full gap-0 mt-4"):
-            diagram = StepDiagram()
+        # The buttons stand above the diagram. So they stay in their place
+        # when the text below the diagram gets longer or shorter.
         with ui.row().classes("w-full items-center gap-3 mt-4"):
             previous = ui.button("Previous step").props("outline no-caps")
             play_button = ui.button("Play").props("unelevated no-caps")
             following = ui.button("Next step").props("outline no-caps")
             counter = ui.label().classes("sr-small ml-2")
+        with ui.column().classes("w-full gap-0 mt-2"):
+            diagram = StepDiagram(hint=KEYS_HINT)
         _parts(kind, address)
 
     def draw(position: int, moving: bool) -> None:

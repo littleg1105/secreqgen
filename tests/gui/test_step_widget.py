@@ -40,6 +40,9 @@ async def test_the_diagram_draws_only_when_the_board_changed(user: User) -> None
         assert "4 passages" in diagram.picture.content
     await user.should_see("The writer model writes rows")
     await user.should_see("Group 1 of 1.")
+    # The button and the hint of the full screen are parts of the diagram.
+    await user.should_see("Full screen")
+    await user.should_see("Esc: leave the full screen.")
 
 
 async def test_without_moving_the_picture_has_no_slip(user: User) -> None:

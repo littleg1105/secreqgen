@@ -170,7 +170,19 @@ def _write_threat_run() -> None:
     )
 
 
-async def test_history_lists_runs_newest_first(user):
+@pytest.fixture
+def athens_time(monkeypatch):
+    """Give the test a known local time zone (UTC+2 in November)."""
+    import time
+
+    monkeypatch.setenv("TZ", "Europe/Athens")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+async def test_history_lists_runs_newest_first(user, athens_time):
     from nicegui import ui
 
     _write_threat_run()
@@ -180,8 +192,9 @@ async def test_history_lists_runs_newest_first(user):
     await user.should_see("All runs in the data folder.")
     table = user.find(kind=ui.table).elements.pop()
     assert [r["id"] for r in table.rows] == [RUN, OLD]
-    assert table.rows[0]["date"] == "17 November 2026, 21:45"
-    assert table.rows[1]["date"] == "16 November 2026, 10:00"
+    # The manifest holds UTC. The page shows the local time.
+    assert table.rows[0]["date"] == "17 November 2026, 23:45"
+    assert table.rows[1]["date"] == "16 November 2026, 12:00"
     assert table.rows[1]["result"] == "16 rows, 11 accepted"
     assert table.rows[1]["models"] == "gemma4:26b, qwen3.8:27b"
     assert table.rows[1]["kind"] == "Threat list"

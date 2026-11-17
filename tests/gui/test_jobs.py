@@ -122,6 +122,8 @@ def test_run_goes_through_checking_running_and_done(spec):
 
     manifest = storage.read_manifest(run_id)
     assert manifest["status"] == "finished"
+    # The manifest keeps the count of rows with a fault for the run page.
+    assert manifest["per_story"][0]["faults"] == 1
     assert manifest["kind"] == "threats"
     assert manifest["writer"] == WRITER and manifest["checker"] == CHECKER
     assert manifest["stories_total"] == 3

@@ -187,3 +187,23 @@ def test_all_paths_stay_inside_the_data_home(gui_home):
         storage.prompt_sets_dir(),
     ):
         assert folder.resolve().parent == gui_home.resolve()
+
+
+def test_the_date_of_a_run_is_shown_in_local_time(monkeypatch):
+    import time
+
+    from secreqgen_gui import storage
+
+    monkeypatch.setenv("TZ", "Europe/Athens")
+    time.tzset()
+    try:
+        item = {"created_at": "2026-11-17T20:43:06Z", "id": "x"}
+        assert storage.run_date_text(item) == "17 November 2026, 22:43"
+        # With no time in the manifest, the run id gives it (also UTC).
+        only_id = {"id": "20261117-235900-threats"}
+        assert storage.run_date_text(only_id) == "18 November 2026, 01:59"
+        assert storage.run_date_text({"id": "no time here"}) == ""
+        assert storage.run_date_text({}) == ""
+    finally:
+        monkeypatch.undo()
+        time.tzset()

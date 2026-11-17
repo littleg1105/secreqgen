@@ -159,6 +159,9 @@ body {{
   color: var(--sr-slate);
 }}
 .sr-steps {{ max-width: 1160px; }}
+.sr-steps-bar {{ min-height: 0; margin-bottom: 2px; }}
+.sr-steps-full {{ font-size: var(--sr-size-small); }}
+.sr-step-words {{ min-height: 132px; }}
 .sr-step-title {{
   font-size: var(--sr-size-section);
   font-weight: 600;
@@ -166,7 +169,39 @@ body {{
 }}
 .sr-step-facts {{ font-weight: 600; margin-top: 2px; }}
 .sr-step-text {{ color: var(--sr-slate); max-width: 84ch; margin-top: 2px; }}
+.sr-steps-hint {{ display: none; }}
 """
+
+# The step diagram in the full screen of the browser, for a projector. Each
+# browser name of the state needs its own rule block.
+_FULL_SCREEN = """
+.sr-steps:{state} {{
+  background: var(--sr-paper);
+  max-width: none;
+  padding: 40px 56px;
+  justify-content: center;
+  overflow: auto;
+}}
+.sr-steps:{state} svg.srp {{ max-width: none !important; max-height: 62vh; }}
+.sr-steps:{state} .sr-steps-bar {{ display: none; }}
+.sr-steps:{state} .sr-step-title {{ font-size: 30px; margin-top: 28px; }}
+.sr-steps:{state} .sr-step-facts {{ font-size: 22px; margin-top: 6px; }}
+.sr-steps:{state} .sr-step-text {{
+  font-size: 20px;
+  line-height: 1.45;
+  max-width: 96ch;
+  margin-top: 6px;
+}}
+.sr-steps:{state} .sr-steps-hint {{
+  display: block;
+  font-size: var(--sr-size-text);
+  color: var(--sr-slate);
+  margin-top: 20px;
+}}
+"""
+CSS += "".join(
+    _FULL_SCREEN.format(state=state) for state in ("fullscreen", "-webkit-full-screen")
+)
 
 
 def apply_app() -> None:

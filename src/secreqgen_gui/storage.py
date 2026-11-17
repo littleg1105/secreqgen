@@ -103,6 +103,27 @@ def read_manifest(run_id: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def run_date_text(item: dict) -> str:
+    """Return the start of a run in the local time zone.
+
+    The text is like "17 November 2026, 22:43". The manifest holds the time
+    in UTC (created_at). The run id holds the same time. An item with no
+    time that can be read gives an empty text.
+    """
+    stamp = str(item.get("created_at") or "")
+    try:
+        when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            when = datetime.strptime(str(item.get("id", ""))[:15], "%Y%m%d-%H%M%S")
+        except ValueError:
+            return ""
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    local = when.astimezone()
+    return f"{local.day} {local:%B %Y, %H:%M}"
+
+
 def list_runs() -> list[dict]:
     """Return all runs, newest first.
 

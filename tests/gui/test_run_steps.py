@@ -205,6 +205,15 @@ async def test_the_run_page_before_the_first_story(user, monkeypatch):
     await user.should_see("No story is in work")
 
 
+async def test_the_run_page_when_the_run_reads_the_documentation(user, monkeypatch):
+    # The check of the model server is done. No story started yet.
+    state = _live_state(None)
+    monkeypatch.setattr(jobs, "manager", StandIn(state))
+    await user.open(f"/runs/{state.id}")
+    await user.should_see("The run reads the documentation.")
+    await user.should_not_see("The run checks the model server.")
+
+
 def _stored_run(run_id="20261117-090000-threats"):
     folder = storage.run_dir(run_id) / "stories" / "S-1"
     folder.mkdir(parents=True)

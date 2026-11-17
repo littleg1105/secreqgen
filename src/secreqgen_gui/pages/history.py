@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from nicegui import run, ui
 
 from secreqgen_gui import storage
@@ -41,25 +39,8 @@ ACTION_SLOT = """
 
 
 def format_date(item: dict) -> str:
-    """Return a date like "17 November 2026, 21:45" for a run."""
-    stamp = str(item.get("created_at") or "")
-    when = None
-    for text in (stamp.replace("Z", "+00:00"), str(item.get("id", ""))[:15]):
-        for pattern in (None, "%Y%m%d-%H%M%S"):
-            try:
-                when = (
-                    datetime.fromisoformat(text)
-                    if pattern is None
-                    else datetime.strptime(text, pattern)
-                )
-            except ValueError:
-                continue
-            break
-        if when is not None:
-            break
-    if when is None:
-        return ""
-    return f"{when.day} {when:%B %Y, %H:%M}"
+    """Return the start of a run in the local time zone."""
+    return storage.run_date_text(item)
 
 
 def _plural(count: int, word: str) -> str:

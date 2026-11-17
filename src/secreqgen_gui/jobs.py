@@ -153,16 +153,22 @@ def _plural(count: int, word: str) -> str:
     return f"{count} {word}" if count == 1 else f"{count} {word}s"
 
 
+def _faults(outcome: Any) -> int:
+    """Return the number of rows where the second model names a fault."""
+    rows = (getattr(outcome, "model", None) or {}).get("rows") or []
+    return sum(
+        1
+        for row in rows
+        if isinstance(row, dict) and row.get("second_model") == "refuses"
+    )
+
+
 def _threat_summary(outcome: Any, checked: bool) -> str:
     summary = outcome.summary
     parts = [_plural(summary.rows, "row")]
     if checked:
         parts.append(f"{summary.accepted} accepted")
-        refused = sum(
-            1
-            for row in (outcome.model or {}).get("rows") or []
-            if isinstance(row, dict) and row.get("second_model") == "refuses"
-        )
+        refused = _faults(outcome)
         if refused:
             parts.append(f"{refused} with a fault")
     return ", ".join(parts)
@@ -458,6 +464,8 @@ class JobManager:
                     entry["seconds"] = story.seconds
                 if run.kind == "requirements" and outcome is not None:
                     entry["requirements"] = len(outcome.requirements)
+                if run.kind == "threats" and outcome is not None and checked:
+                    entry["faults"] = _faults(outcome)
                 manifest["per_story"].append(entry)
                 if event.error is not None:
                     manifest["failures"].append(

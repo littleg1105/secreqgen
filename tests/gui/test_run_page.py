@@ -80,7 +80,8 @@ def write_manifest(run_id, **extra):
                 "seconds": 61.0,
                 "rows": 5,
                 "accepted": 4,
-                "dropped": 1,
+                "dropped": 3,  # rows that the tool code removed: not faults
+                "faults": 1,
             },
         ],
         "failures": [],

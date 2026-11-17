@@ -112,7 +112,7 @@ REQUIREMENTS_FLOW = Flow(
         Step("story", 0, 0, ("Story and", "documentation"), "your input"),
         Step("search", 1, 1, ("Search the", "documentation"), "the search"),
         Step("write", 2, 2, ("Write the", "requirements"), "the model"),
-        Step("parse", 1, 3, ("Read the", "answer"), "the fixed form"),
+        Step("parse", 1, 3, ("Put into the", "fixed form"), "the fixed form"),
         Step("read", 0, 4, ("Read the", "requirements"), "your review"),
     ),
 )

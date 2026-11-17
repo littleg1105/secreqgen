@@ -7,6 +7,7 @@ from nicegui import ui
 from secreqgen_gui.pipeline_view import Board, render_svg
 
 SAME_STORY = object()  # the slip starts at the step of the last picture
+FULL_SCREEN_HINT = "Esc: leave the full screen."
 
 
 class StepDiagram:
@@ -16,17 +17,35 @@ class StepDiagram:
     moves one time for each change, and a page can call show() on a timer.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, hint: str = FULL_SCREEN_HINT) -> None:
         self._key: tuple | None = None
         self._story = ""
         self._active: str | None = None
-        with ui.column().classes("w-full gap-0 sr-steps"):
+        with ui.column().classes("w-full gap-0 sr-steps") as box:
+            with ui.row().classes("w-full justify-end sr-steps-bar"):
+                full = ui.button("Full screen").props("flat dense no-caps")
+                full.classes("sr-steps-full")
             # The SVG text is built by render_svg from fixed strings and
             # escaped values. No text from outside is in it unescaped.
             self.picture = ui.html("", sanitize=False).classes("w-full")
-            self.title = ui.label().classes("sr-step-title")
-            self.facts = ui.label().classes("sr-step-facts")
-            self.text = ui.label().classes("sr-step-text")
+            with ui.column().classes("w-full gap-0 sr-step-words"):
+                self.title = ui.label().classes("sr-step-title")
+                self.facts = ui.label().classes("sr-step-facts")
+                self.text = ui.label().classes("sr-step-text")
+            # The hint shows in the full screen only (see theme.py).
+            ui.label(hint).classes("sr-steps-hint")
+        # The browser must start the full screen inside the click itself, so
+        # the handler runs in the browser. The id is a number of NiceGUI.
+        full.on(
+            "click",
+            js_handler=(
+                "() => {"
+                f" const box = document.getElementById('c{box.id}');"
+                " const go = box.requestFullscreen || box.webkitRequestFullscreen;"
+                " if (go) { go.call(box); }"
+                " }"
+            ),
+        )
 
     def show(
         self,

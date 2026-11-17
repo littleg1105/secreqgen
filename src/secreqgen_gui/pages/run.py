@@ -28,6 +28,7 @@ FAILED_HINT = "Check the model server on the start page, then start the run agai
 ID_WIDTH = "width:112px;flex:none"
 READABLE = "max-width:960px"
 CHECKING_LINE = "The run checks the model server."
+READING_LINE = "The run reads the documentation."
 
 
 @dataclass
@@ -109,8 +110,10 @@ def _summary(kind: str, entry: dict, checked: bool) -> str:
     parts = [f"{rows} row" + ("" if rows == 1 else "s")]
     if checked:
         parts.append(f"{int(entry.get('accepted') or 0)} accepted")
-        if entry.get("dropped"):
-            parts.append(f"{int(entry['dropped'])} with a fault")
+        # "dropped" counts the rows that the tool code removed. It is not
+        # the count of rows with a fault.
+        if entry.get("faults"):
+            parts.append(f"{int(entry['faults'])} with a fault")
     return ", ".join(parts)
 
 
@@ -331,7 +334,8 @@ def _steps_view(view: View, stored: dict | None) -> tuple | None:
             board = pipeline_boards.live_board(
                 pipeline_boards.new_progress(view.kind), notes=notes
             )
-            return board, "", CHECKING_LINE, None, True
+            line = CHECKING_LINE if view.state == "checking" else READING_LINE
+            return board, "", line, None, True
         story_id = str(progress["story_id"])
         ids = [s.id for s in view.stories]
         number = ids.index(story_id) + 1 if story_id in ids else _position(view)
