@@ -18,7 +18,7 @@ Open `http://127.0.0.1:8080`. Ollama must run and must have the models of the Se
 3. In "Documentation", click "Browse" and pick the folder with the Markdown (`.md`) files of the product. The search reads `.md` files only.
 4. Click "Start threat list".
 
-On macOS, "Browse" opens the normal file dialog. On other systems, and when the GUI listens on a network address, "Browse" shows a list of folders in the page.
+"Browse" shows a list of folders in the page. It works the same way on every system and in a container.
 
 ## Pages
 

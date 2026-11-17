@@ -8,41 +8,12 @@ ui.markdown, ui.code or raw HTML.
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
-import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from nicegui import run, ui
+from nicegui import ui
 
-from secreqgen_gui.settings import (
-    expand_path,
-    listens_on_this_computer_only,
-    show_path,
-)
-
-# The file dialog of macOS. The text is fixed. The start folder, the prompt
-# and the kind go in as arguments, never as script text.
-PICK_SCRIPT = """
-on run argv
-    set startPath to item 1 of argv
-    set promptText to item 2 of argv
-    set wantFolder to (item 3 of argv is "folder")
-    try
-        set startPlace to (POSIX file startPath) as alias
-    on error
-        set startPlace to (path to home folder)
-    end try
-    tell me to activate
-    if wantFolder then
-        set picked to choose folder with prompt promptText default location startPlace
-    else
-        set picked to choose file with prompt promptText default location startPlace
-    end if
-    return POSIX path of picked
-end run
-"""
+from secreqgen_gui.settings import expand_path, show_path
 
 TAG_KINDS = ("plain", "keep", "delete", "caution")
 
@@ -108,38 +79,6 @@ def _list_folder(folder: Path, folders_only: bool) -> tuple[list[Path], str]:
     return entries, ""
 
 
-def os_picker_available() -> bool:
-    """True when Browse can open the file dialog of the operating system.
-
-    The dialog opens on the screen of the computer that runs the GUI. So it
-    is used only on macOS and only when the GUI listens on this computer.
-    In every other case Browse shows a list of folders in the page.
-    """
-    return (
-        sys.platform == "darwin"
-        and shutil.which("osascript") is not None
-        and listens_on_this_computer_only()
-    )
-
-
-def pick_with_os_dialog(start: Path, prompt: str, folder: bool) -> Path | None:
-    """Open the file dialog of macOS. Return the path that the person picked.
-
-    None means that the person cancelled, or that the dialog did not open.
-    The call waits for the dialog, so a page runs it off the event loop.
-    """
-    command = ["osascript", "-e", PICK_SCRIPT, str(start), prompt]
-    command.append("folder" if folder else "file")
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-    except OSError:
-        return None
-    picked = result.stdout.strip()
-    if result.returncode != 0 or not picked:
-        return None
-    return Path(picked)
-
-
 def _start_place(value: str, fallback: Path | None) -> Path:
     """Return the folder where a dialog starts."""
     place = expand_path(value) if (value or "").strip() else fallback
@@ -158,35 +97,21 @@ def path_field(
     hint: str = "",
     start: Path | None = None,
 ):
-    """Show an input for a path with a Browse button. Return the input.
+    """Show an input for a path with a Browse dialog. Return the input.
 
-    Browse opens the file dialog of the operating system when that is
-    possible (see os_picker_available). In every other case it shows a list
-    of folders in the page. With no path in the field, the dialog starts in
+    The dialog lists the folders of the computer that runs the GUI. So it
+    works the same way on every system and in a container. Its Pick button
+    gives the current folder when folder is True. Otherwise a click on a
+    file gives that file. With no path in the field, the dialog starts in
     the folder start. A hint shows under the field.
     """
-    prompt = "Pick the " + label.replace(" (optional)", "").lower()
-
-    async def browse() -> None:
-        if not os_picker_available():
-            _browse(field, folder, start)
-            return
-        button.disable()
-        try:
-            place = _start_place(field.value, start)
-            picked = await run.io_bound(pick_with_os_dialog, place, prompt, folder)
-        finally:
-            button.enable()
-        if picked is not None:
-            field.set_value(show_path(picked))
-
     with ui.row().classes("w-full items-start gap-2 no-wrap"):
         field = ui.input(label, value=value).props("outlined dense").classes("grow")
         if hint:
             field.props(f'hint="{hint}"')
-        button = ui.button("Browse", on_click=browse).props(
-            "outline no-caps unelevated"
-        )
+        ui.button(
+            "Browse", on_click=lambda: _browse(field, folder, start)
+        ).props("outline no-caps unelevated")
     return field
 
 
