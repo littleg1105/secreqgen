@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from nicegui import run, ui
 
-from secreqgen_gui import jobs
+from secreqgen_gui import form_memory, jobs
+from secreqgen_gui.form_memory import COMMON, REQUIREMENTS
 from secreqgen_gui.pages._setup_parts import (
     UNTESTED_PROMPTS,
     DocsPart,
     Foot,
     StoriesPart,
     about_summary,
+    clear_button,
     initial_path,
     initial_product,
     message,
@@ -30,27 +32,40 @@ def page(
 ) -> None:
     """Build the form. The query values stories, docs, product fill the fields."""
     defaults = load_settings()
+    saved = form_memory.recall
     page_title("New requirements")
     with ui.column().classes("w-full max-w-[680px] gap-6"):
-        stories_part = StoriesPart(lambda: refresh(), initial_path(stories))
+        stories_part = StoriesPart(
+            lambda: refresh(),
+            initial_path(stories) or saved(COMMON, "stories_file", ""),
+        )
         docs_part = DocsPart(
             lambda: refresh(),
             stories_part,
-            initial_path(docs),
-            initial_product(product),
+            initial_path(docs) or saved(COMMON, "docs", ""),
+            initial_product(product) or saved(COMMON, "product", ""),
         )
 
         body = section("Options")
         with body:
             model = (
-                ui.input("Model", value=defaults.requirements_model)
+                ui.input(
+                    "Model",
+                    value=saved(REQUIREMENTS, "model", defaults.requirements_model),
+                )
                 .props("outlined dense")
                 .classes("w-full")
             )
-            context = path_field("System context file (optional)")
+            context = path_field(
+                "System context file (optional)",
+                saved(REQUIREMENTS, "context_file", ""),
+            )
             choices = prompt_set_choices("requirements")
+            old_set = saved(REQUIREMENTS, "prompts")
             prompt = ui.select(
-                choices, value=next(iter(choices)), label="Prompts"
+                choices,
+                value=old_set if old_set in choices else next(iter(choices)),
+                label="Prompts",
             ).props("outlined dense")
             prompt.classes("w-full")
             untested = message()
@@ -99,4 +114,32 @@ def page(
         )
         prompt.on_value_change(lambda _e: refresh())
         model.on_value_change(lambda _e: refresh())
+        kept = {"model": model, "context_file": context, "prompts": prompt}
+        muted = {"on": False}
+
+        def keep(name: str):
+            def handler(_e) -> None:
+                if not muted["on"]:
+                    value = kept[name].value
+                    if name == "context_file":
+                        value = (value or "").strip()
+                    form_memory.remember(REQUIREMENTS, name, value)
+
+            return handler
+
+        for name, element in kept.items():
+            element.on_value_change(keep(name))
+
+        def reset() -> None:
+            muted["on"] = True
+            model.set_value(defaults.requirements_model)
+            context.set_value("")
+            prompt.set_value(next(iter(choices)))
+            muted["on"] = False
+            stories_part.reset()
+            docs_part.reset()
+            form_memory.clear()
+            refresh()
+
+        clear_button(reset)
         refresh()

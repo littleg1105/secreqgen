@@ -20,7 +20,8 @@ from secreqgen.application.inputs import (
 )
 from secreqgen.application.prompt_sets import list_user_prompt_sets
 
-from secreqgen_gui import jobs, storage
+from secreqgen_gui import form_memory, jobs, storage
+from secreqgen_gui.form_memory import COMMON
 from secreqgen_gui.settings import expand_path, show_path
 from secreqgen_gui.widgets import path_field
 
@@ -49,6 +50,16 @@ BUSY = "Another run is in progress. Wait for it to end, or stop it."
 UNTESTED_PROMPTS = "A run with these prompts gets the tag: untested prompts."
 PRODUCT_NOTE = "Product name (optional)"
 PRODUCT_LIMIT = 80
+TABS = {"path": "File path", "upload": "Upload", "type": "Type a story"}
+TYPED_DEFAULT = {"id": "US-001", "title": "", "story": "", "criteria": ""}
+CLEAR_FORM = "Clear the form"
+
+
+def clear_button(on_click: Callable[[], None]) -> None:
+    """Show the link at the foot of a form that empties the memory."""
+    ui.button(CLEAR_FORM, on_click=on_click).props("flat dense no-caps").classes(
+        "sr-link-button"
+    )
 
 
 def initial_path(text: str | None) -> str:
@@ -156,13 +167,28 @@ class StoriesPart:
         self.checks: dict[str, ui.checkbox] = {}
         self._token = 0
         self.loaded: Path | None = None
+        self.muted = False
+        previous = form_memory.recall(COMMON, "stories_file", "")
+        if initial != previous:
+            form_memory.remember(COMMON, "stories_file", initial)
+            form_memory.remember(COMMON, "story_ids", None)
+        # The chosen stories wait for the first redraw of the list.
+        self._restore = form_memory.recall(COMMON, "story_ids")
+        if not isinstance(self._restore, list):
+            self._restore = None
+        saved = form_memory.recall(COMMON, "stories_tab", "path")
+        if saved not in TABS:
+            saved = "path"
         body = section("Stories")
         with body:
-            with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
-                tab_file = ui.tab("File path")
-                tab_up = ui.tab("Upload")
-                tab_one = ui.tab("Type a story")
-            with ui.tab_panels(tabs, value=tab_file).classes("w-full"):
+            with ui.tabs(value=saved).props("dense align=left no-caps").classes(
+                "w-full"
+            ) as tabs:
+                self.tabs = tabs
+                tab_file = ui.tab("path", TABS["path"])
+                tab_up = ui.tab("upload", TABS["upload"])
+                tab_one = ui.tab("type", TABS["type"])
+            with ui.tab_panels(tabs, value=saved).classes("w-full"):
                 with ui.tab_panel(tab_file).classes("p-0 pt-3"):
                     self.field = path_field(
                         "Stories file",
@@ -184,11 +210,47 @@ class StoriesPart:
             self.skipped = message()
             self.list_box = ui.column().classes("w-full gap-1")
         self.field.props("debounce=300")
+        self.field.on_value_change(self._field_changed)
         self.field.on_value_change(lambda _e: self.read())
+        tabs.on_value_change(self._tab_changed)
         for label in (self.problem, self.info, self.skipped):
             label.set_visibility(False)
         if initial:
             ui.timer(0.05, self.read, once=True)
+
+    # the memory
+
+    def _field_changed(self, _e=None) -> None:
+        """Remember the file. A different file forgets the chosen stories."""
+        if self.muted:
+            return
+        value = (self.field.value or "").strip()
+        if value != form_memory.recall(COMMON, "stories_file", ""):
+            self._restore = None
+            form_memory.remember(COMMON, "story_ids", None)
+        form_memory.remember(COMMON, "stories_file", value)
+
+    def _tab_changed(self, _e=None) -> None:
+        if not self.muted:
+            form_memory.remember(COMMON, "stories_tab", self.tabs.value)
+
+    def _save_choice(self) -> None:
+        """Remember the chosen stories (nothing when all are chosen)."""
+        if self.muted or not self.checks:
+            return
+        form_memory.remember(
+            COMMON, "story_ids", None if self.all_selected else list(self.selected)
+        )
+
+    def reset(self) -> None:
+        """Show the defaults in place. The caller empties the memory."""
+        self.muted = True
+        self._restore = None
+        self.tabs.set_value("path")
+        for name, box in self._typed.items():
+            box.set_value(TYPED_DEFAULT[name])
+        self.field.set_value("")
+        self.muted = False
 
     # ways to give a file
 
@@ -226,19 +288,48 @@ class StoriesPart:
         self.field.set_value(show_path(path))
 
     def _type_panel(self) -> None:
-        story_id = ui.input("Story ID", value="US-001").props("outlined dense")
-        title = ui.input("Title").props("outlined dense").classes("w-full")
+        saved = form_memory.recall(COMMON, "typed_story", {})
+        if not isinstance(saved, dict):
+            saved = {}
+
+        def old(name: str) -> str:
+            value = saved.get(name)
+            return value if isinstance(value, str) else TYPED_DEFAULT[name]
+
+        story_id = ui.input("Story ID", value=old("id")).props("outlined dense")
+        title = (
+            ui.input("Title", value=old("title"))
+            .props("outlined dense")
+            .classes("w-full")
+        )
         story = (
-            ui.textarea("Story")
+            ui.textarea("Story", value=old("story"))
             .props("outlined autogrow")
             .classes("w-full")
             .mark("story_text")
         )
         criteria = (
-            ui.textarea("Acceptance criteria (one in each line)")
+            ui.textarea("Acceptance criteria (one in each line)", value=old("criteria"))
             .props("outlined autogrow")
             .classes("w-full")
         )
+        self._typed = {
+            "id": story_id,
+            "title": title,
+            "story": story,
+            "criteria": criteria,
+        }
+
+        def keep(_e=None) -> None:
+            if self.muted:
+                return
+            data = {name: box.value or "" for name, box in self._typed.items()}
+            form_memory.remember(
+                COMMON, "typed_story", None if data == TYPED_DEFAULT else data
+            )
+
+        for box in self._typed.values():
+            box.on_value_change(keep)
         warn = message("text-negative")
         warn.set_visibility(False)
 
@@ -327,17 +418,33 @@ class StoriesPart:
                     "flat no-caps dense"
                 )
             with ui.column().classes("w-full gap-0 max-h-[240px] overflow-auto"):
+                chosen = self._chosen_ids()
                 for story in self.stories:
                     box = ui.checkbox(
                         f"{story.id}   {story.title}",
-                        value=True,
-                        on_change=lambda _e: self.on_change(),
+                        value=chosen is None or story.id in chosen,
+                        on_change=lambda _e: self._box_changed(),
                     ).props("dense")
                     self.checks[story.id] = box
+        self._restore = None
+
+    def _box_changed(self) -> None:
+        self._save_choice()
+        self.on_change()
+
+    def _chosen_ids(self) -> set[str] | None:
+        """Return the remembered ids that are in this file, or None for all."""
+        if self._restore is None:
+            return None
+        if not self._restore:
+            return set()  # the person picked none
+        known = {story.id for story in self.stories} & set(self._restore)
+        return known or None
 
     def _set_all(self, value: bool) -> None:
         for box in self.checks.values():
             box.set_value(value)
+        self._save_choice()
         self.on_change()
 
     # what the form reads
@@ -370,6 +477,9 @@ class DocsPart:
         self.files = 0
         self._token = 0
         self._auto_product = ""
+        self.muted = False
+        form_memory.remember(COMMON, "docs", initial)
+        form_memory.remember(COMMON, "product", product)
         body = section("Documentation")
         with body:
             self.field = path_field(
@@ -383,10 +493,30 @@ class DocsPart:
                 .classes("w-full")
             )
         self.field.props("debounce=300")
+        self.field.on_value_change(self._field_changed)
         self.field.on_value_change(lambda _e: self.check())
-        self.product.on_value_change(lambda _e: self.on_change())
+        self.product.on_value_change(self._product_changed)
         if initial:
             ui.timer(0.05, self.check, once=True)
+
+    def _field_changed(self, _e=None) -> None:
+        if not self.muted:
+            form_memory.remember(COMMON, "docs", (self.field.value or "").strip())
+
+    def _product_changed(self, _e=None) -> None:
+        """Remember only a name that the person typed."""
+        value = (self.product.value or "").strip()
+        if not self.muted and value != self._auto_product:
+            form_memory.remember(COMMON, "product", value)
+        self.on_change()
+
+    def reset(self) -> None:
+        """Show the defaults in place. The caller empties the memory."""
+        self.muted = True
+        self._auto_product = ""
+        self.field.set_value("")
+        self.product.set_value("")
+        self.muted = False
 
     async def check(self) -> None:
         self._token += 1
@@ -421,8 +551,8 @@ class DocsPart:
         """Fill the product name from the story file when the person did not."""
         name = self.stories.project or ""
         if name and self.product.value in ("", self._auto_product):
-            self.product.set_value(name)
             self._auto_product = name
+            self.product.set_value(name)
 
     @property
     def path(self) -> Path | None:

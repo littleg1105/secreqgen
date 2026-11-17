@@ -6,13 +6,15 @@ from nicegui import run, ui
 from secreqgen.application.errors import InputError
 from secreqgen.application.inputs import check_about
 
-from secreqgen_gui import jobs
+from secreqgen_gui import form_memory, jobs
+from secreqgen_gui.form_memory import COMMON, THREATS
 from secreqgen_gui.pages._setup_parts import (
     UNTESTED_PROMPTS,
     DocsPart,
     Foot,
     StoriesPart,
     about_summary,
+    clear_button,
     initial_path,
     initial_product,
     message,
@@ -36,42 +38,58 @@ def page(
 ) -> None:
     """Build the form. The query values stories, docs, product fill the fields."""
     defaults = load_settings()
+    saved = form_memory.recall
     page_title("New threat list")
     with ui.column().classes("w-full max-w-[680px] gap-6"):
-        stories_part = StoriesPart(lambda: refresh(), initial_path(stories))
+        stories_part = StoriesPart(
+            lambda: refresh(),
+            initial_path(stories) or saved(COMMON, "stories_file", ""),
+        )
         docs_part = DocsPart(
             lambda: refresh(),
             stories_part,
-            initial_path(docs),
-            initial_product(product),
+            initial_path(docs) or saved(COMMON, "docs", ""),
+            initial_product(product) or saved(COMMON, "product", ""),
         )
 
         body = section("Options")
         with body:
             writer = (
-                ui.input("Writer", value=defaults.writer_model)
+                ui.input(
+                    "Writer", value=saved(THREATS, "writer", defaults.writer_model)
+                )
                 .props('outlined dense hint="The model that writes the threats."')
                 .classes("w-full")
             )
-            check = ui.switch("Use a checker", value=True)
+            check = ui.switch(
+                "Use a checker", value=bool(saved(THREATS, "check", True))
+            )
             checker = (
-                ui.input("Checker", value=defaults.checker_model)
+                ui.input(
+                    "Checker", value=saved(THREATS, "checker", defaults.checker_model)
+                )
                 .props('outlined dense hint="The model that checks each threat."')
                 .classes("w-full")
             )
             same = message()
             labels = ui.switch(
-                "Add a threat actor and a STRIDE category", value=True
+                "Add a threat actor and a STRIDE category",
+                value=bool(saved(THREATS, "labels", True)),
             )
             about = (
-                ui.textarea("About the product (optional)")
+                ui.textarea(
+                    "About the product (optional)", value=saved(THREATS, "about", "")
+                )
                 .props(f'outlined autogrow hint="{ABOUT_HINT}"')
                 .classes("w-full")
             )
             counter = ui.label().classes("sr-small")
             choices = prompt_set_choices("threats")
+            old_set = saved(THREATS, "prompts")
             prompt = ui.select(
-                choices, value=next(iter(choices)), label="Prompts"
+                choices,
+                value=old_set if old_set in choices else next(iter(choices)),
+                label="Prompts",
             ).props("outlined dense")
             prompt.classes("w-full")
             untested = message()
@@ -148,4 +166,39 @@ def page(
             element.on_value_change(lambda _e: refresh())
         for element in (writer, checker, about):
             element.on_value_change(lambda _e: refresh())
+        kept = {
+            "writer": writer,
+            "check": check,
+            "checker": checker,
+            "labels": labels,
+            "about": about,
+            "prompts": prompt,
+        }
+        muted = {"on": False}
+
+        def keep(name: str):
+            def handler(_e) -> None:
+                if not muted["on"]:
+                    form_memory.remember(THREATS, name, kept[name].value)
+
+            return handler
+
+        for name, element in kept.items():
+            element.on_value_change(keep(name))
+
+        def reset() -> None:
+            muted["on"] = True
+            writer.set_value(defaults.writer_model)
+            check.set_value(True)
+            checker.set_value(defaults.checker_model)
+            labels.set_value(True)
+            about.set_value("")
+            prompt.set_value(next(iter(choices)))
+            muted["on"] = False
+            stories_part.reset()
+            docs_part.reset()
+            form_memory.clear()
+            refresh()
+
+        clear_button(reset)
         refresh()
