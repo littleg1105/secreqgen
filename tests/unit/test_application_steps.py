@@ -11,6 +11,7 @@ import pytest
 from secreqgen.application.requirements import RequirementsOptions, run_requirements
 from secreqgen.application.steps import (
     StepEvent,
+    _Reporter,
     requirements_trace,
     threat_trace,
     watch_requirements_generator,
@@ -549,3 +550,78 @@ def test_threat_run_with_on_step(workdir):
     assert len(run.lists) == 1
     assert events[0].step == "search" and events[-1].step == "weak_signs"
     assert run.lists[0].model["rows"]
+
+
+# F1 --------------------------------------------------------------------------
+
+
+def _keep_finished_options(workdir: Path) -> RequirementsOptions:
+    return RequirementsOptions(
+        input_file=workdir / "stories.json",
+        docs=workdir / "docs",
+        output_format="json",
+        keep_finished=True,
+    )
+
+
+def test_unreadable_answer_fails_at_parse(workdir):
+    class NotJson(ReqClient):
+        def respond(self, prompt: str) -> str:
+            return "this is not json"
+
+    events: list[StepEvent] = []
+    watched = run_requirements(
+        _keep_finished_options(workdir),
+        make_client=req_factory(NotJson()),
+        on_step=events.append,
+    )
+    plain = run_requirements(
+        _keep_finished_options(workdir), make_client=req_factory(NotJson())
+    )
+    assert events[-1].step == "parse" and events[-1].state == "failed"
+    assert not [e for e in events if e.step == "search" and e.state == "failed"]
+    assert watched.aborted == plain.aborted
+
+
+def test_model_error_fails_at_write(workdir):
+    class Raising(ReqClient):
+        def respond(self, prompt: str):
+            return RuntimeError("model gone")
+
+    events: list[StepEvent] = []
+    run_requirements(
+        _keep_finished_options(workdir),
+        make_client=req_factory(Raising()),
+        on_step=events.append,
+    )
+    assert (events[-1].step, events[-1].state) == ("write", "failed")
+
+
+def test_reporter_failed_names_last_started_step():
+    events: list[StepEvent] = []
+    reporter = _Reporter(events.append)
+    reporter.reset("S-1")
+    reporter.failed()
+    assert events[-1].step == "search"
+    for step in ("search", "write"):
+        reporter.send(step, "start")
+        reporter.send(step, "done")
+    reporter.failed()
+    assert (events[-1].step, events[-1].state) == ("write", "failed")
+    reporter.reset("S-2")
+    reporter.failed()
+    assert events[-1].step == "search"
+
+
+def test_reason_when_the_writer_gave_no_note():
+    model = hand_made()
+    model["dropped"] = [
+        {"group": 1, "why": "the note of P1 says fits_story 'no'"},
+        {"group": 1, "why": "the note of P2 says fits_story None"},
+        {"group": 2, "why": "the note of P3 says fits_story None"},
+    ]
+    reasons = dict(threat_trace(model)["check"]["reasons"])
+    assert reasons == {
+        "the passage does not fit the story": 1,
+        "the writer gave no note about the passage": 2,
+    }

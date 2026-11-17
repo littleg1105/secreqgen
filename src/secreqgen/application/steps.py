@@ -60,10 +60,12 @@ class _Reporter:
         self.on_step = on_step
         self.story_id = ""
         self.open: list[str] = []  # steps that started and are not done
+        self.last_started: str | None = None
 
     def reset(self, story_id: str) -> None:
         self.story_id = story_id
         self.open = []
+        self.last_started = None
 
     def send(
         self,
@@ -77,6 +79,7 @@ class _Reporter:
             if step in self.open:
                 self.open.remove(step)
             self.open.append(step)
+            self.last_started = step
         elif state == "done" and step in self.open:
             self.open.remove(step)
         try:
@@ -87,7 +90,8 @@ class _Reporter:
             pass
 
     def failed(self) -> None:
-        step = self.open[-1] if self.open else "search"
+        """Report the open step, else the last started step, else search."""
+        step = self.open[-1] if self.open else (self.last_started or "search")
         self.send(step, "failed")
 
 
@@ -448,7 +452,11 @@ class _RequirementsWatcher:
         try:
             result = self._generator.generate(**kwargs)
         except Exception:
-            self._reporter.failed()
+            if not self._reporter.open and self._model.attempt > 0:
+                # The model answered. The tool code could not read the answer.
+                self._reporter.send("parse", "failed")
+            else:
+                self._reporter.failed()
             raise
         numbers: dict[str, int] = {}
         try:
@@ -477,6 +485,9 @@ _REASON_TEXTS = (
 )
 
 
+_NO_NOTE_TEXT = "the writer gave no note about the passage"
+
+
 def _int(value: Any) -> int:
     try:
         return int(value)
@@ -494,6 +505,8 @@ def _dicts(value: Any) -> list[dict]:
 
 def _reason(why: Any) -> str:
     text = why if isinstance(why, str) else ""
+    if text.startswith("the note of") and text.endswith("None"):
+        return _NO_NOTE_TEXT
     for start, fixed in _REASON_TEXTS:
         if text.startswith(start):
             return fixed
