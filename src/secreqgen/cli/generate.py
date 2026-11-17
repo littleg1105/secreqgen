@@ -118,45 +118,35 @@ def generate_requirements(
       ]
     }
     """
-    import json
-    import yaml as yaml_lib
-
-    from secreqgen.application.retrievers import (
-        build_vector_retriever,
-        build_word_retriever,
+    from secreqgen.application.errors import InputError
+    from secreqgen.application.inputs import (
+        build_user_stories,
+        check_docs_option,
+        check_input_file,
+        read_story_data,
     )
-    from secreqgen.exceptions import GenerationError, LLMConnectionError
-    from secreqgen.generation import (
-        GenerationMode,
-        SecurityRequirementsGenerator,
-        SecurityRequirementsPromptBuilder,
+    from secreqgen.application.requirements import (
+        build_requirements_generator,
+        build_requirements_retriever,
+        format_requirements,
+        generate_for_stories,
+        requirements_format,
+        requirements_prompt_builder,
     )
-    from secreqgen.generation.schemas import UserStory
-    from secreqgen.output import OutputFormat, RequirementsFormatter
+    from secreqgen.exceptions import LLMConnectionError
+    from secreqgen.generation import GenerationMode
     from secreqgen.retrieval.word_search import SearchError
 
-    # Validate input file
-    if not input_file.exists():
-        console.print(f"[red]Error:[/red] Input file not found: {input_file}")
-        raise typer.Exit(1)
-    if docs is not None and not docs.is_dir():
-        console.print(f"[red]Error:[/red] Documentation folder not found: {docs}")
-        raise typer.Exit(1)
-    if docs is not None and baseline:
-        # The tested setup has no zero-shot mode.
-        # No test ran its prompt without the passages.
-        console.print("[red]Error:[/red] --baseline cannot be used with --docs.")
+    # Validate input file and the --docs option
+    try:
+        check_input_file(input_file)
+        check_docs_option(docs, baseline)
+    except InputError as e:
+        console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 
     # Validate format
-    format_map = {
-        "json": OutputFormat.JSON,
-        "yaml": OutputFormat.YAML,
-        "markdown": OutputFormat.MARKDOWN,
-        "md": OutputFormat.MARKDOWN,
-        "csv": OutputFormat.CSV,
-    }
-    output_format = format_map.get(format.lower())
+    output_format = requirements_format(format, allow_csv=True)
     if output_format is None:
         console.print(
             f"[red]Error:[/red] Invalid format: {format}\n"
@@ -193,11 +183,7 @@ def generate_requirements(
         progress.add_task("Loading user stories...", total=None)
 
         try:
-            content = input_file.read_text()
-            if input_file.suffix.lower() in [".yaml", ".yml"]:
-                data = yaml_lib.safe_load(content)
-            else:
-                data = json.loads(content)
+            data = read_story_data(input_file)
         except Exception as e:
             console.print(f"[red]Error parsing input file:[/red] {e}")
             raise typer.Exit(1)
@@ -208,18 +194,9 @@ def generate_requirements(
         console.print("[yellow]No user stories found in input file.[/yellow]")
         raise typer.Exit(0)
 
-    user_stories = []
-    for i, story_data in enumerate(stories_data):
-        try:
-            story = UserStory(
-                id=story_data.get("id", f"US-{i+1:03d}"),
-                title=story_data.get("title", "Untitled"),
-                story=story_data.get("story", ""),
-                acceptance_criteria=story_data.get("acceptance_criteria", []),
-            )
-            user_stories.append(story)
-        except Exception as e:
-            console.print(f"[yellow]Warning: Skipping invalid story {i+1}: {e}[/yellow]")
+    user_stories, skipped = build_user_stories(stories_data)
+    for number, e in skipped:
+        console.print(f"[yellow]Warning: Skipping invalid story {number}: {e}[/yellow]")
 
     console.print(f"[green]✓[/green] Loaded {len(user_stories)} user stories")
 
@@ -257,31 +234,21 @@ def generate_requirements(
                 )
                 raise typer.Exit(1)
 
-            # Initialize retriever for RAG mode
-            retriever = None
-            if mode == GenerationMode.RAG and docs is not None:
-                # The tested setup: word search over the documentation folder.
-                # The product name comes from --product, or from the key
-                # "project" of the input file.
-                product_name = product
-                if product_name is None and isinstance(data, dict):
-                    product_name = data.get("project")
-                retriever = build_word_retriever(docs, product_name)
-            elif mode == GenerationMode.RAG:
-                retriever = build_vector_retriever(cfg)
+            # Initialize retriever for RAG mode.
+            # The tested setup: word search over the documentation folder.
+            # The product name comes from --product, or from the key
+            # "project" of the input file.
+            product_name = product
+            if product_name is None and isinstance(data, dict):
+                product_name = data.get("project")
+            retriever = build_requirements_retriever(
+                cfg, mode, docs=docs, product=product_name
+            )
 
             # Initialize generator. With --docs the prompt is the tested prompt set.
-            prompts_dir = None
-            if docs is not None:
-                from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
-
-                prompts_dir = TESTED_PROMPT_SET
-            generator = SecurityRequirementsGenerator(
-                llm_client=llm_client,
-                retriever=retriever,
-                prompt_builder=SecurityRequirementsPromptBuilder(
-                    prompts_dir=prompts_dir
-                ),
+            prompt_builder = requirements_prompt_builder(docs)
+            generator = build_requirements_generator(
+                llm_client, retriever, prompt_builder
             )
 
         console.print("[green]✓[/green] Components initialized")
@@ -294,7 +261,6 @@ def generate_requirements(
         raise typer.Exit(1)
 
     # Generate requirements
-    results = []
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -304,18 +270,17 @@ def generate_requirements(
     ) as progress:
         task = progress.add_task("Generating requirements...", total=len(user_stories))
 
-        for story in user_stories:
-            try:
-                result = generator.generate(
-                    user_story=story,
-                    mode=mode,
-                    system_context=system_context,
+        def on_progress(event) -> None:
+            if event.error is not None:
+                console.print(
+                    f"[yellow]Warning: Failed to generate for {event.story_id}: "
+                    f"{event.error}[/yellow]"
                 )
-                results.append(result)
-                progress.advance(task)
-            except (GenerationError, SearchError) as e:
-                console.print(f"[yellow]Warning: Failed to generate for {story.id}: {e}[/yellow]")
-                progress.advance(task)
+            progress.advance(task)
+
+        results, _failures = generate_for_stories(
+            generator, user_stories, mode, system_context, on_progress
+        )
 
     if not results:
         console.print("[red]No requirements generated.[/red]")
@@ -325,11 +290,7 @@ def generate_requirements(
     console.print(f"[green]✓[/green] Generated {total_reqs} requirements from {len(results)} stories")
 
     # Format output
-    formatter = RequirementsFormatter()
-    if len(results) == 1:
-        formatted_output = formatter.format(results[0], output_format)
-    else:
-        formatted_output = formatter.format_batch(results, output_format)
+    formatted_output = format_requirements(results, output_format)
 
     # Output
     if output:
@@ -390,39 +351,30 @@ def generate_single(
     """Generate requirements for a single user story (interactive mode)."""
     import uuid
 
-    from secreqgen.application.retrievers import (
-        build_vector_retriever,
-        build_word_retriever,
+    from secreqgen.application.errors import InputError
+    from secreqgen.application.inputs import check_docs_option
+    from secreqgen.application.requirements import (
+        build_requirements_generator,
+        build_requirements_retriever,
+        format_requirements,
+        requirements_format,
+        requirements_prompt_builder,
     )
     from secreqgen.exceptions import GenerationError, LLMConnectionError
-    from secreqgen.generation import (
-        GenerationMode,
-        SecurityRequirementsGenerator,
-        SecurityRequirementsPromptBuilder,
-    )
+    from secreqgen.generation import GenerationMode
     from secreqgen.generation.schemas import UserStory
-    from secreqgen.output import OutputFormat, RequirementsFormatter
     from secreqgen.retrieval.word_search import SearchError
 
     # Validate format
-    format_map = {
-        "json": OutputFormat.JSON,
-        "yaml": OutputFormat.YAML,
-        "markdown": OutputFormat.MARKDOWN,
-        "md": OutputFormat.MARKDOWN,
-    }
-    output_format = format_map.get(format.lower())
+    output_format = requirements_format(format, allow_csv=False)
     if output_format is None:
         console.print(f"[red]Error:[/red] Invalid format: {format}")
         raise typer.Exit(1)
 
-    if docs is not None and not docs.is_dir():
-        console.print(f"[red]Error:[/red] Documentation folder not found: {docs}")
-        raise typer.Exit(1)
-    if docs is not None and baseline:
-        # The tested setup has no zero-shot mode.
-        # No test ran its prompt without the passages.
-        console.print("[red]Error:[/red] --baseline cannot be used with --docs.")
+    try:
+        check_docs_option(docs, baseline)
+    except InputError as e:
+        console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
     if context is not None and not context.is_file():
         console.print(f"[red]Error:[/red] Context file not found: {context}")
@@ -462,25 +414,15 @@ def generate_single(
                 console.print("[red]Cannot connect to Ollama.[/red]")
                 raise typer.Exit(1)
 
-            retriever = None
-            prompt_builder = None
-            if docs is not None:
-                # The tested setup: word search over the documentation folder,
-                # and the tested prompt set.
-                from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
+            # The tested setup: word search over the documentation folder,
+            # and the tested prompt set.
+            prompt_builder = requirements_prompt_builder(docs)
+            retriever = build_requirements_retriever(
+                cfg, mode, docs=docs, product=product, system_context_file=context
+            )
 
-                prompt_builder = SecurityRequirementsPromptBuilder(
-                    prompts_dir=TESTED_PROMPT_SET
-                )
-            if mode == GenerationMode.RAG and docs is not None:
-                retriever = build_word_retriever(docs, product, context)
-            elif mode == GenerationMode.RAG:
-                retriever = build_vector_retriever(cfg)
-
-            generator = SecurityRequirementsGenerator(
-                llm_client=llm_client,
-                retriever=retriever,
-                prompt_builder=prompt_builder,
+            generator = build_requirements_generator(
+                llm_client, retriever, prompt_builder
             )
 
         with Progress(
@@ -498,8 +440,7 @@ def generate_single(
 
         console.print(f"[green]✓[/green] Generated {len(result.requirements)} requirements")
 
-        formatter = RequirementsFormatter()
-        formatted_output = formatter.format(result, output_format)
+        formatted_output = format_requirements([result], output_format)
         console.print("\n" + formatted_output)
 
     except LLMConnectionError as e:

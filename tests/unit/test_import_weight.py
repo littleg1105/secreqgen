@@ -117,3 +117,17 @@ def test_application_builders_import_is_light():
         HEAVY + ["secreqgen.ingestion", "secreqgen.retrieval"],
     )
     assert found == []
+
+
+def test_application_use_case_import_is_light():
+    found = forbidden_loaded(
+        [
+            "secreqgen.application.errors",
+            "secreqgen.application.events",
+            "secreqgen.application.inputs",
+            "secreqgen.application.requirements",
+        ],
+        HEAVY
+        + ["secreqgen.ingestion", "secreqgen.retrieval", "typer", "rich"],
+    )
+    assert found == []
