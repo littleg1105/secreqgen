@@ -18,6 +18,7 @@ from types import MappingProxyType
 
 from secreqgen.generation.prompts import SecurityRequirementsPromptBuilder
 from secreqgen.generation.schemas import UserStory
+from tuning_lib import search as _search
 from tuning_lib.guard import GuardError, WriteGuard, assert_no_private_text, guarded_mkdir, guarded_write_text
 from tuning_lib.passages import (
     FALLBACK_CONTEXT,
@@ -417,11 +418,34 @@ _KC_COMMANDS: Mapping[str, str] = MappingProxyType(
         "admin": "bin/kcadm.sh",
     }
 )
+# Titles of the server guides: the title attribute of docs/guides/server/<id>.adoc of the Keycloak
+# repository, with {project_name} written as Keycloak (the guide "index" has no title).
 _GUIDE_TITLES: Mapping[str, str] = MappingProxyType(
     {
         "vault": "Using a vault",
         "configuration": "Configuring Keycloak",
         "configuration-production": "Configuring Keycloak for production",
+        "all-config": "All configuration",
+        "all-provider-config": "All provider configuration",
+        "bootstrap-admin-recovery": "Bootstrapping and recovering an admin account",
+        "caching": "Configuring distributed caches",
+        "configuration-provider": "Configuring providers",
+        "containers": "Running Keycloak in a container",
+        "db": "Configuring the database",
+        "directory-structure": "Directory Structure",
+        "enabletls": "Configuring TLS",
+        "features": "Enabling and disabling features",
+        "fips": "FIPS 140-2 support",
+        "hostname": "Configuring the hostname (v2)",
+        "importExport": "Importing and exporting realms",
+        "keycloak-truststore": "Configuring trusted certificates",
+        "logging": "Configuring logging",
+        "management-interface": "Configuring the Management Interface",
+        "mutual-tls": "Configuring trusted certificates for mTLS",
+        "outgoinghttp": "Configuring outgoing HTTP requests",
+        "reverseproxy": "Configuring a reverse proxy",
+        "update-compatibility": "Checking if rolling updates are possible",
+        "windows-service": "Run Keycloak as a Windows Service",
     }
 )
 _MD_ESCAPABLE = "<>*_[]#"
@@ -435,7 +459,20 @@ _LINKS_MACRO_RE = re.compile(
     r"\\?<@links\.server(" + _BLOCK + r")\s*/\\?>", re.DOTALL
 )
 _OPTS_MACRO_RE = re.compile(
-    r"\\?<@opts\.printRelevantOptions((?:\s+\w+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s\"'<>\\/]+))*)\s*(/?)\\?>"
+    r"\\?<@opts\.(?:printRelevantOptions|includeOptions)"
+    r"((?:\s+\w+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s\"'<>\\/]+))*)\s*(/?)\\?>"
+)
+# White space with one line break at most (a converter wraps long lines).
+_WS1 = r"(?:[ \t]+|[ \t]*\n[ \t]*)"
+# A run of FreeMarker imports, also when the converter wrapped it over several lines. An import prints nothing.
+_IMPORT_RUN_RE = re.compile(
+    r"(?:\\?<#import" + _WS1 + r'"[^"\n]*"' + _WS1 + r"as" + _WS1 + r"\w+[ \t]*\\?>(?:" + _WS1 + r")?)+"
+)
+# docs/guides/templates/profile.adoc: ifProduct prints its text only in the product build, ifCommunity
+# only in the community build. The stored documentation is the community one.
+_IF_PRODUCT_RE = re.compile(r"\\?<@profile\.ifProduct\\?>.*?\\?</@profile\.ifProduct\\?>[ \t]*", re.DOTALL)
+_IF_COMMUNITY_RE = re.compile(
+    r"\\?<@profile\.ifCommunity\\?>[ \t]*\n?(.*?)[ \t]*\n?[ \t]*\\?</@profile\.ifCommunity\\?>", re.DOTALL
 )
 _RAW_STRING_RE = re.compile(r'\$\{r"([^"\n]*)"\}')
 _ATTR_RE = re.compile(r'\s*(\w+)="([^"]*)"')
@@ -447,6 +484,9 @@ _DROP_LINE_RES = (
     re.compile(r"^[ \t]*\\?</#list\\?>[ \t]*$"),
     re.compile(r"^[ \t]*\\?</@tmpl\.guide\\?>[ \t]*$"),
     re.compile(r"^[ \t]*\\?</@opts\.printRelevantOptions\\?>[ \t]*$"),
+    # An include of another template file: the passage cannot show that file, so the line says nothing.
+    re.compile(r'^[ \t]*\\?<#include\s+"[^"\n]*"\s*/?\\?>[ \t]*$'),
+    re.compile(r"^[ \t]*\\?</@opts\.includeOptions\\?>[ \t]*$"),
 )
 _WRAPPER_OPEN_RE = re.compile(r"^[ \t]*\\?<@tmpl\.guide\b")
 _WRAPPER_END_RE = re.compile(r"\\?>[ \t]*$")
@@ -606,6 +646,9 @@ def _code_segments(text: str) -> list[tuple[str, str]]:
 
 def _render_markup_body(body: str) -> str:
     body = _MANGLED_LINK_RE.sub(r'\1"/', body)
+    body = _IMPORT_RUN_RE.sub("", body)
+    body = _IF_PRODUCT_RE.sub("", body)
+    body = _IF_COMMUNITY_RE.sub(lambda m: m.group(1), body)
     body = _KC_MACRO_RE.sub(_render_kc, body)
     body = _LINKS_MACRO_RE.sub(_render_links, body)
     body = _OPTS_MACRO_RE.sub(_render_options, body)
@@ -645,11 +688,67 @@ def _render_markup(block: str, context: PassageContext | None = None) -> str:
     return SEPARATOR.join(parts)
 
 
+# --- drop_empty: a documentation passage with no text ------------------------------------
+# A page can start with template lines only. After render_markup such a first part is empty.
+# This change removes a documentation passage that holds only its header line.
+
+
+def _drop_empty(block: str, context: PassageContext | None = None) -> str:
+    try:
+        passages = split_context(block)
+    except PassagesError as exc:
+        raise PromptError(f"drop_empty: the block is not a passage block: {exc}") from exc
+    kept = [p.text for p in passages if p.kind != "doc" or p.text.partition("\n")[2].strip()]
+    if len(kept) == len(passages):
+        return block
+    parts: list[str] = []
+    for number, text in enumerate(kept, start=1):
+        text, n = _HEADER_NUMBER_RE.subn(f"### [{number}] ", text, count=1)
+        if n != 1:
+            raise PromptError("drop_empty: a passage has no numbered header line")
+        parts.append(text)
+    return SEPARATOR.join(parts)
+
+
+# --- search_<option>: documentation passages of a new search step -------------------------
+# The stored block of Study 2b holds the 5 best sections of the present search. This change puts
+# the passages of another search option in their place (scripts/tuning_lib/search.py; the passages
+# are made before the run by scripts/search_freeze.py and stored below tuning/_search/). The
+# code-search hits of the stored block stay, after the documentation. The prompt text does not
+# change, so a version with this change tests the search alone.
+
+
+def _use_search(option: str) -> PassageChange:
+    def change(block: str, context: PassageContext | None = None) -> str:
+        if context is None:
+            raise PromptError(f"search_{option} needs a PassageContext (the product and the story text)")
+        try:
+            entry = _search.frozen_entry(option, context.project, context.story_text)
+            new_docs = split_context(entry["doc_block"])
+            old = split_context(block)
+        except (_search.SearchError, PassagesError) as exc:
+            raise PromptError(f"search_{option}: {exc}") from exc
+        if any(p.kind != "doc" for p in new_docs):
+            raise PromptError(f"search_{option}: the stored search holds a passage that is not documentation")
+        texts = [p.text for p in new_docs] + [p.text for p in old if p.kind == "code"]
+        parts: list[str] = []
+        for number, text in enumerate(texts, start=1):
+            text, n = _HEADER_NUMBER_RE.subn(f"### [{number}] ", text, count=1)
+            if n != 1:
+                raise PromptError(f"search_{option}: a passage has no numbered header line")
+            parts.append(text)
+        return SEPARATOR.join(parts)
+
+    return change
+
+
 PASSAGE_CHANGES: dict[str, PassageChange] = {
     "identity": _identity,
     "drop_code_hits": _drop_code_hits,
     "render_markup": _render_markup,
     "story_name_hits": _story_name_hits,
+    "drop_empty": _drop_empty,
+    **{f"search_{name}": _use_search(name) for name in _search.OPTIONS},
 }
 
 

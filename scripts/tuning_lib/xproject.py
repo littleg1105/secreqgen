@@ -17,7 +17,9 @@ from pathlib import Path
 from tuning_lib.guard import DEFAULT_GUARD, GuardError, WriteGuard, guarded_mkdir, guarded_write_text
 from tuning_lib.passages import PassagesError, StoredContext, doc_passages, split_context
 from tuning_lib.paths import (
+    BLOCK_SOURCE_MODEL,
     DATA,
+    EXTRA_MODELS,
     FALLBACK_CONTEXT,
     REPO_DIR_OVERRIDE,
     REPOS_ROOT,
@@ -28,6 +30,7 @@ from tuning_lib.paths import (
     TUNING_ROOT,
     model_slug,
 )
+from tuning_lib.search import strip_include_wrappers
 from tuning_lib.prompts import (
     VERSIONS_ROOT,
     BuiltPrompt,
@@ -68,6 +71,31 @@ ALLOWED_PRODUCTS: dict[str, XProduct] = {
         name="mattermost",
         docs_dir=RTC / "mattermost" / "docs",
         repo_dir=REPOS_ROOT / REPO_DIR_OVERRIDE.get("mattermost", "mattermost"),
+    ),
+    # Added on 16 November 2026 for the second check of the search. The documentation folder
+    # equals PROJECTS["gitlab"][1] of run_cross_family_winning_config.py.
+    "gitlab": XProduct(
+        name="gitlab",
+        docs_dir=RTC / "gitlab" / "docs",
+        repo_dir=REPOS_ROOT / REPO_DIR_OVERRIDE.get("gitlab", "gitlab"),
+    ),
+    # The three products of the lab, for their older stories (May 2026, real_test_cases/<product>/
+    # user_stories.json). The lab never used these stories. The documentation folders are the
+    # docs_dir values of study2/<product>/stories.json (scripts/xproject_search_freeze.py checks it).
+    "keycloak": XProduct(
+        name="keycloak",
+        docs_dir=RTC / "extracted_docs_md" / "keycloak",
+        repo_dir=REPOS_ROOT / REPO_DIR_OVERRIDE.get("keycloak", "keycloak"),
+    ),
+    "bitwarden": XProduct(
+        name="bitwarden",
+        docs_dir=RTC / "bitwarden-test-data",
+        repo_dir=REPOS_ROOT / REPO_DIR_OVERRIDE.get("bitwarden", "bitwarden"),
+    ),
+    "mastodon": XProduct(
+        name="mastodon",
+        docs_dir=RTC / "mastodon" / "docs",
+        repo_dir=REPOS_ROOT / REPO_DIR_OVERRIDE.get("mastodon", "mastodon"),
     ),
 }
 
@@ -149,6 +177,11 @@ def load_xstories(
 # ---------------------------------------------------------------------------
 # Frozen passage blocks
 # ---------------------------------------------------------------------------
+
+
+def block_model(model: str) -> str:
+    """The model whose frozen block a generator model uses. An extra model has no block of its own."""
+    return BLOCK_SOURCE_MODEL if model in EXTRA_MODELS else model
 
 
 def frozen_path(project: str, model: str, xroot: Path = XPROJECT_ROOT) -> Path:
@@ -234,11 +267,18 @@ class XProjectBuilder(PromptBuilder):
         return self._stories
 
     def stored_block(self, story_id: str, model: str) -> str:
-        """The frozen passage block of the story for the generator model."""
+        """The frozen passage block of the story for the generator model.
+
+        The wrapper lines that the extraction of the Keycloak documentation left around an included
+        file hold a folder path of the machine that made the extraction. They are removed here, in
+        the same way as the new search removes them before it reads a file. A block with no such
+        line stays byte-equal (each block of mattermost and gitlab).
+        """
         key = (story_id, model)
         if key not in self._blocks:
             project = self.story(story_id).project
-            self._blocks[key] = read_xfrozen(project, model, story_id, self.xroot).text
+            text = read_xfrozen(project, block_model(model), story_id, self.xroot).text
+            self._blocks[key] = strip_include_wrappers(text)
         return self._blocks[key]
 
     def verify_v0_old(self, story_id: str, model: str) -> None:
@@ -326,7 +366,7 @@ def write_evidence_files(
 
 __all__ = [
     "ALLOWED_PRODUCTS", "EVIDENCE_X_ROOT", "GuardError", "XPROJECT_ROOT", "XProduct",
-    "XProjectBuilder", "XProjectError", "build_x_prompt", "check_persist_dir",
+    "XProjectBuilder", "XProjectError", "block_model", "build_x_prompt", "check_persist_dir",
     "check_product_folders", "evidence_text", "frozen_path", "lab_story_ids", "load_xstories",
     "persist_dir_of", "product", "read_xfrozen", "vectordb_guard", "write_evidence_files",
 ]

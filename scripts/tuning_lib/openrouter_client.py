@@ -45,6 +45,7 @@ class ModelPin:
     price_in_per_mtok: float
     price_out_per_mtok: float
     confirmed: bool
+    reasoning_off: bool = True  # False for a model with no reasoning mode: its endpoint does not take the parameter
 
 
 HOSTED_MODELS: dict[str, ModelPin] = {
@@ -71,6 +72,36 @@ HOSTED_MODELS: dict[str, ModelPin] = {
         price_in_per_mtok=0.15,
         price_out_per_mtok=1.875,
         confirmed=True,
+    ),
+    # The two models of the model test of 16 November 2026 (word search, 38 stories). Endpoints and prices from
+    # the public endpoint list of OpenRouter of that day.
+    "mistral-small3.2:24b": ModelPin(
+        local_name="mistral-small3.2:24b",
+        model_id="mistralai/mistral-small-3.2-24b-instruct",
+        provider_tag="deepinfra/fp8",  # the bf16 endpoint (Parasail) showed 0 uptime on that day
+        expected_provider_name="DeepInfra",
+        top_p=0.9,  # top_p and top_k: the defaults of the local runtime that the May runs of this model used
+        top_k=40,
+        extra_sampling={},
+        price_in_per_mtok=0.075,
+        price_out_per_mtok=0.20,
+        confirmed=True,  # by the run m0_models_smoke on 16 November 2026 (provider name DeepInfra, no reasoning tokens)
+        reasoning_off=False,
+    ),
+    # Not used: meta/muse-glimmer-30b. Its endpoint deepinfra/bf16 answered the first call of 16 November 2026 with
+    # HTTP 400 "Reasoning is mandatory for this endpoint and cannot be disabled", and the lab runs each model with
+    # reasoning switched off.
+    "nemotron3-nano:30b": ModelPin(
+        local_name="nemotron3-nano:30b",
+        model_id="nvidia/nemotron-3-nano-30b-a3b",
+        provider_tag="nebius/fp8",  # the only endpoint of this model on that day
+        expected_provider_name="Nebius",
+        top_p=0.95,  # the model page gives no default values; these are common runtime defaults
+        top_k=40,
+        extra_sampling={},
+        price_in_per_mtok=0.06,
+        price_out_per_mtok=0.24,
+        confirmed=True,  # by the run m0b_models_smoke on 16 November 2026 (provider name Nebius, no reasoning tokens)
     ),
 }
 SAMPLING_COMMON: dict[str, float | int] = {"temperature": 0.1, "max_completion_tokens": 4096}
@@ -201,6 +232,8 @@ def build_request_body(pin: ModelPin, system_prompt: str | None, user_prompt: st
         },
         "plugins": [{"id": "context-compression", "enabled": False}],
     }
+    if not pin.reasoning_off:
+        del body["reasoning"]
     for name, value in pin.extra_sampling.items():
         if name in body:
             raise FatalHostedError(f"extra_sampling key '{name}' clashes with a fixed request field")

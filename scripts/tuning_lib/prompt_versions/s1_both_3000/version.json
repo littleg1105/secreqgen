@@ -1,0 +1,11 @@
+{
+ "name": "s1_both_3000",
+ "parent": "v3_pn_render_fact_hits",
+ "description": "The best prompt with a new search: search by meaning and word search merged, reranker, page fill to 3,000 tokens.",
+ "passage_changes": [
+  "search_both_3000",
+  "story_name_hits",
+  "render_markup",
+  "drop_empty"
+ ]
+}

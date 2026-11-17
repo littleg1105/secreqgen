@@ -157,9 +157,30 @@ def test_story_loader_refuses_a_lab_story_id(synth):
         X.load_xstories("synth", rtc_root=synth["rtc"])
 
 
+def test_stored_block_loses_the_wrapper_line_with_a_local_path_and_keeps_other_text(monkeypatch):
+    block = (
+        "### [1] a.md > A (Relevance: 0.45)\nSection: A\n"
+        '<div class="included"\npath="/Users/someone/extracted/a.adoc">\ntext of a\n</div>\n<div class="x">kept</div>'
+    )
+    builder = X.XProjectBuilder(("mattermost",))
+    monkeypatch.setattr(builder, "story", lambda story_id: type("S", (), {"project": "mattermost"})())
+    monkeypatch.setattr(X, "read_xfrozen", lambda *a, **k: type("C", (), {"text": block})())
+    out = builder.stored_block("MM-X", "qwen3.8:27b")
+    assert "/Users/" not in out and "text of a" in out and '<div class="x">kept</div>' in out
+    plain = "### [1] a.md > A (Relevance: 0.45)\nSection: A\ntext with <div>one</div> element"
+    monkeypatch.setattr(X, "read_xfrozen", lambda *a, **k: type("C", (), {"text": plain})())
+    assert builder.stored_block("MM-Y", "qwen3.8:27b") == plain
+
+
 def test_unknown_product_is_refused(synth):
     with pytest.raises(X.XProjectError, match="not allowed"):
-        X.load_xstories("gitlab", rtc_root=synth["rtc"])
+        X.load_xstories("grafana", rtc_root=synth["rtc"])
+
+
+def test_the_allow_list_holds_the_two_products_of_the_search_checks():
+    assert sorted(X.ALLOWED_PRODUCTS) == ["bitwarden", "gitlab", "keycloak", "mastodon", "mattermost"]
+    assert X.ALLOWED_PRODUCTS["gitlab"].docs_dir.name == "docs"
+    assert X.ALLOWED_PRODUCTS["gitlab"].docs_dir.parent.name == "gitlab"
 
 
 def test_mattermost_stories_are_not_lab_stories():
@@ -399,3 +420,9 @@ def test_plan_orders_versions_and_counts(synth):
     assert len(jobs) == 2 * 2 * 2 * 3
     assert len({j.key for j in jobs}) == len(jobs)
     assert all(j.arm == "B2" and j.step == "lab" and j.n_doc_passages == 2 for j in jobs)
+
+
+def test_an_extra_model_uses_the_stored_block_of_the_source_model():
+    assert X.block_model("mistral-small3.2:24b") == "qwen3.8:27b"
+    assert X.block_model("nemotron3-nano:30b") == "qwen3.8:27b"
+    assert X.block_model("gemma4:26b") == "gemma4:26b"

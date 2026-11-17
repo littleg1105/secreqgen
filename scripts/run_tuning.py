@@ -945,7 +945,9 @@ def preflight(
             if pin is None:
                 raise GuardError(f"no hosted pin for {job.model}")
             body = build_request_body(pin, job.system, job.user_sent)
-            if body.get("reasoning") != {"effort": "none"}:
+            # A model with no reasoning mode sends no reasoning field (its endpoint refuses the parameter).
+            # The client still stops when an answer holds reasoning.
+            if body.get("reasoning") != ({"effort": "none"} if pin.reasoning_off else None):
                 raise GuardError("reasoning is not switched off in the request")
             prov = body.get("provider", {})
             if len(prov.get("only", [])) != 1 or prov.get("allow_fallbacks") is not False:
@@ -1724,7 +1726,9 @@ def preflight_lab(
             if pin is None:
                 raise GuardError(f"no hosted pin for {job.model}")
             body = build_request_body(pin, job.system, job.user_sent)
-            if body.get("reasoning") != {"effort": "none"}:
+            # A model with no reasoning mode sends no reasoning field (its endpoint refuses the parameter).
+            # The client still stops when an answer holds reasoning.
+            if body.get("reasoning") != ({"effort": "none"} if pin.reasoning_off else None):
                 raise GuardError("reasoning is not switched off in the request")
             prov = body.get("provider", {})
             if len(prov.get("only", [])) != 1 or prov.get("allow_fallbacks") is not False:

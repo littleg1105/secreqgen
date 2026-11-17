@@ -37,10 +37,12 @@ from tuning_lib.guard import (  # noqa: E402
 )
 from tuning_lib.openrouter_client import FatalHostedError, ModelPin, OpenRouterClient, build_request_body  # noqa: E402
 from tuning_lib.passages import PassagesError, StoredPrompt, estimate_prompt_tokens  # noqa: E402
-from tuning_lib.paths import FALLBACK_CONTEXT, MODELS, RTC, SECREQGEN, TUNING_ROOT, model_slug  # noqa: E402
+from tuning_lib.paths import EXTRA_MODELS, FALLBACK_CONTEXT, MODELS, RTC, SECREQGEN, TUNING_ROOT, model_slug  # noqa: E402
 from tuning_lib.prompts import BASELINE, TEMPLATE_FILES, PromptError, check_generality  # noqa: E402
 from tuning_lib.records import key_states, read_jsonl  # noqa: E402
+from tuning_lib import search as search_lib  # noqa: E402
 from tuning_lib.xproject import (  # noqa: E402
+    block_model,
     ALLOWED_PRODUCTS,
     XPROJECT_ROOT,
     XProjectBuilder,
@@ -80,8 +82,11 @@ def plan_x_jobs(
     *,
     order_seed: int = 1,
     xroot: Path = XPROJECT_ROOT,
+    stories: Sequence[str] | None = None,
 ) -> list[rt.LabJob]:
     """Build and order the jobs. Same loop and same job type as plan_lab_jobs of run_tuning.py.
+
+    The argument stories limits the run to these story ids (default: each story of the product).
 
     plan_lab_jobs needs stored Study 2b prompts, so it cannot be used. A job holds a StoredPrompt
     of the new product only for its source fields and for the cost estimate.
@@ -90,6 +95,11 @@ def plan_x_jobs(
         raise rt.SelectionError("--versions needs at least one name and no duplicate")
     infos = {name: builder.version(name) for name in versions}
     story_ids = sorted(builder.stories())
+    if stories is not None:
+        unknown = sorted(set(stories) - set(story_ids))
+        if unknown or not stories or len(set(stories)) != len(stories):
+            raise rt.SelectionError(f"--stories: unknown, empty or duplicate story ids: {unknown}")
+        story_ids = sorted(stories)
     jobs: list[rt.LabJob] = []
     for repeat in range(1, repeats + 1):
         for story_id in story_ids:
@@ -106,7 +116,7 @@ def plan_x_jobs(
                         doc_context_ref="frozen", doc_context_sha256=built.block_sha256, system_sha256=None,
                         user_sha256=None, local_prompt_tokens=tokens, local_completion_tokens=ANSWER_TOKENS_ESTIMATE,
                         local_n_requirements=0,
-                        source_file=_rel_rtc(frozen_path(project, model, xroot)), source_line=1,
+                        source_file=_rel_rtc(frozen_path(project, block_model(model), xroot)), source_line=1,
                     )
                     jobs.append(rt.LabJob(
                         config_id=name, step="lab", project=project, model=model, arm="B2",
@@ -232,7 +242,9 @@ def preflight_x(
             if pin is None:
                 raise GuardError(f"no hosted pin for {job.model}")
             body = build_request_body(pin, job.system, job.user_sent)
-            if body.get("reasoning") != {"effort": "none"}:
+            # A model with no reasoning mode sends no reasoning field (its endpoint refuses the parameter).
+            # The client still stops when an answer holds reasoning.
+            if body.get("reasoning") != ({"effort": "none"} if pin.reasoning_off else None):
                 raise GuardError("reasoning is not switched off in the request")
             prov = body.get("provider", {})
             if len(prov.get("only", [])) != 1 or prov.get("allow_fallbacks") is not False:
@@ -285,10 +297,22 @@ def x_input_hashes(project: str, models: Sequence[str], xroot: Path, rtc_root: P
     """SHA-256 of the frozen files and of the story file (paths relative to real_test_cases)."""
     out: dict[str, str] = {}
     for model in models:
-        path = frozen_path(project, model, xroot)
+        path = frozen_path(project, block_model(model), xroot)
         out[_rel_rtc(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
     stories = rtc_root / project / "user_stories.json"
-    return {"frozen_sha256": out, "user_stories_sha256": hashlib.sha256(stories.read_bytes()).hexdigest()}
+    search: dict[str, str] = {}  # the stored passages of the new search options of this product, if made
+    for option in sorted(search_lib.OPTIONS):
+        paths = [search_lib.frozen_path(option, project=project)]
+        if project in search_lib.PROJECTS:
+            paths.append(search_lib.other_stories_path(option, project))
+        for path in paths:
+            if path.is_file():
+                search[_rel_rtc(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {
+        "frozen_sha256": out,
+        "search_frozen_sha256": search,
+        "user_stories_sha256": hashlib.sha256(stories.read_bytes()).hexdigest(),
+    }
 
 
 def x_code_hashes(builder: XProjectBuilder, versions: Sequence[str]) -> dict[str, str]:
@@ -335,6 +359,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p.add_argument("--project", required=True, choices=sorted(ALLOWED_PRODUCTS))
     p.add_argument("--run-name", required=True, type=rt._run_name)
     p.add_argument("--versions", required=True, type=rt._csv)
+    p.add_argument("--stories", type=rt._csv, default=None, help="only these story ids (default: each story of the product)")
     p.add_argument("--repeats", type=int, default=3)
     p.add_argument("--models", type=rt._csv, default=["both"])
     p.add_argument("--workers", type=int, default=6)
@@ -356,9 +381,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     if not 1 <= args.max_attempts <= 3:
         p.error("--max-attempts must be from 1 to 3")
     if args.models != ["both"]:
-        bad = [m for m in args.models if m not in MODELS]
+        bad = [m for m in args.models if m not in MODELS + EXTRA_MODELS]
         if bad:
-            p.error(f"--models: {', '.join(bad)} not allowed; choose from both or {', '.join(MODELS)}")
+            p.error(f"--models: {', '.join(bad)} not allowed; choose from both or {', '.join(MODELS + EXTRA_MODELS)}")
     return args
 
 
@@ -384,18 +409,27 @@ def main(
     versions = list(args.versions)
     try:
         builder = builder or XProjectBuilder((args.project,), xroot=xroot)
-        models = MODELS if args.models == ["both"] else tuple(m for m in MODELS if m in args.models)
+        models = MODELS if args.models == ["both"] else tuple(m for m in MODELS + EXTRA_MODELS if m in args.models)
         bad = [m for m in models if m not in rt.HOSTED_MODELS]
         if bad:
             print(f"[FAIL] --models: no hosted pin for {', '.join(bad)}")
             return 2
         story_ids = sorted(builder.stories())
+        if args.stories is not None:
+            unknown = sorted(set(args.stories) - set(story_ids))
+            if unknown or not args.stories:
+                print(f"[FAIL] --stories: unknown or empty story ids: {unknown}")
+                return 2
+            story_ids = sorted(set(args.stories))
         sel = rt.Selection((args.project,), models, ("B2",), frozenset(story_ids), args.repeats)
-        jobs = plan_x_jobs(args.project, versions, models, args.repeats, builder, order_seed=args.order_seed, xroot=xroot)
+        jobs = plan_x_jobs(
+            args.project, versions, models, args.repeats, builder, order_seed=args.order_seed, xroot=xroot,
+            stories=story_ids if args.stories is not None else None,
+        )
     except (PromptError, XProjectError, rt.SelectionError, PassagesError, GuardError) as exc:
         print(f"[FAIL] plan: {type(exc).__name__}: {rt._cut(str(exc), 400)}")
         return 2
-    spec = f"xproject:{args.project}"
+    spec = f"xproject:{args.project}" + (":" + ",".join(story_ids) if args.stories is not None else "")
     if args.dry_run:
         try:
             rt._print_lab_dry_run(sel, jobs, versions)

@@ -576,3 +576,15 @@ def test_import_has_no_side_effect():
     # The module-level pins are plain data and the constants are the design values.
     assert oc.KEYCHAIN_SERVICE == "openrouter-api-key"
     assert oc.API_URL.startswith("https://openrouter.ai/")
+
+
+def test_a_pin_with_no_reasoning_mode_sends_no_reasoning_field_and_each_other_field_stays():
+    pin = oc.HOSTED_MODELS["mistral-small3.2:24b"]
+    assert pin.reasoning_off is False
+    body = oc.build_request_body(pin, "sys", "user")
+    assert "reasoning" not in body
+    assert body["model"] == "mistralai/mistral-small-3.2-24b-instruct"
+    assert body["provider"]["only"] == ["deepinfra/fp8"] and body["provider"]["allow_fallbacks"] is False
+    assert body["top_k"] == 40 and body["temperature"] == oc.SAMPLING_COMMON["temperature"]
+    other = oc.build_request_body(oc.HOSTED_MODELS["nemotron3-nano:30b"], "sys", "user")
+    assert other["reasoning"] == {"effort": "none"} and other["provider"]["only"] == ["nebius/fp8"]

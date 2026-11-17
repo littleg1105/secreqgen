@@ -24,6 +24,10 @@ HASH_LISTS: dict[str, Path] = {
 }
 PROJECTS: tuple[str, ...] = ("mastodon", "keycloak", "bitwarden")
 MODELS: tuple[str, ...] = ("qwen3.8:27b", "gemma4:26b")  # local names; the "model" key of every record
+# Models of the model test of 16 November 2026 (hosted only, with the word search). They have no stored
+# passages of their own: for them the code of xproject.py takes the stored block of BLOCK_SOURCE_MODEL.
+EXTRA_MODELS: tuple[str, ...] = ("mistral-small3.2:24b", "nemotron3-nano:30b")
+BLOCK_SOURCE_MODEL: str = "qwen3.8:27b"
 FALLBACK_CONTEXT: str = "No relevant security documentation found."  # 41 characters; retriever.py:343
 ANALYSIS_S2B: Path = STUDY2B / "analysis_s2b.json"
 
