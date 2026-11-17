@@ -165,3 +165,4 @@ The tests marked `slow` need a real model server or a model download. The fast r
 
 - `docs/README.md`: the documents of the project and which ones to trust.
 - `scripts/README.md`: the lab scripts that ran the experiments. They are a frozen record.
+- Code map: `src/secreqgen/README.md`: the modules, the layer rule, the test patch points and the golden tests.

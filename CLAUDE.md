@@ -9,6 +9,7 @@ SecReqGen is the tool of an MSc thesis. For one user story, it writes security r
 1. `docs/README.md`: which documents are current and which are old.
 2. `scripts/README.md`: the lab record. It explains each experiment script.
 3. The top block of `docs/HANDOFF.md` (the block that says "read this block first"). Lower blocks are history.
+4. Code map: `src/secreqgen/README.md`: the modules, the layer rule and the test patch points.
 
 Do not write entries in `docs/log.md`. It is an old file. It does not hold the current state.
 
