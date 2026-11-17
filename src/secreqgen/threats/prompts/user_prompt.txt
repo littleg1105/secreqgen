@@ -1,0 +1,46 @@
+## Documentation passages
+The passages below come from the documentation of the product. The name in square brackets in the header of a passage is its source name, for example P3.
+
+$passages
+
+---
+
+## User story
+**Title:** $story_title
+
+**Story:** $story_text
+
+**Acceptance criteria:**
+$acceptance_criteria
+
+## Task
+Step 1. For each passage write:
+- fits_story: "yes", "partly" or "no".
+- statements: the security statements of the passage that are about the setup and the feature of this user story. Copy each one as an exact quote, $max_quote_words words at most. Most passages have none: then write [].
+
+A security statement is one of these two:
+- attack: the passage says what an attacker can do, or what goes wrong for security.
+- rule: the passage says what must be done, or what must not be done, to stay secure.
+These are not security statements: a sentence that only says how a feature works, what a field holds or which option exists; an example of a command; a statement about a mode, an option or a part that this user story does not use.
+
+Step 2. For each statement of step 1 write one row:
+- type: "attack" or "rule".
+- threat: one sentence. For an attack: who can do what, in the words of the passage. For a rule: the breach of the rule, which means who does what the rule forbids, or who does not do what the rule demands. Add the result only if the passage states it.
+- harm: what is lost. One of: "disclosure of data", "change of data", "false identity", "access with no permission", "loss of service", "no record of actions", "not stated". Write "not stated" when the passage does not show it.
+- story_part: the words of the user story or of its acceptance criteria that this row is about, as an exact copy, 15 words at most.
+- requirement: one sentence that stops the threat, for the part that this user story builds or sets up. Use only names and values that the passage gives.
+Do not add a result, a parameter, a role or a step that the passage does not state.
+
+When step 1 finds no security statement, "rows" is an empty list. That is a correct answer.
+
+## Answer form
+{
+ "passages": [
+  {"source": "<source name>", "fits_story": "<yes, partly or no>", "statements": ["<exact words of the passage>"]}
+ ],
+ "rows": [
+  {"source": "<source name>", "quote": "<one statement of step 1, exact words>", "type": "<attack or rule>", "threat": "<one sentence>", "harm": "<one value of the list>", "story_part": "<exact words of the user story>", "requirement": "<one sentence>"}
+ ]
+}
+
+Respond only with the JSON object. Do not include any text before or after it.

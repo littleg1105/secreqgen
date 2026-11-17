@@ -999,6 +999,137 @@ def generate_single(
         raise typer.Exit(1)
 
 
+@generate_app.command("threats")
+def generate_threats(
+    input_file: Annotated[
+        Path, typer.Argument(help="Input file with user stories (JSON/YAML)")
+    ],
+    docs: Annotated[
+        Path,
+        typer.Option("--docs", help="Documentation folder for the word search"),
+    ],
+    product: Annotated[
+        Optional[str],
+        typer.Option("--product", help="Name of the product (default: key 'project')"),
+    ] = None,
+    story_id: Annotated[
+        Optional[str],
+        typer.Option("--story-id", help="Write the threat list of this story only"),
+    ] = None,
+    actor: Annotated[
+        bool,
+        typer.Option(
+            "--actor/--no-actor",
+            help="One short call for each story: a threat actor for each row, from a fixed list",
+        ),
+    ] = True,
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Output folder"),
+    ] = Path("threat_lists"),
+) -> None:
+    """Write a DRAFT threat list for each user story: the attacks and the security rules that the documentation states."""
+    import json
+    import re
+
+    import yaml as yaml_lib
+    from rich.markup import escape
+
+    from secreqgen.exceptions import GenerationError, LLMConnectionError
+    from secreqgen.generation.schemas import UserStory
+    from secreqgen.retrieval.word_search import SearchError
+    from secreqgen.threats import ThreatListError, ThreatListGenerator, render_markdown
+    from secreqgen.threats.pipeline import DRAFT_NOTICE
+
+    if not input_file.exists():
+        console.print(f"[red]Error:[/red] Input file not found: {input_file}")
+        raise typer.Exit(1)
+    if not docs.is_dir():
+        console.print(f"[red]Error:[/red] Documentation folder not found: {docs}")
+        raise typer.Exit(1)
+    try:
+        text = input_file.read_text(encoding="utf-8")
+        if input_file.suffix.lower() in [".yaml", ".yml"]:
+            data = yaml_lib.safe_load(text)
+        else:
+            data = json.loads(text)
+        if not isinstance(data, dict):
+            raise ValueError("the file must hold an object")
+    except Exception as e:
+        console.print(f"[red]Error parsing input file:[/red] {e}")
+        raise typer.Exit(1)
+
+    user_stories = []
+    for i, story_data in enumerate(data.get("user_stories", []) or []):
+        try:
+            user_stories.append(
+                UserStory(
+                    id=story_data.get("id", f"US-{i+1:03d}"),
+                    title=story_data.get("title", "Untitled"),
+                    story=story_data.get("story", ""),
+                    acceptance_criteria=story_data.get("acceptance_criteria", []),
+                )
+            )
+        except Exception as e:
+            console.print(f"[yellow]Warning: Skipping invalid story {i+1}: {e}[/yellow]")
+    if story_id is not None:
+        user_stories = [s for s in user_stories if s.id == story_id]
+        if not user_stories:
+            console.print(f"[red]Error:[/red] Story not found in the input file: {story_id}")
+            raise typer.Exit(1)
+    if not user_stories:
+        console.print("[yellow]No user stories found in input file.[/yellow]")
+        raise typer.Exit(0)
+
+    product_name = product if product is not None else data.get("project")
+    cfg = get_config()
+    try:
+        llm_client = _ollama_client(cfg, tested_setup=True)
+        if not llm_client.check_health():
+            console.print(
+                "[red]Error:[/red] Cannot connect to Ollama.\n"
+                "Make sure Ollama is running: [cyan]ollama serve[/cyan]"
+            )
+            raise typer.Exit(1)
+        generator = ThreatListGenerator(llm_client, docs, product=product_name, name_actor=actor)
+    except LLMConnectionError as e:
+        console.print(f"[red]LLM Connection Error:[/red] {e}")
+        raise typer.Exit(1)
+    except (SearchError, ThreatListError) as e:
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+
+    written = 0
+    for story in user_stories:
+        try:
+            model = generator.generate(story)
+        except (ThreatListError, SearchError, GenerationError) as e:
+            console.print(
+                f"[yellow]Warning: no threat list for {escape(story.id)}: {escape(str(e))}[/yellow]"
+            )
+            continue
+        folder = output / (re.sub(r"[^A-Za-z0-9._-]", "_", story.id).strip(".") or "story")
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "threats.json").write_text(
+            json.dumps(model, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        (folder / "threats.md").write_text(render_markdown(model), encoding="utf-8")
+        written += 1
+        rows = model["rows"]
+        attacks = sum(1 for r in rows if r["type"] == "attack")
+        marked = sum(1 for r in rows if r.get("signal"))
+        console.print(
+            f"[green]✓[/green] {escape(story.id)}: {len(rows)} rows ({attacks} attacks, "
+            f"{len(rows) - attacks} rules), {marked} from a warning or a rule, "
+            f"{len(model['dropped'])} removed by the script, {len(model['calls'])} calls, {model['seconds']} s"
+        )
+
+    if written == 0:
+        console.print("[red]No threat list was written.[/red]")
+        raise typer.Exit(1)
+    console.print(f"\n[bold]{DRAFT_NOTICE}[/bold]")
+
+
 # Evaluate commands
 @evaluate_app.command("run")
 def evaluate_run(
