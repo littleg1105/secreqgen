@@ -12,6 +12,8 @@ from secreqgen_gui.pages._setup_parts import (
     Foot,
     StoriesPart,
     about_summary,
+    initial_path,
+    initial_product,
     message,
     prompt_set_choices,
     prompt_set_value,
@@ -25,8 +27,12 @@ ABOUT_LIMIT = 120
 SAME_MODEL = "The second model must be a different model."
 
 
-def page(stories: str | None = None, docs: str | None = None) -> None:
-    """Build the form. The query values stories and docs fill the two paths."""
+def page(
+    stories: str | None = None,
+    docs: str | None = None,
+    product: str | None = None,
+) -> None:
+    """Build the form. The query values stories, docs, product fill the fields."""
     defaults = load_settings()
     page_title(
         "Start a threat list",
@@ -34,8 +40,13 @@ def page(stories: str | None = None, docs: str | None = None) -> None:
         "The defaults are the tested setup.",
     )
     with ui.column().classes("w-full max-w-[680px] gap-6"):
-        stories_part = StoriesPart(lambda: refresh(), stories or "")
-        docs_part = DocsPart(lambda: refresh(), stories_part, docs or "")
+        stories_part = StoriesPart(lambda: refresh(), initial_path(stories))
+        docs_part = DocsPart(
+            lambda: refresh(),
+            stories_part,
+            initial_path(docs),
+            initial_product(product),
+        )
 
         body = section("Setup")
         with body:

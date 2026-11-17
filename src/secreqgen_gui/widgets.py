@@ -13,6 +13,8 @@ from pathlib import Path
 
 from nicegui import ui
 
+from secreqgen_gui.settings import expand_path, show_path
+
 TAG_KINDS = ("plain", "keep", "delete", "caution")
 
 
@@ -93,7 +95,7 @@ def path_field(label: str, value: str = "", *, folder: bool = False):
 
 
 def _browse(field, folder_mode: bool) -> None:
-    start = Path(field.value).expanduser() if field.value else Path.home()
+    start = expand_path(field.value) if (field.value or "").strip() else Path.home()
     if start.is_file():
         start = start.parent
     if not start.is_dir():
@@ -106,7 +108,7 @@ def _browse(field, folder_mode: bool) -> None:
         box = ui.column().classes("w-full gap-0 h-[320px] overflow-auto")
 
         def refresh() -> None:
-            where.set_text(str(state["path"]))
+            where.set_text(show_path(state["path"]))
             entries, error = _list_folder(state["path"], folder_mode)
             problem.set_text(error)
             box.clear()
@@ -124,7 +126,7 @@ def _browse(field, folder_mode: bool) -> None:
             refresh()
 
         def choose(path: Path) -> None:
-            field.set_value(str(path))
+            field.set_value(show_path(path))
             dialog.close()
 
         with ui.row().classes("w-full justify-end gap-2"):

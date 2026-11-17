@@ -18,6 +18,7 @@ from secreqgen_gui.settings import (
     load_settings,
     make_config,
     save_settings,
+    show_path,
 )
 from secreqgen_gui.widgets import page_title
 
@@ -154,7 +155,7 @@ def page() -> None:
         ).classes("mt-3")
 
         with section("Data folder"):
-            ui.label(str(data_home())).classes("sr-code break-all")
+            ui.label(show_path(data_home())).classes("sr-code break-all")
             ui.label(DATA_SENTENCE).classes("sr-muted")
 
         with section("About"):

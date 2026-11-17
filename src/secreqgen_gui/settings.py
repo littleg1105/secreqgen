@@ -24,6 +24,35 @@ class GuiSettings:
     requirements_model: str = "gemma4:26b"
 
 
+def expand_path(text: str | Path) -> Path:
+    """Make a path from typed text. A leading ~ means the home folder.
+
+    The links are not resolved and the path need not exist.
+    """
+    return Path(str(text).strip()).expanduser()
+
+
+def show_path(path: str | Path | None) -> str:
+    """Return the text of a path for the person.
+
+    The home folder and the paths below it start with ~. Any other path stays
+    as it is. An empty value gives an empty text. This function never raises.
+    """
+    try:
+        text = str(path).strip() if path is not None else ""
+        if not text:
+            return ""
+        value = Path(text)
+        home = Path.home()
+        if value == home:
+            return "~"
+        if home in value.parents:
+            return "~/" + value.relative_to(home).as_posix()
+        return text
+    except (OSError, RuntimeError, ValueError):
+        return str(path) if path is not None else ""
+
+
 def data_home() -> Path:
     """Return the data folder. It is made on first use.
 

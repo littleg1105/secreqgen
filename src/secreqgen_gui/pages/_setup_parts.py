@@ -17,6 +17,7 @@ from secreqgen.application.inputs import check_story_upload, read_story_file
 from secreqgen.application.prompt_sets import list_user_prompt_sets
 
 from secreqgen_gui import jobs, storage
+from secreqgen_gui.settings import expand_path, show_path
 from secreqgen_gui.widgets import path_field
 
 TESTED_SET = "__tested__"
@@ -25,6 +26,18 @@ FOLDER_MISSING = (
 )
 FOLDER_EMPTY = "The folder holds no Markdown file."
 PRODUCT_NOTE = "Product name"
+PRODUCT_LIMIT = 80
+
+
+def initial_path(text: str | None) -> str:
+    """Return a path from a query value in the short form for the field."""
+    value = (text or "").strip()
+    return show_path(expand_path(value)) if value else ""
+
+
+def initial_product(text: str | None) -> str:
+    """Return the product name from a query value, at most 80 characters."""
+    return (text or "").strip()[:PRODUCT_LIMIT]
 
 
 def plural(count: int, one: str, many: str) -> str:
@@ -137,7 +150,7 @@ class StoriesPart:
         except (InputError, ValueError) as exc:
             set_message(self.problem, f"{exc} Choose another file.", "bad")
             return
-        self.field.set_value(str(path))
+        self.field.set_value(show_path(path))
 
     def _type_panel(self) -> None:
         story_id = ui.input("Story id", value="US-001").props("outlined dense")
@@ -179,7 +192,7 @@ class StoriesPart:
                 set_message(warn, f"{exc} Change the text and try again.", "bad")
                 return
             set_message(warn, "")
-            self.field.set_value(str(path))
+            self.field.set_value(show_path(path))
 
         ui.button("Use this story", on_click=use).props("outline no-caps unelevated")
 
@@ -193,7 +206,7 @@ class StoriesPart:
         if not value:
             self._clear("")
             return
-        path = Path(value).expanduser()
+        path = expand_path(value)
         try:
             result = await run.io_bound(read_story_file, path)
         except Exception as exc:  # the text of the error is the message
@@ -280,6 +293,7 @@ class DocsPart:
         on_change: Callable[[], None],
         stories: StoriesPart,
         initial: str = "",
+        product: str = "",
     ) -> None:
         self.on_change = on_change
         self.stories = stories
@@ -292,7 +306,9 @@ class DocsPart:
             self.info = message()
             self.info.set_visibility(False)
             self.product = (
-                ui.input(PRODUCT_NOTE).props("outlined dense").classes("w-full")
+                ui.input(PRODUCT_NOTE, value=product)
+                .props("outlined dense")
+                .classes("w-full")
             )
         self.field.props("debounce=300")
         self.field.on_value_change(lambda _e: self.check())
@@ -309,7 +325,7 @@ class DocsPart:
             set_message(self.info, "")
             self.on_change()
             return
-        folder = Path(value).expanduser()
+        folder = expand_path(value)
         isdir = await run.io_bound(folder.is_dir)
         count = await run.io_bound(count_markdown, folder) if isdir else 0
         if token != self._token:
@@ -336,7 +352,7 @@ class DocsPart:
     @property
     def path(self) -> Path | None:
         value = (self.field.value or "").strip()
-        return Path(value).expanduser() if value else None
+        return expand_path(value) if value else None
 
     @property
     def ok(self) -> bool:

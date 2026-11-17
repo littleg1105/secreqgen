@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from secreqgen_gui import __version__, storage
-from secreqgen_gui.settings import load_settings, make_config
+from secreqgen_gui.settings import expand_path, load_settings, make_config
 
 TESTED_THREAT_SET = "threats_v5b_labels"
 TESTED_REQUIREMENTS_SET = "s1_word_3000"
@@ -629,7 +629,9 @@ def spec_from_dict(data: dict) -> ThreatRunSpec | RequirementsRunSpec:
         raise ValueError("Unknown field: " + ", ".join(sorted(unknown)))
     for key in ("stories_file", "docs"):
         if key in data:
-            data[key] = Path(data[key])
+            data[key] = expand_path(data[key])
+    if data.get("system_context"):
+        data["system_context"] = str(expand_path(data["system_context"]))
     if data.get("story_ids") is not None:
         data["story_ids"] = tuple(data["story_ids"])
     return cls(**data)
