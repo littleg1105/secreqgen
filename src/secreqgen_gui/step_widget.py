@@ -7,7 +7,7 @@ from nicegui import ui
 from secreqgen_gui.pipeline_view import Board, render_svg
 
 SAME_STORY = object()  # the slip starts at the step of the last picture
-FULL_SCREEN_HINT = "Esc: leave the full screen."
+FULL_SCREEN_HINT = "Esc: exit."
 
 
 class StepDiagram:
@@ -17,7 +17,8 @@ class StepDiagram:
     moves one time for each change, and a page can call show() on a timer.
     """
 
-    def __init__(self, *, hint: str = FULL_SCREEN_HINT) -> None:
+    def __init__(self, *, hint: str = FULL_SCREEN_HINT, details: bool = False) -> None:
+        self._with_details = details
         self._key: tuple | None = None
         self._story = ""
         self._active: str | None = None
@@ -32,6 +33,12 @@ class StepDiagram:
                 self.title = ui.label().classes("sr-step-title")
                 self.facts = ui.label().classes("sr-step-facts")
                 self.text = ui.label().classes("sr-step-text")
+                # More about the step, closed until the person asks for it.
+                self.more = ui.expansion("Details").props("dense")
+                self.more.classes("sr-step-more")
+                with self.more:
+                    self.details = ui.label().classes("sr-step-text")
+                self.more.set_visibility(False)
             # The hint shows in the full screen only (see theme.py).
             ui.label(hint).classes("sr-steps-hint")
         # The browser must start the full screen inside the click itself, so
@@ -74,5 +81,7 @@ class StepDiagram:
         self.facts.set_visibility(bool(board.facts))
         self.text.set_text(board.text)
         self.text.set_visibility(bool(board.text))
+        self.details.set_text(board.details)
+        self.more.set_visibility(self._with_details and bool(board.details))
         self._key, self._story, self._active = key, story_id, board.active
         return True

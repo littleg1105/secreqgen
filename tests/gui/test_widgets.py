@@ -100,3 +100,11 @@ async def test_confirm_runs_the_action_only_after_yes(user):
     assert done == []
     user.find("Delete run").click()
     assert done == [1]
+
+
+def test_list_folder_error_uses_the_new_text(tmp_path):
+    from secreqgen_gui.widgets import _list_folder
+
+    entries, error = _list_folder(tmp_path / "missing", True)
+    assert entries == []
+    assert error.startswith("This folder cannot be read: ")

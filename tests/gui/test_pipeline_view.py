@@ -121,10 +121,13 @@ def test_the_flows_hold_the_steps_that_the_tool_reports():
 def test_each_step_has_a_text_that_ends_with_a_period():
     for kind, flow in view.FLOWS.items():
         for step in flow.steps:
-            title, text = boards.TEXTS[kind][step.key]
+            title, text, details = boards.TEXTS[kind][step.key]
             assert title and not title.endswith(".")
             assert text.endswith(".")
-            assert chr(0x2014) not in title + text
+            assert not details or details.endswith(".")
+            assert chr(0x2014) not in title + text + details
+            # One short sentence or two. The long part is in the details.
+            assert len(text.split()) <= 32
             assert len(step.title[0]) <= 14 and len(step.title[1]) <= 14
 
 
@@ -172,7 +175,7 @@ def test_the_live_board_follows_the_reports_of_the_tool():
     assert board.active == "write" and board.part == 1 and not board.loop_used
     assert board.steps["search"] == StepView("done", ("14 passages", "3 groups"))
     assert board.steps["write"] == StepView("active", ("group 1 of 3", "attempt 2"))
-    assert board.facts == "Group 1 of 3, attempt 2."
+    assert board.facts == "Group 1 of 3. Attempt 2."
 
     board = board_after(8)  # group 2 starts
     assert board.part == 2 and board.loop_used
@@ -180,24 +183,24 @@ def test_the_live_board_follows_the_reports_of_the_tool():
     assert board.steps["check"] == StepView("partial", ("1 of 3 checked",))
 
     board = board_after(14)  # the tool knows the rows that stay
-    assert board.steps["write"] == StepView("done", ("11 rows",))
-    assert board.steps["check"] == StepView("done", ("9 kept", "2 removed"))
+    assert board.steps["write"] == StepView("done", ("11 written",))
+    assert board.steps["check"] == StepView("done", ("9 passed", "2 failed"))
     assert board.active is None
 
     board = board_after(19)  # the second row of the second model starts
     assert board.active == "second_model"
-    assert board.steps["labels"] == StepView("done", ("9 of 9 rows",))
+    assert board.steps["labels"] == StepView("done", ("9 labelled",))
     assert board.steps["second_model"] == StepView(
-        "active", ("row 2 of 9", "1 accepted")
+        "active", ("threat 2 of 9", "1 accepted")
     )
-    assert board.facts == "Row 2 of 9."
+    assert board.facts == "Threat 2 of 9."
 
     board = board_after(len(threat_events()))
     assert board.active is None
-    assert board.steps["second_model"] == StepView("done", ("7 accepted", "2 faults"))
-    assert board.steps["weak_signs"] == StepView(
-        "done", ("1 with a sign", "8 with none")
+    assert board.steps["second_model"] == StepView(
+        "done", ("7 accepted", "2 flagged")
     )
+    assert board.steps["weak_signs"] == StepView("done", ("1 marked",))
     assert board.steps["read"] == StepView("partial", ("your turn",))
     assert board.title == "You read the list"
 
@@ -217,9 +220,9 @@ def test_a_step_that_the_story_passed_shows_no_rows():
         progress, StepEvent(STORY, "weak_signs", "done", 0, 0, {"clean": 0})
     )
     board = boards.live_board(progress)
-    assert board.steps["labels"] == StepView("off", ("no rows",))
-    assert board.steps["second_model"] == StepView("off", ("no rows",))
-    assert board.steps["write"].lines == ("0 rows", "3 groups failed")
+    assert board.steps["labels"] == StepView("off", ("no threats",))
+    assert board.steps["second_model"] == StepView("off", ("no threats",))
+    assert board.steps["write"].lines == ("0 written", "3 groups failed")
 
 
 def test_a_failed_step_shows_where_the_story_stopped():
@@ -230,7 +233,7 @@ def test_a_failed_step_shows_where_the_story_stopped():
     board = boards.live_board(progress)
     assert board.steps["write"] == StepView("failed", ("stopped here",))
     assert board.active is None
-    assert board.title.startswith("The story stopped at this step")
+    assert board.title == "This story stopped at the writer"
 
 
 def test_a_new_story_starts_with_an_empty_progress():
@@ -306,33 +309,36 @@ def test_the_replay_shows_each_group_in_true_order():
     board = boards.replay_board("threats", TRACE, ("write", 2))
     assert board.active == "write" and board.part == 2 and board.loop_used
     assert board.steps["write"] == StepView("active", ("group 2 of 3", "5 passages"))
-    assert board.steps["check"] == StepView("partial", ("1 kept", "1 removed"))
+    assert board.steps["check"] == StepView("partial", ("1 passed", "1 failed"))
     assert board.facts == "Group 2 of 3: 5 passages, 2 attempts, 4 seconds."
 
     board = boards.replay_board("threats", TRACE, ("check", 2))
-    assert board.steps["check"] == StepView("active", ("3 kept", "1 removed"))
+    assert board.steps["check"] == StepView("active", ("3 passed", "1 failed"))
     assert board.steps["write"] == StepView("partial", ("2 of 3 groups",))
     assert board.facts == (
-        "Group 2 of 3: 2 rows stay, 0 rows are removed. "
-        "So far: 3 rows stay, 1 row is removed."
+        "Group 2 of 3: 2 passed, 0 failed. So far 3 passed, 1 failed."
     )
 
     board = boards.replay_board("threats", TRACE, ("write", 3))
-    assert "could not read an answer" in board.facts
-    assert "risk word" in board.facts
+    assert board.facts == (
+        "Group 3 of 3: 2 passages, 3 attempts, 9 seconds. This group has the "
+        "passages with a risk word. SecReqGen could not read the answer."
+    )
 
     board = boards.replay_board("threats", TRACE, ("second_model", 0))
-    assert board.steps["write"] == StepView("done", ("4 rows",))
-    assert board.steps["second_model"] == StepView("active", ("2 accepted", "1 fault"))
-    assert board.facts == "2 accepted, 1 with a fault."
+    assert board.steps["write"] == StepView("done", ("4 written",))
+    assert board.steps["second_model"] == StepView(
+        "active", ("2 accepted", "1 flagged")
+    )
+    assert board.facts == "2 accepted, 1 flagged."
 
 
 def test_the_last_check_frame_gives_the_reasons():
     trace = dict(TRACE, groups=TRACE["groups"][:2])
     board = boards.replay_board("threats", trace, ("check", 2))
-    assert board.facts.endswith(
-        "In all, 3 rows stay and 1 row is removed. "
-        "Reasons: the quote is not in the passage (1)."
+    assert board.facts == (
+        "Group 2 of 2: 2 passed, 0 failed. In total 3 passed and 1 failed. "
+        "Failed because: quote not in the passage (1)."
     )
 
 
@@ -360,13 +366,13 @@ def test_the_result_board_has_every_step_done():
 def test_rows_with_no_verdict_show_in_the_box_of_the_second_model():
     second = {"on": True, "accepted": 0, "faults": 0, "no_verdict": 3}
     board = boards.result_board("threats", dict(TRACE, second_model=second))
-    assert board.steps["second_model"].lines == ("0 accepted", "3 no verdict")
+    assert board.steps["second_model"].lines == ("0 accepted", "3 no answer")
     second = {"on": True, "accepted": 1, "faults": 1, "no_verdict": 1}
     board = boards.replay_board(
         "threats", dict(TRACE, second_model=second), ("second_model", 0)
     )
     assert board.steps["second_model"].lines == ("1 accepted", "2 not accepted")
-    assert board.facts == "1 accepted, 1 with a fault, 1 with no verdict."
+    assert board.facts == "1 accepted, 1 flagged, 1 with no answer."
     # The live board gives the same lines.
     progress = boards.new_progress("threats", STORY)
     for item in threat_events()[:17]:
@@ -375,14 +381,14 @@ def test_rows_with_no_verdict_show_in_the_box_of_the_second_model():
     boards.apply_event(progress, last)
     live = boards.live_board(progress)
     assert live.steps["second_model"] == StepView(
-        "done", ("0 accepted", "9 no verdict")
+        "done", ("0 accepted", "9 no answer")
     )
 
 
 def test_no_decision_yet_reads_as_work_to_do():
     board = boards.result_board("threats", TRACE, verdicts={})
-    assert board.steps["read"] == StepView("partial", ("3 rows to read",))
-    assert board.facts == "No row is decided yet."
+    assert board.steps["read"] == StepView("partial", ("3 to read",))
+    assert board.facts == "3 threats to read."
 
 
 def test_the_texts_hold_the_limits_of_the_code():
@@ -394,13 +400,14 @@ def test_the_texts_hold_the_limits_of_the_code():
         QUOTE_LIMIT,
     )
 
-    search = boards.TEXTS["threats"]["search"][1]
-    assert f"{DEFAULT_BUDGET:,} tokens" in search
-    assert f"groups of {GROUP_SIZE}" in search
-    assert f"at most {EXTRA_SECTIONS} of them" in search
-    assert f"more than {QUOTE_LIMIT} words" in boards.TEXTS["threats"]["check"][1]
-    assert f"{DEFAULT_BUDGET:,} tokens" in boards.TEXTS["requirements"]["search"][1]
-    assert MAX_JSON_ATTEMPTS == 3  # the design page names this limit
+    search = boards.TEXTS["threats"]["search"][2]
+    assert f"up to {DEFAULT_BUDGET:,} tokens" in search
+    assert f"A group has {GROUP_SIZE} passages" in search
+    assert f"up to {EXTRA_SECTIONS} of them" in search
+    assert f"more than {QUOTE_LIMIT} words" in boards.TEXTS["threats"]["check"][2]
+    assert f"{DEFAULT_BUDGET:,} tokens" in boards.TEXTS["requirements"]["search"][2]
+    for kind in ("threats", "requirements"):
+        assert f"up to {MAX_JSON_ATTEMPTS} times" in boards.TEXTS[kind]["write"][2]
 
 
 def test_a_trace_with_options_off_and_an_empty_trace():
@@ -411,7 +418,7 @@ def test_a_trace_with_options_off_and_an_empty_trace():
     assert board.steps["labels"] == StepView("off", ("off",))
     assert board.steps["second_model"] == StepView("off", ("off",))
     empty = boards.result_board("threats", {})
-    assert empty.steps["check"] == StepView("done", ("0 kept", "0 removed"))
+    assert empty.steps["check"] == StepView("done", ("0 passed", "0 failed"))
     assert view.render_svg(empty, moving=False).startswith("<svg")
 
 
@@ -428,7 +435,7 @@ def test_the_requirements_replay():
     board = boards.replay_board("requirements", trace, ("parse", 0))
     assert board.steps["search"] == StepView("done", ("9 passages",))
     assert board.steps["parse"] == StepView("active", ("5 requirements",))
-    assert board.facts == "For this story: 5 requirements."
+    assert board.facts == "5 requirements."
 
 
 # ------------------------------------------------------------------ the picture
@@ -477,4 +484,4 @@ def test_an_empty_board_draws(kind):
     board = boards.live_board(boards.new_progress(kind))
     svg = view.render_svg(board)
     assert svg.startswith("<svg") and svg.endswith("</svg>")
-    assert board.title == "No story is in work"
+    assert board.title == "No story is running"

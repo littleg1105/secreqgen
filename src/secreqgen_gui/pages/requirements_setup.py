@@ -6,6 +6,7 @@ from nicegui import run, ui
 
 from secreqgen_gui import jobs
 from secreqgen_gui.pages._setup_parts import (
+    UNTESTED_PROMPTS,
     DocsPart,
     Foot,
     StoriesPart,
@@ -29,10 +30,7 @@ def page(
 ) -> None:
     """Build the form. The query values stories, docs, product fill the fields."""
     defaults = load_settings()
-    page_title(
-        "Start requirements",
-        "Choose the stories and the documentation of the product.",
-    )
+    page_title("New requirements")
     with ui.column().classes("w-full max-w-[680px] gap-6"):
         stories_part = StoriesPart(lambda: refresh(), initial_path(stories))
         docs_part = DocsPart(
@@ -42,7 +40,7 @@ def page(
             initial_product(product),
         )
 
-        body = section("Setup")
+        body = section("Options")
         with body:
             model = (
                 ui.input("Model", value=defaults.requirements_model)
@@ -52,7 +50,7 @@ def page(
             context = path_field("System context file (optional)")
             choices = prompt_set_choices("requirements")
             prompt = ui.select(
-                choices, value=next(iter(choices)), label="Prompt set"
+                choices, value=next(iter(choices)), label="Prompts"
             ).props("outlined dense")
             prompt.classes("w-full")
             untested = message()
@@ -68,7 +66,7 @@ def page(
         def refresh() -> None:
             docs_part.fill_product()
             chosen = prompt_set_value(prompt.value)
-            set_message(untested, "Not the tested setup" if chosen else "", "caution")
+            set_message(untested, UNTESTED_PROMPTS if chosen else "", "caution")
             foot.update()
 
         async def start() -> None:

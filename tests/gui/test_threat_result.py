@@ -1,4 +1,4 @@
-"""The threat list of one story shows its rows and the evidence beside them."""
+"""The threat list of one story shows its threats and the evidence beside them."""
 
 from __future__ import annotations
 
@@ -15,7 +15,13 @@ pytestmark = pytest.mark.anyio
 STORY = "MM-US-007"
 SCRIPT = "<script>alert(1)</script>"
 IMG = '<img src=x onerror="document.title=1">'
-NOTICE = "DRAFT for a person to check."
+NOTICE = (
+    "This is a draft, not a complete threat model. It covers only what your "
+    "documentation says. Check each threat against its quote."
+)
+
+
+NOT_FOUND = "Cannot highlight the quote in this passage. The quote is below."
 
 
 def _row(row_id, kind, threat, quote, **extra):
@@ -148,17 +154,16 @@ def _marked(user):
 async def test_groups_and_rows_show_in_order(user):
     run_id = _store()
     await user.open(_url(run_id))
-    await user.should_see(f"Threat list of {STORY}")
+    await user.should_see(f"Threat list: {STORY}")
     await user.should_see("Bot and integration setup")
     await user.should_see(NOTICE)
-    await user.should_see("Rows that the second model (qwen3.8:27b) accepts (2)")
-    await user.should_see("Rows where the second model sees a fault (1)")
-    await user.should_see("3 rows")
-    await user.should_see("2 accepted by the second model")
-    await user.should_see("1 with a fault")
-    await user.should_see("3 open")
-    await user.should_see("weak sign")
-    await user.should_see("Second model: names a fault")
+    await user.should_see("Accepted by the checker (2)")
+    await user.should_see("Flagged by the checker (1)")
+    await user.should_see("3 threats: 2 accepted, 1 flagged")
+    await user.should_see("Keep or delete each threat.")
+    await user.should_see("weak support")
+    await user.should_see("From 1 passage the writer wrote 3 threats.")
+    await user.should_see("All passed the quote check.")
     found = sorted(user.find(kind=ui.label).elements, key=lambda e: e.id)
     texts = [e.text for e in found]
     first = texts.index("Users may phish other users.")
@@ -168,33 +173,33 @@ async def test_groups_and_rows_show_in_order(user):
     third = texts.index("A threat with a quote that is gone.")
     assert texts[third - 1] == "3"
     assert first < second < third
-    await user.should_see("Choose a row to see its evidence.")
+    await user.should_see("Pick a threat to see its evidence.")
 
 
 async def test_click_on_a_row_shows_the_marked_quote(user):
     run_id = _store()
     await user.open(_url(run_id))
-    await user.should_see("3 rows")
+    await user.should_see("3 threats: 2 accepted, 1 flagged")
     user.find(marker="row-T1").click()
     await user.should_see("Evidence")
     await user.should_see("configure_integrations.md")
     await user.should_see("Integrations > Webhooks")
     await user.should_see('"Webhooks can be configured"')
+    await user.should_see("Requirement for this threat")
     await user.should_see("Requirement of T1.")
+    await user.should_see("In your story")
     assert any("phishing" in piece for piece in _marked(user))
-    await user.should_not_see("The quote was not found in the stored passage.")
+    await user.should_not_see(NOT_FOUND)
 
 
 async def test_missing_quote_shows_the_line_about_it(user):
     run_id = _store()
     await user.open(_url(run_id, "?row=T2"))
-    await user.should_see(
-        "The quote was not found in the stored passage. "
-        "Compare it with the page yourself."
-    )
-    await user.should_see("Weak signs")
+    await user.should_see(NOT_FOUND)
+    await user.should_see("Why the support is weak")
     await user.should_see("the quote is a fragment of 5 words or fewer")
-    await user.should_see("names a fault")
+    await user.should_see("Checker")
+    await user.should_see("flagged")
     assert _marked(user) == []
 
 
@@ -209,19 +214,17 @@ async def test_row_parameter_opens_the_row(user):
 async def test_keep_stores_the_verdict_and_a_second_click_clears_it(user):
     run_id = _store()
     await user.open(_url(run_id))
-    await user.should_see("3 rows")
+    await user.should_see("3 threats: 2 accepted, 1 flagged")
     user.find(marker="row-keep-T1").click()
-    await user.should_see("1 kept")
-    await user.should_see("2 open")
+    await user.should_see("You kept 1 and deleted 0. 2 left.")
     data = json.loads(_verdict_file(run_id).read_text(encoding="utf-8"))
     assert data["rows"]["T1"]["verdict"] == "keep"
     user.find(marker="row-keep-T1").click()
-    await user.should_see("0 kept")
-    await user.should_see("3 open")
+    await user.should_see("Keep or delete each threat.")
     data = json.loads(_verdict_file(run_id).read_text(encoding="utf-8"))
     assert "T1" not in data["rows"]
     user.find(marker="row-delete-T2").click()
-    await user.should_see("1 deleted")
+    await user.should_see("You kept 0 and deleted 1. 2 left.")
     data = json.loads(_verdict_file(run_id).read_text(encoding="utf-8"))
     assert data["rows"]["T2"]["verdict"] == "delete"
 
@@ -231,7 +234,7 @@ async def test_panel_button_uses_the_same_state(user):
     await user.open(_url(run_id, "?row=T1"))
     await user.should_see("Evidence")
     user.find(marker="panel-keep-T1").click()
-    await user.should_see("1 kept")
+    await user.should_see("You kept 1 and deleted 0. 2 left.")
     data = json.loads(_verdict_file(run_id).read_text(encoding="utf-8"))
     assert data["rows"]["T1"]["verdict"] == "keep"
 
@@ -240,26 +243,26 @@ async def test_next_row_moves_the_panel(user):
     run_id = _store()
     await user.open(_url(run_id, "?row=T1"))
     await user.should_see("Evidence")
-    user.find("Next row").click()
+    user.find("Next threat").click()
     await user.should_see(IMG)
 
 
 async def test_export_with_no_kept_row_gives_the_notification(user):
     run_id = _store()
     await user.open(_url(run_id))
-    await user.should_see("3 rows")
-    user.find("Export kept rows").click()
+    await user.should_see("3 threats: 2 accepted, 1 flagged")
+    user.find("Export kept threats").click()
     user.find(marker="export-markdown").click()
-    await user.should_see("Mark a row as kept first.")
+    await user.should_see("Keep at least one threat before you export.")
 
 
 async def test_export_after_keep_downloads_the_row(user):
     run_id = _store()
     await user.open(_url(run_id))
-    await user.should_see("3 rows")
+    await user.should_see("3 threats: 2 accepted, 1 flagged")
     user.find(marker="row-keep-T1").click()
-    await user.should_see("1 kept")
-    user.find("Export kept rows").click()
+    await user.should_see("You kept 1 and deleted 0. 2 left.")
+    user.find("Export kept threats").click()
     user.find(marker="export-json").click()
     response = await user.download.next()
     assert "Users may phish other users." in response.text
@@ -286,7 +289,7 @@ async def test_story_navigation_follows_the_manifest(user):
 async def test_not_the_tested_setup_label(user):
     run_id = _store(_model(prompt_set="user:mine", tested_prompts=False))
     await user.open(_url(run_id))
-    await user.should_see("Not the tested setup")
+    await user.should_see("untested prompts")
 
 
 async def test_failed_calls_show_the_warning(user):
@@ -295,7 +298,9 @@ async def test_failed_calls_show_the_warning(user):
     )
     run_id = _store(model)
     await user.open(_url(run_id))
-    await user.should_see("WARNING: 1 of 1 model calls gave no valid answer.")
+    await user.should_see(
+        "1 of 1 calls to the writer failed. This list is not complete."
+    )
 
 
 async def test_unknown_story_shows_the_empty_state(user):
@@ -308,4 +313,27 @@ async def test_unknown_story_shows_the_empty_state(user):
 async def test_unknown_run_shows_the_empty_state(user):
     await user.open(f"/runs/20200101-000000-threats/stories/{STORY}")
     await user.should_see("This run does not exist.")
-    await user.should_see("Open the history")
+    await user.should_see("Open History")
+
+
+async def test_no_threats_shows_the_plain_line(user):
+    run_id = _store(_model(rows=[]))
+    await user.open(_url(run_id))
+    await user.should_see(
+        "No threats found for this story. Replay the steps to see why."
+    )
+
+
+async def test_no_checker_counts_weak_support(user):
+    run_id = _store(_model(checker=None))
+    await user.open(_url(run_id))
+    await user.should_see("3 threats: 1 with weak support")
+    await user.should_see("Weak support (1)")
+    await user.should_see("Threats (2)")
+
+
+async def test_old_words_are_gone(user):
+    run_id = _store()
+    await user.open(_url(run_id, "?row=T2"))
+    for old in ("Second model", "with a fault", "tool code", "Weak signs"):
+        await user.should_not_see(old)

@@ -12,21 +12,16 @@ from secreqgen.application.steps import requirements_trace, threat_trace
 from secreqgen_gui import pipeline_boards as boards
 from secreqgen_gui import storage
 from secreqgen_gui.pages.history import format_date
-from secreqgen_gui.pages.home import section
 from secreqgen_gui.settings import load_settings
 from secreqgen_gui.step_widget import StepDiagram
 from secreqgen_gui.widgets import page_title
 
 KINDS = (("threats", "Threat list"), ("requirements", "Requirements"))
 PLAY_SECONDS = 2.8
-PURPOSE = "The parts of the tool and the steps of one story."
-NO_RUN = "No finished run yet. The diagram shows the steps with no numbers."
+NO_RUN = "No finished run yet. Start one to see real numbers."
 NO_RESULT = "This story has no stored result."
 CSS = ".sr-link { color: #1D3A6B; }"
-KEYS_HINT = (
-    "Arrow right: next step. Arrow left: previous step. Space: play or pause. "
-    "Esc: leave the full screen."
-)
+KEYS_HINT = "Arrow keys: next and previous step. Space: play or pause. Esc: exit."
 
 
 def _pick_threat_story(run_id: str, manifest: dict) -> str | None:
@@ -127,7 +122,7 @@ def _load(kind: str, run_id: str | None, story_id: str | None) -> dict:
 
 
 def _notes(kind: str, data: dict) -> tuple[dict[str, str], str]:
-    """Return the lane notes and the address of the model server."""
+    """Return the lane notes and the address of Ollama."""
     settings = data["settings"]
     manifest = data.get("manifest") if data["status"] == "story" else None
     if manifest is None:
@@ -184,12 +179,12 @@ def _source_line(kind: str, data: dict) -> None:
         if data["status"] == "story":
             manifest = data["manifest"]
             text = (
-                f"Replay of story {data['story_id']} from the run of "
+                f"Replay of {data['story_id']} from the run of "
                 f"{format_date({**manifest, 'id': data['run_id']})}."
             )
             seconds = _seconds_text(data["trace"])
             if seconds:
-                text += f" The real run of this story took {seconds}."
+                text += f" The real run took {seconds}."
             ui.label(text).classes("sr-small")
             if kind == "threats":
                 target = (
@@ -205,55 +200,11 @@ def _source_line(kind: str, data: dict) -> None:
         else:
             ui.label(NO_RUN).classes("sr-small")
         if kind == "threats":
-            ui.link("Start a threat list", "/threats/new").classes("sr-link text-sm")
+            ui.link("New threat list", "/threats/new").classes("sr-link text-sm")
         else:
-            ui.link("Start requirements", "/requirements/new").classes(
+            ui.link("New requirements", "/requirements/new").classes(
                 "sr-link text-sm"
             )
-
-
-def _parts(kind: str, address: str) -> None:
-    with section("The parts"):
-        if kind == "threats":
-            lines = [
-                (
-                    "You",
-                    "you give the story and the documentation. "
-                    "You decide about each row.",
-                ),
-                (
-                    "Tool code",
-                    "fixed rules, no AI. It searches the documentation, "
-                    "checks each quote and builds the page.",
-                ),
-                (
-                    "Models",
-                    "language models. They answer through the model "
-                    f"server at {address}.",
-                ),
-            ]
-        else:
-            lines = [
-                (
-                    "You",
-                    "you give the story and the documentation. "
-                    "You read the requirements.",
-                ),
-                (
-                    "Tool code",
-                    "fixed rules, no AI. It searches the documentation and "
-                    "puts the answer of the model into the fixed form.",
-                ),
-                (
-                    "Model",
-                    "a language model. It answers through the model "
-                    f"server at {address}.",
-                ),
-            ]
-        for name, rest in lines:
-            with ui.row().classes("w-full gap-0 no-wrap items-baseline"):
-                ui.label(f"{name}:").classes("font-semibold mr-1 shrink-0")
-                ui.label(rest)
 
 
 async def page(
@@ -267,7 +218,7 @@ async def page(
     if kind not in dict(KINDS):
         kind = "threats"
     data = await nice_run.io_bound(_load, kind, run, story)
-    notes, address = _notes(kind, data)
+    notes, _address = _notes(kind, data)
     has_story = data["status"] == "story"
     if has_story:
         trace = data["trace"]
@@ -293,19 +244,18 @@ async def page(
     state = {"index": _frame_number(frame, total), "playing": False}
 
     with ui.column().classes("w-full gap-0"):
-        page_title("How it works", PURPOSE)
+        page_title("How it works")
         _kind_links(kind)
         _source_line(kind, data)
         # The buttons stand above the diagram. So they stay in their place
         # when the text below the diagram gets longer or shorter.
         with ui.row().classes("w-full items-center gap-3 mt-4"):
-            previous = ui.button("Previous step").props("outline no-caps")
+            previous = ui.button("Previous").props("outline no-caps")
             play_button = ui.button("Play").props("unelevated no-caps")
-            following = ui.button("Next step").props("outline no-caps")
+            following = ui.button("Next").props("outline no-caps")
             counter = ui.label().classes("sr-small ml-2")
         with ui.column().classes("w-full gap-0 mt-2"):
-            diagram = StepDiagram(hint=KEYS_HINT)
-        _parts(kind, address)
+            diagram = StepDiagram(hint=KEYS_HINT, details=True)
 
     def draw(position: int, moving: bool) -> None:
         came_from = frames[position - 1][0] if position > 0 else None

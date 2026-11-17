@@ -1,6 +1,6 @@
 """The progress of a run and, after it, its stories.
 
-A run in work comes from the job manager. A run that ended long ago comes
+A run in progress comes from the job manager. A run that ended long ago comes
 from its manifest on disk. The page polls the manager and redraws only when
 the version number changed.
 """
@@ -24,11 +24,12 @@ from secreqgen_gui.widgets import empty_state, page_title, tag
 POLL_SECONDS = 0.5
 ACTIVE = ("checking", "running")
 TAG_KIND = {"done": "keep", "failed": "delete"}
-FAILED_HINT = "Check the model server on the start page, then start the run again."
+OLLAMA_HINT = "Check Ollama on the Home page, then start a new run."
+OTHER_HINT = "Fix the problem, then start a new run."
 ID_WIDTH = "width:112px;flex:none"
 READABLE = "max-width:960px"
-CHECKING_LINE = "The run checks the model server."
-READING_LINE = "The run reads the documentation."
+CHECKING_LINE = "Checking Ollama."
+READING_LINE = "Reading the documentation."
 
 
 @dataclass
@@ -108,13 +109,12 @@ def _summary(kind: str, entry: dict, checked: bool) -> str:
         count = int(entry.get("requirements") or 0)
         return f"{count} requirement" + ("" if count == 1 else "s")
     rows = int(entry.get("rows") or 0)
-    parts = [f"{rows} row" + ("" if rows == 1 else "s")]
+    parts = [f"{rows} threat" + ("" if rows == 1 else "s")]
     if checked:
         parts.append(f"{int(entry.get('accepted') or 0)} accepted")
-        # "dropped" counts the rows that the tool code removed. It is not
-        # the count of rows with a fault.
+        # "faults" counts the threats that the checker flagged.
         if entry.get("faults"):
-            parts.append(f"{int(entry['faults'])} with a fault")
+            parts.append(f"{int(entry['faults'])} flagged")
     return ", ".join(parts)
 
 
@@ -160,7 +160,7 @@ def _from_manifest(run_id: str, manifest: dict) -> View:
     if isinstance(error, dict):
         message = str(error.get("message") or "")
     if status in ("interrupted", "running"):
-        message = "The program ended while the run was in work."
+        message = "The GUI closed before this run finished."
     view = View(
         id=run_id,
         kind=str(manifest.get("kind") or "threats"),
@@ -222,7 +222,7 @@ def _state_words(view: View) -> str:
     total = len(view.stories)
     finished = sum(1 for s in view.stories if s.state in ("done", "failed"))
     if view.state == "checking":
-        return "Checking the model server"
+        return "Starting"
     if view.state == "running":
         return f"Running: story {_position(view)} of {total}"
     if view.state == "done":
@@ -232,9 +232,11 @@ def _state_words(view: View) -> str:
     return f"Failed: {view.message}" if view.message else "Failed"
 
 
-def _needs_hint(view: View) -> bool:
-    low = view.message.lower()
-    return not any(w in low for w in ("check ", "start ollama", "ollama pull"))
+def _hint(view: View) -> str:
+    """Return the line that tells the person what to do after a failure."""
+    if "ollama" in view.message.lower():
+        return OLLAMA_HINT
+    return OTHER_HINT
 
 
 def _next_story_id(view: View) -> str:
@@ -258,12 +260,12 @@ def _head(view: View) -> None:
     if view.product:
         ui.label(f"Product: {view.product}").classes("sr-purpose")
     if view.kind == "threats" and view.writer:
-        second = f"{view.checker} checks" if view.checker else "no second model"
+        second = f"{view.checker} checks" if view.checker else "no checker"
         ui.label(f"{view.writer} writes, {second}").classes("sr-purpose")
     elif view.kind == "requirements" and view.model:
         ui.label(f"Model: {view.model}").classes("sr-purpose")
     if not view.tested and view.prompt_name:
-        ui.label(f"Not the tested setup: prompt set {view.prompt_name}").style(
+        ui.label(f"Untested prompts: {view.prompt_name}").style(
             "color:var(--sr-caution)"
         )
 
@@ -382,9 +384,11 @@ def _story_row(view: View, story) -> None:
             with ui.element("div").style("width:40px;flex:none"):
                 if view.kind == "threats" and story.state == "done":
                     target = f"/runs/{view.id}/stories/{quote(story.id, safe='')}"
-                    ui.link("Read", target).style("color:var(--sr-blue)")
+                    ui.link("Read", target).classes("sr-small").style(
+                        "color:var(--sr-blue)"
+                    )
             if story.state == "done":
-                ui.link("Steps", _replay_address(view, story.id)).classes(
+                ui.link("Replay", _replay_address(view, story.id)).classes(
                     "sr-small"
                 ).style("width:40px;flex:none;color:var(--sr-blue)")
         if story.state == "failed" and story.error:
@@ -416,8 +420,8 @@ def page(run_id: str) -> None:
             else:
                 ui.label(_state_words(view)).classes("sr-section-title")
             holder["elapsed"] = ui.label(_elapsed(view)).classes("sr-small")
-        if view.state == "failed" and _needs_hint(view):
-            ui.label(FAILED_HINT).classes("sr-small")
+        if view.state == "failed":
+            ui.label(_hint(view)).classes("sr-small")
         total = len(view.stories)
         finished = sum(1 for s in view.stories if s.state in ("done", "failed"))
         ui.linear_progress(
@@ -430,9 +434,9 @@ def page(run_id: str) -> None:
         if view.live:
             if holder["stop_clicked"] or view.stop_requested:
                 ui.label(
-                    f"The run stops when story {_next_story_id(view)} ends."
+                    f"Stopping after story {_next_story_id(view)}."
                     if _next_story_id(view)
-                    else "The run stops after the check."
+                    else "Stopping before the first story."
                 )
             else:
                 ui.button("Stop after this story", on_click=stop).props(
@@ -445,7 +449,8 @@ def page(run_id: str) -> None:
                 on_click=lambda: ui.navigate.to(f"/runs/{view.id}/requirements"),
             ).props("unelevated no-caps color=primary")
         target = "/threats/new" if view.kind == "threats" else "/requirements/new"
-        ui.link("Start a new run", target).style("color:var(--sr-blue)")
+        words = "New threat list" if view.kind == "threats" else "New requirements"
+        ui.link(words, target).style("color:var(--sr-blue)")
 
     @ui.refreshable
     def stories_view() -> None:
@@ -481,7 +486,7 @@ def page(run_id: str) -> None:
             with holder["line_row"]:
                 _plain(line, "sr-small")
                 if link:
-                    ui.link("Replay the steps", link).classes("sr-small").style(
+                    ui.link("Replay", link).classes("sr-small").style(
                         "color:var(--sr-blue)"
                     )
 
@@ -510,7 +515,7 @@ def page(run_id: str) -> None:
             else:
                 timer.deactivate()
                 holder["stored"] = await run.io_bound(_stored_story, new)
-                show_steps(new)  # the "run ended" form, one time
+                show_steps(new)  # the "run ended" form, once
             return
         label = holder["elapsed"]
         if label is not None and not label.is_deleted:
@@ -525,7 +530,7 @@ def page(run_id: str) -> None:
         with body:
             if view is None:
                 empty_state(
-                    "This run does not exist.", "Open the history", "/history"
+                    "This run does not exist.", "Open History", "/history"
                 )
                 return
             holder["view"] = view

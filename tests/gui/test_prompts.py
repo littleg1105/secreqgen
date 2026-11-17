@@ -27,10 +27,10 @@ async def test_list_shows_tested_sets_with_files_and_hashes(user):
     from secreqgen.application.prompt_sets import tested_prompt_sets
 
     await user.open("/prompts")
-    await user.should_see("Prompt sets")
+    await user.should_see("Prompts")
     await user.should_see("Threat list")
     await user.should_see("Requirements")
-    await user.should_see("Tested setup")
+    await user.should_see("Tested prompts")
     await user.should_see("tested")
     for info in tested_prompt_sets():
         for file in info.files:
@@ -41,13 +41,13 @@ async def test_list_shows_tested_sets_with_files_and_hashes(user):
 async def test_copy_to_edit_makes_folder_and_opens_set(user):
     await user.open("/prompts")
     user.find(marker="copy-threats").click()
-    await user.should_see("Name of your prompt set")
-    await user.should_see("Small letters, digits, hyphen and underscore.")
+    await user.should_see("Name of the new set")
+    await user.should_see("Use lowercase letters, digits, hyphens and underscores.")
     user.find(marker="copy-name").type("my_set")
     user.find(marker="copy-go").click()
-    await user.should_see("Save file")
+    await user.should_see("Save")
     assert (_root() / "threats" / "my_set" / "user_prompt.txt").is_file()
-    await user.should_see("A run with this prompt set gets the label")
+    await user.should_see("A run with these prompts gets the tag: untested prompts.")
 
 
 @pytest.mark.parametrize("bad", ["my set", "../x"])
@@ -62,16 +62,16 @@ async def test_copy_with_bad_name_shows_error(user, bad):
 
 async def test_tested_page_is_read_only(user):
     await user.open("/prompts/threats/tested")
-    await user.should_see("Read only. This is the setup that the tests of")
+    await user.should_see("Locked. The thesis tests used these prompts.")
     await user.should_see("Placeholders: $accep")
-    await user.should_not_see("Save file")
+    await user.should_not_see("Save")
 
 
 async def test_unknown_set_invites(user):
     await user.open("/prompts/threats/nothing")
     await user.should_see("This prompt set does not exist.")
     await user.open("/prompts/bogus/tested")
-    await user.should_see("Open the prompt sets")
+    await user.should_see("Open Prompts")
 
 
 async def test_save_with_removed_placeholder_is_refused(user):
@@ -93,18 +93,18 @@ async def test_good_save_changes_file(user):
     editor = user.find(marker="editor-system_prompt.txt").elements.pop()
     editor.set_value("A new system text.")
     user.find(marker="save-system_prompt.txt").click()
-    await user.should_see("File saved")
+    await user.should_see("Saved.")
     assert path.read_text(encoding="utf-8") == "A new system text."
 
 
 async def test_delete_removes_folder(user):
     folder = _make()
     await user.open("/prompts")
-    await user.should_see("not tested")
+    await user.should_see("untested")
     user.find(marker="delete-threats-my_set").click()
     await user.should_see("Delete the prompt set my_set?")
-    user.find("Delete prompt set").click()
-    await user.should_see("Prompt set deleted")
+    user.find(kind=ui.button, content="Delete").click()
+    await user.should_see("Prompt set deleted.")
     assert not folder.exists()
 
 
@@ -112,7 +112,7 @@ async def test_delete_from_set_page(user):
     folder = _make("requirements", "r1")
     await user.open("/prompts/requirements/r1")
     user.find(marker="delete-set").click()
-    user.find("Delete prompt set").click()
-    await user.should_see("Prompt sets")
+    user.find(kind=ui.button, content="Delete").click()
+    await user.should_see("Prompts")
     assert not folder.exists()
     assert ui is not None

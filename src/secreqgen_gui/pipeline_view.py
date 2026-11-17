@@ -87,39 +87,39 @@ THREAT_FLOW = Flow(
     kind="threats",
     lanes=(
         ("You", "reader"),
-        ("Tool code", "code"),
-        ("Writer model", "writer"),
-        ("Second model", "checker"),
+        ("SecReqGen", "code"),
+        ("Writer", "writer"),
+        ("Checker", "checker"),
     ),
     steps=(
         Step("story", 0, 0, ("Story and", "documentation"), "your input"),
         Step("search", 1, 1, ("Search the", "documentation"), "the search"),
-        Step("write", 2, 2, ("Write rows", "with quotes"), "the writer model"),
-        Step("check", 1, 3, ("Check each", "quote"), "the checks of the tool code"),
-        Step("labels", 2, 4, ("Name actor", "and STRIDE"), "the labels"),
-        Step("second_model", 3, 5, ("Accept or", "name a fault"), "the second model"),
-        Step("weak_signs", 1, 6, ("Mark weak", "signs"), "the weak signs"),
+        Step("write", 2, 2, ("Write threats", "with quotes"), "the writer"),
+        Step("check", 1, 3, ("Check the", "quotes"), "the quote check"),
+        Step("labels", 2, 4, ("Add actor", "and STRIDE"), "the labels"),
+        Step("second_model", 3, 5, ("Accept", "or flag"), "the checker"),
+        Step("weak_signs", 1, 6, ("Mark weak", "support"), "the weak support check"),
         Step("read", 0, 7, ("Read, keep", "or delete"), "your review"),
     ),
     loop=("write", "check"),
-    loop_note=("One time for each", "group of passages"),
+    loop_note=("Repeats for each", "group of passages"),
 )
 
 REQUIREMENTS_FLOW = Flow(
     kind="requirements",
-    lanes=(("You", "reader"), ("Tool code", "code"), ("Model", "writer")),
+    lanes=(("You", "reader"), ("SecReqGen", "code"), ("Model", "writer")),
     steps=(
         Step("story", 0, 0, ("Story and", "documentation"), "your input"),
         Step("search", 1, 1, ("Search the", "documentation"), "the search"),
         Step("write", 2, 2, ("Write the", "requirements"), "the model"),
-        Step("parse", 1, 3, ("Put into the", "fixed form"), "the fixed form"),
+        Step("parse", 1, 3, ("Parse the", "answer"), "the parser"),
         Step("read", 0, 4, ("Read the", "requirements"), "your review"),
     ),
 )
 
 FLOWS = {"threats": THREAT_FLOW, "requirements": REQUIREMENTS_FLOW}
 
-LANE_NOTES = {"reader": "the reader", "code": "fixed rules, no AI"}
+LANE_NOTES = {"code": "plain code, no AI"}
 
 
 @dataclass(frozen=True)
@@ -142,6 +142,7 @@ class Board:
     title: str = ""  # the step in words
     text: str = ""  # plain sentences about the step
     facts: str = ""  # one sentence with the numbers of this story
+    details: str = ""  # more about the step, for a person who asks
     lane_notes: Mapping[str, str] = field(default_factory=dict)
 
     def key(self) -> tuple:
@@ -345,11 +346,7 @@ def _server_note(flow: Flow, notes: Mapping[str, str]) -> list[str]:
     if not server:
         return []
     models = sum(1 for _name, key in flow.lanes if key in ("writer", "checker"))
-    first = (
-        "The models run on the model server"
-        if models > 1
-        else "The model runs on the model server"
-    )
+    first = "The models run in Ollama" if models > 1 else "The model runs in Ollama"
     x = flow.width - 12
     bottom = PAD + len(flow.lanes) * LANE_H
     return [
@@ -460,11 +457,11 @@ def _used(line: Connector, flow: Flow, board: Board) -> bool:
 def describe(board: Board) -> str:
     """Return one sentence that says what the picture shows."""
     flow = FLOWS[board.kind]
-    what = "threat list" if board.kind == "threats" else "requirements"
+    what = "a threat list" if board.kind == "threats" else "requirements"
     if board.active is None:
-        return f"The steps of the {what} of one story."
+        return f"The steps of {what} for one story."
     name = flow.step(board.active).name
-    return f"The steps of the {what} of one story. In work: {name}."
+    return f"The steps of {what} for one story. Now: {name}."
 
 
 def render_svg(

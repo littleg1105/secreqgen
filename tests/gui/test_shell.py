@@ -21,13 +21,13 @@ RUN = "20261117-214500-threats"
 
 ROUTES = [
     ("/", "Home"),
-    ("/threats/new", "Start a threat list"),
-    ("/requirements/new", "Start requirements"),
+    ("/threats/new", "New threat list"),
+    ("/requirements/new", "New requirements"),
     (f"/runs/{RUN}", "This run does not exist"),
     (f"/runs/{RUN}/stories/MM-US-007", "Threat list"),
     (f"/runs/{RUN}/requirements", "Requirements"),
-    ("/history", "All runs in the data folder."),
-    ("/prompts", "Prompt sets"),
+    ("/history", "No runs yet."),
+    ("/prompts", "The instructions for the models."),
     ("/prompts/threats/my-set", "This prompt set does not exist"),
     ("/settings", "Settings"),
 ]
@@ -116,9 +116,9 @@ def test_start_file_starts_a_run(tmp_path, monkeypatch):
     assert app.start_run_from_file(tmp_path / "missing.json") is None
 
 
-async def test_rail_shows_the_model_server_state(user):
+async def test_rail_shows_the_ollama_state(user):
     await user.open("/")
-    await user.should_see("Model server answers")
+    await user.should_see("Ollama is running")
 
 
 async def test_the_health_address_answers_without_a_page(user) -> None:

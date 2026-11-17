@@ -96,22 +96,22 @@ async def _ready(user, tmp_path, count=2, files=2, route="/threats/new"):
 
 async def test_story_file_by_path_shows_count_and_stories(user, tmp_path):
     await _ready(user, tmp_path)
-    await user.should_see("Start a threat list")
-    await user.should_see("2 stories in the file.")
+    await user.should_see("New threat list")
+    await user.should_see("2 stories found.")
     await user.should_see("US-001")
     await user.should_see("Title 2")
-    await user.should_see("2 Markdown files in the folder.")
-    await user.should_see("2 stories, about 2 minutes.")
+    await user.should_see("2 Markdown files found.")
+    await user.should_see("2 stories, about 2 minutes")
 
 
 async def test_select_none_and_all(user, tmp_path, recorder):
     await _ready(user, tmp_path)
-    await user.should_see("2 stories in the file.")
-    user.find("Select none").click()
-    await user.should_see("0 stories, about 0 minutes.")
+    await user.should_see("2 stories found.")
+    user.find("Pick none").click()
+    await user.should_see("0 stories, about 0 minutes")
     assert not _button(user, "Start threat list").enabled
-    user.find("Select all").click()
-    await user.should_see("2 stories, about 2 minutes.")
+    user.find("Pick all").click()
+    await user.should_see("2 stories, about 2 minutes")
     assert _button(user, "Start threat list").enabled
 
 
@@ -134,38 +134,37 @@ async def test_folder_without_markdown_shows_its_line(user, tmp_path):
     folder = tmp_path / "empty"
     folder.mkdir()
     await user.open(_url("/threats/new", _stories(tmp_path), folder))
-    await user.should_see("The folder holds no Markdown file.")
+    await user.should_see("This folder has no Markdown files.")
     assert not _button(user, "Start threat list").enabled
 
 
 async def test_missing_folder_shows_its_line(user, tmp_path):
     await user.open(_url("/threats/new", _stories(tmp_path), tmp_path / "none"))
     await user.should_see(
-        "Folder not found. Choose the folder that holds the Markdown files "
-        "of the product."
+        "Folder not found. Check the path or click Browse."
     )
 
 
 async def test_product_name_comes_from_the_story_file(user, tmp_path):
     await _ready(user, tmp_path)
-    await user.should_see("2 stories in the file.")
+    await user.should_see("2 stories found.")
     inputs = {e.props.get("label"): e for e in user.find(kind=ui.input).elements}
     assert inputs["Product name"].value == "Demo"
 
 
 async def _about(user, count):
-    area = user.find(kind=ui.textarea, content="Paragraph about the product (optional)")
+    area = user.find(kind=ui.textarea, content="About the product (optional)")
     area.type(" ".join(["word"] * count))
 
 
 async def test_121_words_block_the_start_and_120_do_not(user, tmp_path):
     await _ready(user, tmp_path)
-    await user.should_see("2 stories in the file.")
-    await user.should_see("2 Markdown files in the folder.")
+    await user.should_see("2 stories found.")
+    await user.should_see("2 Markdown files found.")
     await _about(user, 121)
     await user.should_see("121 of 120 words")
     assert not _button(user, "Start threat list").enabled
-    area = user.find(kind=ui.textarea, content="Paragraph about the product (optional)")
+    area = user.find(kind=ui.textarea, content="About the product (optional)")
     area.clear()
     await _about(user, 120)
     await user.should_see("120 of 120 words")
@@ -174,30 +173,30 @@ async def test_121_words_block_the_start_and_120_do_not(user, tmp_path):
 
 async def test_same_model_two_times_shows_line_and_blocks_start(user, tmp_path):
     await _ready(user, tmp_path)
-    await user.should_see("2 Markdown files in the folder.")
+    await user.should_see("2 Markdown files found.")
     assert _button(user, "Start threat list").enabled
-    second = user.find(kind=ui.input, content="Second model")
+    second = user.find(kind=ui.input, content="Checker")
     second.clear()
     second.type("gemma4:26b")
-    await user.should_see("The second model must be a different model.")
+    await user.should_see("The checker must be a different model from the writer.")
     assert not _button(user, "Start threat list").enabled
 
 
 async def test_second_model_off_when_the_switch_is_off(user, tmp_path, recorder):
     await _ready(user, tmp_path)
-    await user.should_see("2 Markdown files in the folder.")
-    user.find("A second model checks each row").click()
+    await user.should_see("2 Markdown files found.")
+    user.find("Use a checker").click()
     await asyncio.sleep(0.1)
     elements = {e.props.get("label"): e for e in user.find(kind=ui.input).elements}
-    assert not elements["Second model"].enabled
+    assert not elements["Checker"].enabled
 
 
 async def test_click_starts_a_threat_run_with_the_right_spec(
     user, tmp_path, recorder
 ):
     stories, docs = await _ready(user, tmp_path)
-    await user.should_see("2 Markdown files in the folder.")
-    await user.should_see("2 stories in the file.")
+    await user.should_see("2 Markdown files found.")
+    await user.should_see("2 stories found.")
     user.find("Start threat list").click()
     await asyncio.sleep(0.3)
     assert user.back_history[-1] == "/runs/20261117-100000-threats"
@@ -217,11 +216,11 @@ async def test_click_starts_a_threat_run_with_the_right_spec(
 
 async def test_chosen_stories_go_into_the_spec(user, tmp_path, recorder):
     await _ready(user, tmp_path)
-    await user.should_see("2 stories in the file.")
+    await user.should_see("2 stories found.")
     boxes = user.find(kind=ui.checkbox).elements
     first = next(b for b in boxes if "US-002" in b.text)
     first.set_value(False)
-    await user.should_see("1 story, about 1 minute.")
+    await user.should_see("1 story, about 1 minute")
     user.find("Start threat list").click()
     await asyncio.sleep(0.3)
     assert recorder.threats[0].story_ids == ("US-001",)
@@ -232,7 +231,7 @@ async def test_busy_manager_turns_the_start_off(user, tmp_path, monkeypatch):
 
     monkeypatch.setattr(jobs, "manager", Recorder(busy=True))
     await _ready(user, tmp_path)
-    await user.should_see("A run is in work.")
+    await user.should_see("Another run is in progress. Wait for it to end, or stop it.")
     await user.should_see("Open the run")
     assert not _button(user, "Start threat list").enabled
 
@@ -243,19 +242,20 @@ async def test_user_prompt_set_shows_the_caution_line(user, tmp_path):
     folder = storage.prompt_sets_dir() / "threats" / "mine"
     folder.mkdir(parents=True)
     await _ready(user, tmp_path)
-    await user.should_not_see("Not the tested setup")
+    untested = "A run with these prompts gets the tag: untested prompts."
+    await user.should_not_see(untested)
     select = user.find(kind=ui.select)
     select.click()
     user.find("mine").click()
-    await user.should_see("Not the tested setup")
+    await user.should_see("A run with these prompts gets the tag: untested prompts.")
 
 
 async def test_type_one_story_writes_a_file_and_reads_it(user, tmp_path):
     await user.open("/threats/new")
-    user.find("Type one story").click()
+    user.find("Type a story").click()
     user.find(marker="story_text").type("As a user, I want to sign in.")
     user.find("Use this story").click()
-    await user.should_see("1 story in the file.")
+    await user.should_see("1 story found.")
     await user.should_see("US-001")
 
 
@@ -267,7 +267,7 @@ async def test_upload_of_a_wrong_file_type_is_refused(user, tmp_path):
     await up.handle_uploads(
         [SmallFileUpload(name="x.exe", content_type="a/b", _data=b"abc")]
     )
-    await user.should_see("The file must be a .json, .yaml or .yml file.")
+    await user.should_see("Use a .json, .yaml or .yml file.")
 
 
 async def test_upload_of_a_story_file_shows_its_stories(user, tmp_path):
@@ -279,15 +279,15 @@ async def test_upload_of_a_story_file_shows_its_stories(user, tmp_path):
     await up.handle_uploads(
         [SmallFileUpload(name="s.json", content_type="application/json", _data=data)]
     )
-    await user.should_see("3 stories in the file.")
+    await user.should_see("3 stories found.")
 
 
 async def test_requirements_form_starts_with_its_spec(user, tmp_path, recorder):
     stories, docs = await _ready(user, tmp_path, route="/requirements/new")
-    await user.should_see("Start requirements")
+    await user.should_see("New requirements")
     await user.should_see("Model")
     await user.should_see("System context file (optional)")
-    await user.should_see("2 Markdown files in the folder.")
+    await user.should_see("2 Markdown files found.")
     user.find("Start requirements").click()
     await asyncio.sleep(0.3)
     assert len(recorder.requirements) == 1
@@ -300,5 +300,28 @@ async def test_requirements_form_starts_with_its_spec(user, tmp_path, recorder):
 
 async def test_requirements_start_is_off_without_a_folder(user, tmp_path):
     await user.open(_url("/requirements/new", _stories(tmp_path)))
-    await user.should_see("2 stories in the file.")
+    await user.should_see("2 stories found.")
     assert not _button(user, "Start requirements").enabled
+
+
+async def test_forms_have_no_sentence_under_the_title_and_use_the_new_names(
+    user, tmp_path
+):
+    await _ready(user, tmp_path)
+    for seen in ("Options", "Writer", "Prompts", "Stories", "Documentation"):
+        await user.should_see(seen)
+    for gone in ("Setup", "Second model", "Writer model", "Prompt set"):
+        await user.should_not_see(gone)
+    props = {e.props.get("label"): e.props for e in user.find(kind=ui.input).elements}
+    assert props["Writer"]["hint"] == "The model that writes the threats."
+    assert props["Checker"]["hint"] == "The model that checks each threat."
+    assert props["Stories file"]["hint"].startswith("JSON or YAML")
+
+
+async def test_skipped_stories_line_uses_the_singular_form(user, tmp_path):
+    item = {"id": "US-1", "title": "T", "story": "As a user, I want x."}
+    path = tmp_path / "mixed.json"
+    path.write_text(json.dumps({"user_stories": [item, {"id": ["bad"]}]}))
+    await user.open(_url("/threats/new", path, _docs(tmp_path)))
+    await user.should_see("1 story found.")
+    await user.should_see("1 story could not be read and is skipped.")

@@ -86,7 +86,7 @@ def _is_active(label: str, prefixes: tuple[str, ...], path: str) -> bool:
 
 
 def _rail() -> None:
-    """Build the left rail: the name, six entries, the model server line."""
+    """Build the left rail: the name, seven entries, the Ollama line."""
     with ui.left_drawer(value=True, fixed=True, bordered=False).props(
         f"width={theme.RAIL_WIDTH} behavior=desktop"
     ).classes("p-0"):
@@ -114,10 +114,10 @@ def _rail() -> None:
 
 
 def _server_line() -> None:
-    """Build the model server line at the bottom of the rail."""
+    """Build the Ollama status line at the bottom of the rail."""
     with ui.row().classes("sr-rail-server w-full items-center no-wrap"):
         dot = ui.element("span").classes("sr-dot")
-        label = ui.label("Checking the model server")
+        label = ui.label("Checking Ollama")
 
     async def update() -> None:
         url = load_settings().base_url
@@ -125,10 +125,10 @@ def _server_line() -> None:
         dot.classes(remove="sr-dot-ok sr-dot-bad")
         if status.reachable:
             dot.classes(add="sr-dot-ok")
-            label.set_text("Model server answers")
+            label.set_text("Ollama is running")
         else:
             dot.classes(add="sr-dot-bad")
-            label.set_text("Model server does not answer")
+            label.set_text("Ollama is not running")
 
     ui.timer(SERVER_CHECK_SECONDS, update)
 

@@ -1,4 +1,4 @@
-"""The start page: model server state, two entries, the newest runs."""
+"""The start page: Ollama state, two entries, the recent runs."""
 
 from __future__ import annotations
 
@@ -14,27 +14,31 @@ from secreqgen_gui.settings import load_settings, make_config
 from secreqgen_gui.widgets import empty_state, page_title
 
 PURPOSE = (
-    "Security requirements and a draft threat list for each user story, "
-    "from the documentation of your product, with local models."
+    "Get a draft threat list or security requirements for your user stories. "
+    "The models run locally in Ollama."
 )
 NEWEST = 5
 KIND_WORDS = {"threats": "Threat list", "requirements": "Requirements"}
 STATE_WORDS = {
     "finished": "Done",
     "running": "Running",
-    "checking": "Checking the model server",
+    "checking": "Starting",
     "stopped": "Stopped",
-    "aborted": "Stopped by an error",
+    "aborted": "Failed",
     "failed": "Failed",
     "interrupted": "Interrupted",
-    "damaged": "Damaged",
+    "damaged": "Unreadable",
     "unknown": "Unknown",
+}
+STATE_HINTS = {
+    "interrupted": "The GUI closed during this run.",
+    "damaged": "The files of this run cannot be read. Delete it.",
 }
 
 
 @contextmanager
 def section(title: str, first: bool = False) -> Iterator[None]:
-    """Show a part of a page: a line, a section title and the content."""
+    """Show a part of a page: a line, a section title (if any) and the content."""
     classes = "w-full gap-3 pt-5 mt-6"
     if first:
         classes = "w-full gap-3 pt-0 mt-4"
@@ -42,7 +46,8 @@ def section(title: str, first: bool = False) -> Iterator[None]:
     if not first:
         box.style("border-top: 1px solid #D8DEE4")
     with box:
-        ui.label(title).classes("sr-section-title")
+        if title:
+            ui.label(title).classes("sr-section-title")
         yield
 
 
@@ -56,26 +61,21 @@ def model_names(*names: str) -> list[str]:
 
 
 def show_server_result(status, names: list[str], address: str) -> None:
-    """Show the lines for the answer of the model server check."""
+    """Show the lines for the answer of the Ollama check."""
     with ui.column().classes("gap-1"):
         if status.reachable:
-            count = len(status.models)
-            word = "model" if count == 1 else "models"
-            ui.label(
-                f"The model server answers at {address}. "
-                f"It holds {count} {word}. This tool uses:"
-            ).classes("sr-ok")
+            ui.label("Ollama is running.").classes("sr-ok")
             for name in names:
                 if model_available(status, name):
-                    ui.label(f"{name}: ready").classes("sr-ok")
+                    ui.label(f"{name} is ready.").classes("sr-ok")
                 else:
                     ui.label(
-                        f"{name} is missing. Run: ollama pull {name}"
+                        f"{name} is not installed. Run: ollama pull {name}"
                     ).classes("sr-caution")
         else:
             ui.label(
-                f"The model server does not answer at {address}. "
-                "Start Ollama, then choose Check again."
+                f"Ollama is not running at {address}. "
+                "Start Ollama, then check again."
             ).classes("sr-bad")
 
 
@@ -101,13 +101,14 @@ def state_text(run_data: dict) -> str:
     return STATE_WORDS.get(status, status.capitalize())
 
 
+def state_hint(run_data: dict) -> str:
+    """Return the hover text of a run state, or an empty text."""
+    return STATE_HINTS.get(str(run_data.get("status", "")), "")
+
+
 def _banner_text(state) -> str:
-    total = len(state.stories)
-    finished = sum(1 for s in state.stories if s.state in ("done", "failed"))
-    running = [i for i, s in enumerate(state.stories) if s.state == "running"]
-    number = running[0] + 1 if running else min(finished + 1, max(total, 1))
     kind = "threat list" if state.kind == "threats" else "requirements"
-    return f"A run is in work: {kind}, story {number} of {total}."
+    return f"A {kind} run is in progress."
 
 
 def _run_banner() -> None:
@@ -144,7 +145,7 @@ def _server_part() -> None:
     async def check() -> None:
         result.clear()
         with result:
-            ui.label("Checking the model server").classes("sr-small")
+            ui.label("Checking Ollama").classes("sr-small")
         status = await run.io_bound(check_model_server, make_config(settings))
         result.clear()
         with result:
@@ -166,7 +167,7 @@ def _entry(title: str, sentence: str, button: str, target: str) -> None:
 def _newest_runs() -> None:
     runs = storage.list_runs()[:NEWEST]
     if not runs:
-        empty_state("No runs yet.", "Start a threat list", "/threats/new")
+        empty_state("No runs yet.")
         return
     with ui.column().classes("w-full gap-0"):
         for item in runs:
@@ -178,7 +179,9 @@ def _newest_runs() -> None:
                 ui.label(_run_line(item)).classes("sr-run-kind")
                 ui.label(str(item.get("product") or "")).classes("sr-run-product")
                 ui.label(stories_text(item)).classes("sr-run-stories")
-                ui.label(state_text(item)).classes("sr-run-state")
+                label = ui.label(state_text(item)).classes("sr-run-state")
+                if state_hint(item):
+                    label.tooltip(state_hint(item))
     ui.link("All runs", "/history").classes("mt-1 sr-link")
 
 
@@ -188,25 +191,25 @@ def page() -> None:
     with ui.column().classes("w-full max-w-[900px] gap-0"):
         page_title("SecReqGen", PURPOSE)
         _run_banner()
-        with section("Model server", first=True):
+        with section("", first=True):
             _server_part()
-        with section("Start"):
+        with section(""):
             with ui.row().classes("w-full gap-10 no-wrap items-start"):
                 _entry(
                     "Threat list",
-                    "A draft list of threats for each story. Each row shows "
-                    "the sentence of the documentation that it comes from.",
-                    "Start a threat list",
+                    "Draft threats for each story. Each threat has a quote "
+                    "from your documentation.",
+                    "New threat list",
                     "/threats/new",
                 )
                 _entry(
                     "Requirements",
-                    "Security requirements for each story, from the "
+                    "Security requirements for each story, based on your "
                     "documentation.",
-                    "Start requirements",
+                    "New requirements",
                     "/requirements/new",
                 )
-        with section("Newest runs"):
+        with section("Recent runs"):
             _newest_runs()
 
 

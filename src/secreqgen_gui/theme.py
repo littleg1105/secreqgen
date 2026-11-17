@@ -170,6 +170,15 @@ body {{
 .sr-step-facts {{ font-weight: 600; margin-top: 2px; }}
 .sr-step-text {{ color: var(--sr-slate); max-width: 84ch; margin-top: 2px; }}
 .sr-steps-hint {{ display: none; }}
+.sr-step-more {{ margin-top: 4px; max-width: 84ch; }}
+.sr-step-more .q-item {{
+  padding: 0;
+  min-height: 0;
+  color: var(--sr-blue);
+  font-size: var(--sr-size-small);
+}}
+.sr-step-more .q-item__section--side {{ padding-left: 4px; min-width: 0; }}
+.sr-step-more .q-expansion-item__content {{ padding: 2px 0 0 0; }}
 """
 
 # The step diagram in the full screen of the browser, for a projector. Each
@@ -184,6 +193,7 @@ _FULL_SCREEN = """
 }}
 .sr-steps:{state} svg.srp {{ max-width: none !important; max-height: 62vh; }}
 .sr-steps:{state} .sr-steps-bar {{ display: none; }}
+.sr-steps:{state} .sr-step-more {{ display: none; }}
 .sr-steps:{state} .sr-step-title {{ font-size: 30px; margin-top: 28px; }}
 .sr-steps:{state} .sr-step-facts {{ font-size: 22px; margin-top: 6px; }}
 .sr-steps:{state} .sr-step-text {{

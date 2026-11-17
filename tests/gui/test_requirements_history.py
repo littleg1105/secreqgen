@@ -80,7 +80,7 @@ async def test_requirements_show_headers_fields_and_passages(user):
     await user.open(f"/runs/{RUN}/requirements")
     await user.should_see("Requirements")
     await user.should_see("3 requirements for 2 stories.")
-    await user.should_see("mattermost")
+    await user.should_see("Product: mattermost")
     await user.should_see("Model: gemma4:26b")
     await user.should_see("MM-US-007")
     found = user.find(kind=ui.expansion).elements
@@ -94,11 +94,11 @@ async def test_requirements_show_headers_fields_and_passages(user):
     await user.should_see("Posts carry a BOT tag.")
     await user.should_see("Sources")
     await user.should_see("Implementation notes")
-    await user.should_see("Documentation that the model read (1 passage)")
+    await user.should_see("Passages that the model read (1)")
     await user.should_see("Passage text here.")
     await user.should_see("Stories with no result")
     await user.should_see("Model broke.")
-    await user.should_not_see("Not the tested setup")
+    await user.should_not_see("untested prompts")
 
 
 async def test_script_text_is_shown_as_text(user):
@@ -115,10 +115,10 @@ async def test_script_text_is_shown_as_text(user):
 async def test_the_two_downloads_exist(user):
     _write_requirements()
     await user.open(f"/runs/{RUN}/requirements")
-    user.find("Download requirements.json").click()
+    user.find("Download JSON").click()
     first = await user.download.next()
     assert json.loads(first.text)["model"] == "gemma4:26b"
-    user.find("Download as Markdown").click()
+    user.find("Download Markdown").click()
     second = await user.download.next()
     assert "## MM-US-007 Bot setup" in second.text
     assert "### SR-001 Identify webhook posts 1" in second.text
@@ -129,7 +129,7 @@ async def test_the_two_downloads_exist(user):
 async def test_unknown_run_shows_the_empty_state(user):
     await user.open("/runs/20260101-000000-requirements/requirements")
     await user.should_see("This run does not exist.")
-    await user.should_see("Open the history")
+    await user.should_see("Open History")
 
 
 async def test_bad_run_id_shows_the_empty_state(user):
@@ -189,13 +189,13 @@ async def test_history_lists_runs_newest_first(user, athens_time):
     _write_requirements()
     await user.open("/history")
     await user.should_see("History")
-    await user.should_see("All runs in the data folder.")
+    await user.should_not_see("All runs in the data folder.")
     table = user.find(kind=ui.table).elements.pop()
     assert [r["id"] for r in table.rows] == [RUN, OLD]
     # The manifest holds UTC. The page shows the local time.
     assert table.rows[0]["date"] == "17 November 2026, 23:45"
     assert table.rows[1]["date"] == "16 November 2026, 12:00"
-    assert table.rows[1]["result"] == "16 rows, 11 accepted"
+    assert table.rows[1]["result"] == "16 threats, 11 accepted"
     assert table.rows[1]["models"] == "gemma4:26b, qwen3.8:27b"
     assert table.rows[1]["kind"] == "Threat list"
     assert table.rows[0]["result"] == "3 requirements"
@@ -223,8 +223,8 @@ async def test_delete_run_asks_then_removes(user):
     user.find(kind=ui.table).trigger("delete", args={"id": OLD, "busy": False})
     await user.should_see("Delete this run and its files?")
     assert storage.run_dir(OLD).exists()
-    user.find("Delete run").click()
-    await user.should_see("Run deleted")
+    user.find("Delete", kind=ui.button).click()
+    await user.should_see("Run deleted.")
     assert not storage.run_dir(OLD).exists()
     assert storage.run_dir(RUN).exists()
     await asyncio.sleep(0.3)
@@ -232,7 +232,7 @@ async def test_delete_run_asks_then_removes(user):
     assert [r["id"] for r in table.rows] == [RUN]
 
 
-async def test_run_in_work_cannot_be_deleted(user):
+async def test_run_in_progress_cannot_be_deleted(user):
     from nicegui import ui
     from secreqgen_gui import storage
 
@@ -249,10 +249,10 @@ async def test_run_in_work_cannot_be_deleted(user):
 async def test_history_without_runs_shows_the_empty_state(user):
     await user.open("/history")
     await user.should_see("No runs yet.")
-    await user.should_see("Start a threat list")
+    await user.should_see("New threat list")
 
 
-async def test_a_flag_from_the_browser_does_not_unlock_a_run_in_work(user):
+async def test_a_flag_from_the_browser_does_not_unlock_a_run_in_progress(user):
     from nicegui import ui
     from secreqgen_gui import storage
 
@@ -260,6 +260,29 @@ async def test_a_flag_from_the_browser_does_not_unlock_a_run_in_work(user):
     storage.write_manifest(OLD, {"kind": "threats", "status": "running"})
     await user.open("/history")
     user.find(kind=ui.table).trigger("delete", args={"id": OLD, "busy": False})
-    await user.should_see("This run is in work. Stop it first.")
+    await user.should_see("This run is in progress. Stop it first.")
     await user.should_not_see("Delete this run and its files?")
     assert storage.run_dir(OLD).exists()
+
+
+def test_state_words_and_hover_texts():
+    from secreqgen_gui.pages.history import make_row
+
+    row = make_row({"id": "x", "status": "damaged"})
+    assert row["state"] == "Unreadable"
+    assert row["hint"] == "The files of this run cannot be read. Delete it."
+    row = make_row({"id": "x", "status": "interrupted"})
+    assert row["hint"] == "The GUI closed during this run."
+    assert make_row({"id": "x", "status": "finished"})["hint"] == ""
+
+
+async def test_untested_prompts_tag(user):
+    _write_requirements()
+    from secreqgen_gui import storage
+
+    path = storage.run_dir(RUN) / "requirements.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["tested_prompts"] = False
+    path.write_text(json.dumps(data), encoding="utf-8")
+    await user.open(f"/runs/{RUN}/requirements")
+    await user.should_see("untested prompts")

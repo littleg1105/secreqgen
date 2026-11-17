@@ -61,8 +61,8 @@ async def test_setup_page_shows_short_paths(user, home):
     item = {"id": "US-1", "title": "T", "story": "As a user, I want x."}
     (home / "x.json").write_text(json.dumps({"user_stories": [item]}))
     await user.open("/threats/new?stories=~/x.json&docs=~/docs&product=Demo")
-    await user.should_see("1 story in the file.")
-    await user.should_see("1 Markdown file in the folder.")
+    await user.should_see("1 story found.")
+    await user.should_see("1 Markdown file found.")
     values = {e.value for e in user.find(kind=ui.input).elements}
     assert {"~/x.json", "~/docs", "Demo"} <= values
 

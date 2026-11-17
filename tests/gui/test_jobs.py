@@ -1,4 +1,4 @@
-"""The job manager, with stand-in run functions. No model server is used."""
+"""The job manager, with stand-in run functions. Ollama is not used."""
 
 from __future__ import annotations
 
@@ -117,7 +117,7 @@ def test_run_goes_through_checking_running_and_done(spec):
     assert state.state == "done"
     assert not manager.busy()
     assert [s.state for s in state.stories] == ["done"] * 3
-    assert state.stories[0].summary == "1 row, 0 accepted, 1 with a fault"
+    assert state.stories[0].summary == "1 threat, 0 accepted, 1 flagged"
     assert state.stories[0].seconds is not None
     assert state.finished is not None and state.version > 3
 
@@ -145,7 +145,8 @@ def test_the_manager_checks_the_server_first(spec):
     manager.join(10)
     state = manager.get(run_id)
     assert state.state == "failed"
-    assert "does not answer" in state.message and "Check again" in state.message
+    assert "Ollama is not running at" in state.message
+    assert "check again" in state.message
     assert called == []
     assert storage.read_manifest(run_id)["status"] == "failed"
     assert [s.state for s in state.stories] == ["not run"] * 3
@@ -160,7 +161,7 @@ def test_a_missing_model_gives_the_pull_command(spec):
     manager.join(10)
     state = manager.get(run_id)
     assert state.state == "failed"
-    assert f"The model {CHECKER} is missing. Run: ollama pull {CHECKER}" in (
+    assert f"{CHECKER} is not installed. Run: ollama pull {CHECKER}" in (
         state.message
     )
 
@@ -208,7 +209,7 @@ def test_a_second_start_while_busy_raises(spec):
     manager.start_threats(spec)
     try:
         assert manager.busy()
-        with pytest.raises(RuntimeError, match="A run is in work."):
+        with pytest.raises(RuntimeError, match="Another run is in progress."):
             manager.start_threats(spec)
         with pytest.raises(RuntimeError):
             manager.start_requirements(

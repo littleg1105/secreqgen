@@ -22,10 +22,10 @@ PARTS = (("threats", "Threat list"), ("requirements", "Requirements"))
 KINDS = tuple(kind for kind, _ in PARTS)
 TESTED = "tested"
 NAME_RULE = (
-    "Small letters, digits, hyphen and underscore. 40 characters at most."
+    "Use lowercase letters, digits, hyphens and underscores. Up to 40 characters."
 )
-NOT_TESTED_LINE = "A run with this prompt set gets the label: Not the tested setup."
-TESTED_LINE = "Read only. This is the setup that the tests of the thesis used."
+NOT_TESTED_LINE = "A run with these prompts gets the tag: untested prompts."
+TESTED_LINE = "Locked. The thesis tests used these prompts."
 
 
 def _tested_info(kind: str) -> PromptSetInfo | None:
@@ -66,10 +66,10 @@ def _ask_delete(kind: str, name: str, after) -> None:
         except InputError as exc:
             ui.notify(str(exc), type="negative")
             return
-        ui.notify("Prompt set deleted")
+        ui.notify("Prompt set deleted.")
         after()
 
-    confirm(f"Delete the prompt set {name}?", "Delete prompt set", really_delete)
+    confirm(f"Delete the prompt set {name}?", "Delete", really_delete)
 
 
 # ---------------------------------------------------------------- copy
@@ -77,7 +77,7 @@ def _ask_delete(kind: str, name: str, after) -> None:
 
 def _open_copy_dialog(kind: str) -> None:
     with ui.dialog() as dialog, ui.card().classes("w-[440px] max-w-full gap-3"):
-        field = ui.input("Name of your prompt set").props("outlined dense autofocus")
+        field = ui.input("Name of the new set").props("outlined dense autofocus")
         field.classes("w-full")
         field.mark("copy-name")
         ui.label(NAME_RULE).classes("sr-small")
@@ -113,20 +113,20 @@ def _file_rows(info: PromptSetInfo) -> None:
                 ui.label(file.name).classes("sr-code w-[220px]")
                 _hash_label(file.sha256)
                 if not file.used:
-                    ui.label("not used in version 1").classes("sr-small")
+                    ui.label("not used by the GUI").classes("sr-small")
 
 
 def _tested_row(info: PromptSetInfo) -> None:
     with ui.column().classes("w-full gap-2 py-4 border-b border-[#D8DEE4]"):
         with ui.row().classes("w-full items-center gap-3"):
-            ui.label("Tested setup").classes("font-semibold")
+            ui.label("Tested prompts").classes("font-semibold")
             tag("tested", "keep")
             ui.space()
             view_target = f"/prompts/{info.kind}/{TESTED}"
             view = ui.button("View", on_click=lambda: ui.navigate.to(view_target))
             view.props("flat no-caps color=primary").mark(f"view-{info.kind}")
             ui.button(
-                "Copy to edit", on_click=lambda: _open_copy_dialog(info.kind)
+                "Copy", on_click=lambda: _open_copy_dialog(info.kind)
             ).props("outline no-caps color=primary").mark(f"copy-{info.kind}")
         _file_rows(info)
 
@@ -134,7 +134,7 @@ def _tested_row(info: PromptSetInfo) -> None:
 def _user_row(info: PromptSetInfo, refresh) -> None:
     with ui.row().classes("w-full items-center gap-3 py-3 border-b border-[#D8DEE4]"):
         text(info.name, "font-semibold")
-        tag("not tested", "caution")
+        tag("untested", "caution")
         ui.space()
         ui.button(
             "Edit", on_click=lambda: ui.navigate.to(f"/prompts/{info.kind}/{info.name}")
@@ -146,9 +146,9 @@ def _user_row(info: PromptSetInfo, refresh) -> None:
 
 def page() -> None:
     page_title(
-        "Prompt sets",
-        "The texts that the models get. The tested sets cannot be changed. "
-        "Copy one to make your own.",
+        "Prompts",
+        "The instructions for the models. The tested prompts are locked. "
+        "Copy them, then change the copy.",
     )
 
     @ui.refreshable
@@ -177,7 +177,7 @@ def _read_text(path: Path) -> str:
 
 
 def _tested_page(info: PromptSetInfo) -> None:
-    page_title("Tested setup", TESTED_LINE)
+    page_title("Tested prompts", TESTED_LINE)
     for file in info.files:
         with ui.column().classes("w-full gap-2 mt-8 pt-4 border-t border-[#D8DEE4]"):
             ui.label(file.name).classes("sr-section-title")
@@ -201,9 +201,7 @@ def _editor_tab(info: PromptSetInfo, filename: str, required: tuple[str, ...]) -
             original, language=None, theme="basicLight", line_wrapping=True
         ).classes("w-full h-[420px] sr-code border border-[#D8DEE4]")
         editor.mark(f"editor-{filename}")
-        ui.label(
-            f"Placeholders that this file must hold: {_placeholder_text(required)}"
-        ).classes("sr-code")
+        ui.label(f"Placeholders: {_placeholder_text(required)}").classes("sr-code")
         problems = ui.column().classes("gap-1")
         problems.mark(f"problems-{filename}")
 
@@ -222,9 +220,9 @@ def _editor_tab(info: PromptSetInfo, filename: str, required: tuple[str, ...]) -
                         "text-negative" if hard else "text-warning"
                     )
             if not any(m.startswith("Error: ") for m in messages):
-                ui.notify("File saved")
+                ui.notify("Saved.")
 
-        ui.button("Save file", on_click=save).props(
+        ui.button("Save", on_click=save).props(
             "unelevated no-caps color=primary"
         ).mark(f"save-{filename}")
 
@@ -233,7 +231,7 @@ def _user_page(info: PromptSetInfo, tested: PromptSetInfo) -> None:
     required = {f.name: f.placeholders for f in tested.files}
     with ui.row().classes("items-center gap-3"):
         ui.label(info.name).classes("sr-page-title")
-        tag("not tested", "caution")
+        tag("untested", "caution")
     ui.label(NOT_TESTED_LINE).classes("sr-purpose")
     names = [f.name for f in info.files]
     with ui.column().classes("w-full gap-0 mt-6"):
@@ -247,7 +245,7 @@ def _user_page(info: PromptSetInfo, tested: PromptSetInfo) -> None:
                     _editor_tab(info, filename, required.get(filename, ()))
     with ui.row().classes("w-full mt-8 pt-4 border-t border-[#D8DEE4]"):
         ui.button(
-            "Delete this prompt set",
+            "Delete",
             on_click=lambda: _ask_delete(
                 info.kind, info.name, lambda: ui.navigate.to("/prompts")
             ),
@@ -255,7 +253,7 @@ def _user_page(info: PromptSetInfo, tested: PromptSetInfo) -> None:
 
 
 def _missing() -> None:
-    empty_state("This prompt set does not exist.", "Open the prompt sets", "/prompts")
+    empty_state("This prompt set does not exist.", "Open Prompts", "/prompts")
 
 
 def set_page(kind: str, name: str) -> None:

@@ -52,43 +52,40 @@ async def test_home_shows_the_three_parts(user, monkeypatch):
     patch_check(monkeypatch, stand_in())
     await user.open("/")
     for text in (
-        "Model server",
-        "Start",
-        "Newest runs",
-        "Start a threat list",
-        "Start requirements",
-        "A draft list of threats for each story.",
-        "Security requirements for each story, from the documentation.",
+        "Recent runs",
+        "New threat list",
+        "New requirements",
+        "Draft threats for each story.",
+        "Security requirements for each story, based on your documentation.",
+        "Get a draft threat list or security requirements for your user stories.",
         "Check again",
     ):
         await user.should_see(text)
+    await user.should_not_see("Model server")
 
 
 async def test_home_lines_say_ready(user, monkeypatch):
     patch_check(monkeypatch, stand_in())
     await user.open("/")
-    await user.should_see("gemma4:26b: ready")
-    await user.should_see("qwen3.8:27b: ready")
-    await user.should_see(
-        "The model server answers at http://localhost:11434. "
-        "It holds 2 models. This tool uses:"
-    )
+    await user.should_see("Ollama is running.")
+    await user.should_see("gemma4:26b is ready.")
+    await user.should_see("qwen3.8:27b is ready.")
 
 
 async def test_home_server_down_names_the_address(user, monkeypatch):
     patch_check(monkeypatch, stand_in(models=(), reachable=False))
     await user.open("/")
     await user.should_see(
-        "The model server does not answer at http://localhost:11434. "
-        "Start Ollama, then choose Check again."
+        "Ollama is not running at http://localhost:11434. "
+        "Start Ollama, then check again."
     )
 
 
 async def test_home_missing_model_gives_the_pull_command(user, monkeypatch):
     patch_check(monkeypatch, stand_in(models=("gemma4:26b",)))
     await user.open("/")
-    await user.should_see("gemma4:26b: ready")
-    await user.should_see("qwen3.8:27b is missing. Run: ollama pull qwen3.8:27b")
+    await user.should_see("gemma4:26b is ready.")
+    await user.should_see("qwen3.8:27b is not installed. Run: ollama pull qwen3.8:27b")
 
 
 async def test_check_again_runs_the_check_again(user, monkeypatch):
@@ -101,10 +98,10 @@ async def test_check_again_runs_the_check_again(user, monkeypatch):
 
     patch_check(monkeypatch, check)
     await user.open("/")
-    await user.should_see("gemma4:26b: ready")
+    await user.should_see("gemma4:26b is ready.")
     user.find("Check again").click()
     await asyncio.sleep(0.5)
-    await user.should_see("gemma4:26b: ready")
+    await user.should_see("gemma4:26b is ready.")
     assert len(calls) == 2
 
 
@@ -134,10 +131,9 @@ async def test_no_run_shows_the_empty_state(user, monkeypatch):
     patch_check(monkeypatch, stand_in())
     await user.open("/")
     await user.should_see("No runs yet.")
-    await user.should_see("Start a threat list")
 
 
-async def test_run_in_work_shows_one_line(user, monkeypatch, quiet_manager):
+async def test_run_in_progress_shows_one_line(user, monkeypatch, quiet_manager):
     from secreqgen_gui.jobs import RunState, StoryState
 
     patch_check(monkeypatch, stand_in())
@@ -158,7 +154,7 @@ async def test_run_in_work_shows_one_line(user, monkeypatch, quiet_manager):
     )
     monkeypatch.setattr(quiet_manager, "_state", state)
     await user.open("/")
-    await user.should_see("A run is in work: threat list, story 2 of 3.")
+    await user.should_see("A threat list run is in progress.")
     await user.should_see("Open the run")
 
 
@@ -166,16 +162,16 @@ async def test_settings_show_the_parts(user, monkeypatch):
     patch_check(monkeypatch, stand_in())
     await user.open("/settings")
     for text in (
-        "Model server",
+        "Ollama",
         "Models",
         "Data folder",
         "About",
-        "Check the model server",
-        "Save settings",
-        "Uploads, runs and your prompt sets are in this folder.",
-        "The threat list is a draft for a person to check.",
-        "The tested setup: gemma4:26b writes the rows and qwen3.8:27b checks them.",
-        "(ingest, evaluate) are on the command line only.",
+        "Check Ollama",
+        "Save",
+        "Runs, uploads and your prompts are stored here.",
+        "The threat list is a draft, not a complete threat model.",
+        "Tested setup: gemma4:26b writes, qwen3.8:27b checks, with the tested",
+        "The ingest and evaluate commands are on the command line only.",
     ):
         await user.should_see(text, retries=3) if False else await user.should_see(text)
 
@@ -183,21 +179,18 @@ async def test_settings_show_the_parts(user, monkeypatch):
 async def test_settings_check_shows_lines(user, monkeypatch):
     patch_check(monkeypatch, stand_in(models=("gemma4:26b",)))
     await user.open("/settings")
-    user.find("Check the model server").click()
-    await user.should_see(
-        "The model server answers at http://localhost:11434. "
-        "It holds 1 model. This tool uses:"
-    )
-    await user.should_see("qwen3.8:27b is missing. Run: ollama pull qwen3.8:27b")
+    user.find("Check Ollama").click()
+    await user.should_see("Ollama is running.")
+    await user.should_see("qwen3.8:27b is not installed. Run: ollama pull qwen3.8:27b")
 
 
 async def test_settings_check_down_names_the_address(user, monkeypatch):
     patch_check(monkeypatch, stand_in(models=(), reachable=False))
     await user.open("/settings")
     user.find(marker="address").elements.pop().set_value("http://nowhere:1")
-    user.find("Check the model server").click()
-    await user.should_see("The model server does not answer at http://nowhere:1.")
-    await user.should_see("choose Check again")
+    user.find("Check Ollama").click()
+    await user.should_see("Ollama is not running at http://nowhere:1.")
+    await user.should_see("then check again.")
 
 
 async def test_save_writes_the_file(user, monkeypatch, gui_home):
@@ -207,8 +200,8 @@ async def test_save_writes_the_file(user, monkeypatch, gui_home):
     user.find(marker="writer").elements.pop().set_options(
         ["my-model:7b"], value="my-model:7b"
     )
-    user.find("Save settings").click()
-    await user.should_see("Settings saved")
+    user.find("Save").click()
+    await user.should_see("Saved.")
     data = json.loads((gui_home / "settings.json").read_text(encoding="utf-8"))
     assert data["base_url"] == "http://box:11434"
     assert data["writer_model"] == "my-model:7b"
@@ -219,8 +212,8 @@ async def test_empty_address_is_refused(user, monkeypatch, gui_home):
     patch_check(monkeypatch, stand_in())
     await user.open("/settings")
     user.find(marker="address").elements.pop().set_value("  ")
-    user.find("Save settings").click()
-    await user.should_see("Give the address of the model server.")
+    user.find("Save").click()
+    await user.should_see("Enter the address of Ollama.")
     assert not (gui_home / "settings.json").exists()
 
 
@@ -228,6 +221,6 @@ async def test_empty_model_name_is_refused(user, monkeypatch, gui_home):
     patch_check(monkeypatch, stand_in())
     await user.open("/settings")
     user.find(marker="checker").elements.pop().set_value(None)
-    user.find("Save settings").click()
-    await user.should_see("Give the name of the second model.")
+    user.find("Save").click()
+    await user.should_see("Enter the checker model.")
     assert not (gui_home / "settings.json").exists()

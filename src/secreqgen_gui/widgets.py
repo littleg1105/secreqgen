@@ -79,15 +79,19 @@ def _list_folder(folder: Path, folders_only: bool) -> tuple[list[Path], str]:
     return entries, ""
 
 
-def path_field(label: str, value: str = "", *, folder: bool = False):
+def path_field(
+    label: str, value: str = "", *, folder: bool = False, hint: str = ""
+):
     """Show an input for a path with a Browse dialog. Return the input.
 
-    The dialog lists the folders of this computer. Its Select button gives
+    The dialog lists the folders of this computer. Its Pick button gives
     the current folder when folder is True. Otherwise a click on a file
-    gives that file.
+    gives that file. A hint shows under the field.
     """
     with ui.row().classes("w-full items-start gap-2 no-wrap"):
         field = ui.input(label, value=value).props("outlined dense").classes("grow")
+        if hint:
+            field.props(f'hint="{hint}"')
         ui.button("Browse", on_click=lambda: _browse(field, folder)).props(
             "outline no-caps unelevated"
         )
@@ -133,7 +137,7 @@ def _browse(field, folder_mode: bool) -> None:
             ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
             if folder_mode:
                 ui.button(
-                    "Select this folder", on_click=lambda: choose(state["path"])
+                    "Pick this folder", on_click=lambda: choose(state["path"])
                 ).props("unelevated no-caps color=primary")
         refresh()
     dialog.open()

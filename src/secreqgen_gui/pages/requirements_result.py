@@ -122,8 +122,7 @@ def _passages(result: dict) -> None:
     passages = [_as_dict(p) for p in _as_list(result.get("passages"))]
     if not passages:
         return
-    count = _plural(len(passages), "passage")
-    label = f"Documentation that the model read ({count})"
+    label = f"Passages that the model read ({len(passages)})"
     with ui.expansion(label).classes("w-full").style(LINE):
         for passage in passages:
             with ui.column().classes("w-full gap-1 py-2"):
@@ -170,11 +169,11 @@ async def page(run_id: str) -> None:
     except ValueError:
         manifest, data = None, None
         page_title("Requirements")
-        empty_state("This run does not exist.", "Open the history", "/history")
+        empty_state("This run does not exist.", "Open History", "/history")
         return
     if manifest is None and data is None:
         page_title("Requirements")
-        empty_state("This run does not exist.", "Open the history", "/history")
+        empty_state("This run does not exist.", "Open History", "/history")
         return
     if data is None:
         page_title("Requirements")
@@ -196,15 +195,14 @@ async def page(run_id: str) -> None:
     tested = data.get("tested_prompts", prompt.get("tested", True))
     with ui.row().classes("w-full items-center gap-4 mt-3"):
         if product:
-            ui.label(product).classes("font-semibold")
+            text(f"Product: {product}", "sr-small")
         if model:
-            ui.label(f"Model: {model}").classes("sr-small")
+            text(f"Model: {model}", "sr-small")
         if not tested:
-            name = prompt.get("name", "")
-            tag(f"Not the tested setup: prompt set {name}", "caution")
+            tag("untested prompts", "caution")
     with ui.row().classes("gap-2 mt-3 mb-4"):
         ui.button(
-            "Download requirements.json",
+            "Download JSON",
             on_click=lambda: ui.download.content(
                 (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode(),
                 "requirements.json",
@@ -212,7 +210,7 @@ async def page(run_id: str) -> None:
             ),
         ).props("outline no-caps unelevated color=primary")
         ui.button(
-            "Download as Markdown",
+            "Download Markdown",
             on_click=lambda: ui.download.content(
                 build_markdown(data, product).encode(),
                 "requirements.md",

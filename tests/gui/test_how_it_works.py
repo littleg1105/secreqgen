@@ -92,12 +92,12 @@ async def test_no_run_shows_the_steps_with_no_numbers(user):
     await user.open("/how-it-works")
     await user.should_see("How it works")
     await user.should_see("No finished run yet.")
-    await user.should_see("Start a threat list")
+    await user.should_see("New threat list")
     await user.should_see("Step 1 of 8")
-    user.find("Next step").click()
+    user.find("Next").click()
     await user.should_see("Step 2 of 8")
-    await user.should_see("The tool code searches the documentation")
-    user.find("Previous step").click()
+    await user.should_see("SecReqGen searches the documentation")
+    user.find("Previous").click()
     await user.should_see("Step 1 of 8")
 
 
@@ -105,20 +105,20 @@ async def test_a_stored_story_is_replayed_with_its_numbers(user):
     _store()
     frames = _frames()
     await user.open("/how-it-works")
-    await user.should_see(f"Replay of story {STORY} from the run of")
+    await user.should_see(f"Replay of {STORY} from the run of")
     await user.should_see("17 November 2026")
-    await user.should_see("The real run of this story took 42 seconds.")
+    await user.should_see("The real run took 42 seconds.")
     await user.should_see("Open the result")
     await user.should_see(f"Step 1 of {len(frames)}")
-    await user.should_see("Your input")
+    await user.should_see("Your story and the documentation")
     index = frames.index(("check", 1))
     for _ in range(index):
-        user.find("Next step").click()
+        user.find("Next").click()
     await user.should_see(f"Step {index + 1} of {len(frames)}")
-    await user.should_see("In all, 2 rows stay and 1 row is removed.")
-    user.find("Previous step").click()
+    await user.should_see("In total 2 passed and 1 failed.")
+    user.find("Previous").click()
     await user.should_see(f"Step {index} of {len(frames)}")
-    await user.should_see("The writer model writes rows")
+    await user.should_see("The writer writes threats")
 
 
 async def test_frame_parameter_opens_a_frame(user):
@@ -133,12 +133,12 @@ async def test_frame_parameter_opens_a_frame(user):
 async def test_requirements_kind_has_five_steps(user):
     await user.open("/how-it-works?kind=requirements")
     await user.should_see("Step 1 of 5")
-    await user.should_see("Start requirements")
-    await user.should_see("a language model. It answers through")
-    await user.should_see("You read the requirements.")
-    await user.should_see("puts the answer of the model into the fixed form.")
+    await user.should_see("New requirements")
+    for _ in range(3):
+        user.find("Next").click()
+    await user.should_see("Step 4 of 5")
+    await user.should_see("SecReqGen parses the answer")
     await user.should_not_see("checks each quote")
-    await user.should_not_see("decide about each row")
 
 
 async def test_story_without_a_result_says_so(user):
@@ -158,14 +158,12 @@ async def test_play_and_pause_change_the_button(user):
     await user.should_see("Play")
 
 
-async def test_parts_and_rail_entry_show(user):
+async def test_parts_section_is_gone_and_rail_entry_shows(user):
     await user.open("/how-it-works")
-    await user.should_see("The parts")
-    await user.should_see("fixed rules, no AI.")
-    await user.should_see("You decide about each row.")
-    await user.should_see("checks each quote and builds the page.")
-    await user.should_see("language models. They answer through the model server")
-    await user.should_see("http://localhost:11434")
+    await user.should_not_see("The parts")
+    await user.should_see("Arrow keys: next and previous step.")
+    await user.should_see("Threat list")
+    await user.should_see("Requirements")
     await user.should_see("How it works", kind=ui.label, retries=3)
     assert _texts(user).count("How it works") >= 2
 
@@ -217,4 +215,4 @@ async def test_a_requirements_replay_takes_its_time_from_the_manifest(user):
         },
     )
     await user.open("/how-it-works?kind=requirements")
-    await user.should_see("The real run of this story took 37 seconds.")
+    await user.should_see("The real run took 37 seconds.")

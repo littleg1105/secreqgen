@@ -1,4 +1,4 @@
-"""Model server, default models, data folder and about."""
+"""Ollama, default models, data folder and about."""
 
 from __future__ import annotations
 
@@ -23,33 +23,32 @@ from secreqgen_gui.settings import (
 from secreqgen_gui.widgets import page_title
 
 DATA_SENTENCE = (
-    "Uploads, runs and your prompt sets are in this folder. Set the "
-    "environment variable SECREQGEN_GUI_HOME before the start to use "
-    "another folder."
+    "Runs, uploads and your prompts are stored here. To use another folder, "
+    "set SECREQGEN_GUI_HOME before you start the GUI."
 )
 ABOUT = (
-    "The threat list is a draft for a person to check. It holds only what "
-    "the documentation states. It is not a complete threat model.",
-    "The tested setup: gemma4:26b writes the rows and qwen3.8:27b checks them.",
-    "The older commands of the vector store (ingest, evaluate) are on the "
-    "command line only.",
+    "The threat list is a draft, not a complete threat model. It covers only "
+    "what your documentation says.",
+    "Tested setup: gemma4:26b writes, qwen3.8:27b checks, with the tested "
+    "prompts.",
+    "The ingest and evaluate commands are on the command line only.",
 )
 MODEL_FIELDS = (
-    ("writer", "Writer model", "writer_model", "Give the name of the writer model."),
+    ("writer", "Writer", "writer_model", "Enter the writer model."),
     (
         "checker",
-        "Second model",
+        "Checker",
         "checker_model",
-        "Give the name of the second model.",
+        "Enter the checker model.",
     ),
     (
         "requirements",
-        "Model for requirements",
+        "Requirements model",
         "requirements_model",
-        "Give the name of the model for requirements.",
+        "Enter the requirements model.",
     ),
 )
-ADDRESS_ERROR = "Give the address of the model server."
+ADDRESS_ERROR = "Enter the address of Ollama."
 
 
 def _clean(value: object) -> str:
@@ -66,9 +65,9 @@ def page() -> None:
     with ui.column().classes("w-full max-w-[640px] gap-0"):
         page_title("Settings")
 
-        with section("Model server", first=True):
+        with section("Ollama", first=True):
             address = (
-                ui.input("Address of the model server", value=settings.base_url)
+                ui.input("Address", value=settings.base_url)
                 .props("outlined dense")
                 .classes("w-full")
                 .mark("address")
@@ -84,7 +83,7 @@ def page() -> None:
                 notes["address"].set_text("")
                 result.clear()
                 with result:
-                    ui.label("Checking the model server").classes("sr-small")
+                    ui.label("Checking Ollama").classes("sr-small")
                 status = await run.io_bound(
                     check_model_server, make_config(_current(url))
                 )
@@ -93,7 +92,7 @@ def page() -> None:
                     show_server_result(status, _names(), url)
                 _offer(status)
 
-            ui.button("Check the model server", on_click=check).props(
+            ui.button("Check Ollama", on_click=check).props(
                 "outline no-caps unelevated"
             )
 
@@ -148,9 +147,9 @@ def page() -> None:
             if not ok:
                 return
             save_settings(_current(url))
-            ui.notify("Settings saved", type="positive")
+            ui.notify("Saved.", type="positive")
 
-        ui.button("Save settings", on_click=save).props(
+        ui.button("Save", on_click=save).props(
             "unelevated no-caps color=primary"
         ).classes("mt-3")
 

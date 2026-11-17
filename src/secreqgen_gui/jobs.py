@@ -97,6 +97,9 @@ class RunFailedError(Exception):
     """A run ends with a message for the person."""
 
 
+RUN_ENDED = "The run ended before this story finished."
+
+
 def _now_text() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -117,13 +120,13 @@ def _error_text(exc: BaseException, base_url: str) -> str:
     name = type(exc).__name__
     if name == "ModelServerError":
         model = getattr(exc, "model", None)
-        text = f"{exc} Check that Ollama runs at {base_url}"
+        text = f"{exc} Check Ollama at {base_url}"
         if model:
-            text += f" and has the model {model}"
+            text += f" and the model {model}"
         return text + "."
     if name in ("InputError", "NothingToDoError", "RunFailedError"):
         return str(exc)
-    return f"The run stopped with an unexpected error. {name}: {exc}"
+    return f"Unexpected error. {name}: {exc}"
 
 
 def _default_check_server(base_url: str):
@@ -138,16 +141,16 @@ def _model_present(status: Any, name: str) -> bool:
 
 
 def server_problems(status: Any, names: list[str], base_url: str) -> list[str]:
-    """Return plain sentences about the model server. Empty: all is well."""
+    """Return plain sentences about Ollama. Empty: all is well."""
     if not status.reachable:
         return [
-            f"The model server does not answer at {base_url}. "
-            "Start Ollama, then choose Check again."
+            f"Ollama is not running at {base_url}. "
+            "Start Ollama, then check again."
         ]
     problems = []
     for name in names:
         if not _model_present(status, name):
-            problems.append(f"The model {name} is missing. Run: ollama pull {name}")
+            problems.append(f"{name} is not installed. Run: ollama pull {name}")
     return problems
 
 
@@ -156,7 +159,7 @@ def _plural(count: int, word: str) -> str:
 
 
 def _faults(outcome: Any) -> int:
-    """Return the number of rows where the second model names a fault."""
+    """Return the number of threats that the checker flagged."""
     rows = (getattr(outcome, "model", None) or {}).get("rows") or []
     return sum(
         1
@@ -167,12 +170,12 @@ def _faults(outcome: Any) -> int:
 
 def _threat_summary(outcome: Any, checked: bool) -> str:
     summary = outcome.summary
-    parts = [_plural(summary.rows, "row")]
+    parts = [_plural(summary.rows, "threat")]
     if checked:
         parts.append(f"{summary.accepted} accepted")
         refused = _faults(outcome)
         if refused:
-            parts.append(f"{refused} with a fault")
+            parts.append(f"{refused} flagged")
     return ", ".join(parts)
 
 
@@ -220,7 +223,7 @@ class JobManager:
             thread.join(timeout)
 
     def server_status(self, base_url: str):
-        """Check the model server. It never raises."""
+        """Check Ollama. It never raises."""
         check = self._check_server or _default_check_server
         try:
             return check(base_url)
@@ -242,13 +245,13 @@ class JobManager:
                 return
             self._stop.set()
             self._state.stop_requested = True
-            self._state.message = "Stopping after the story that runs."
+            self._state.message = "Stopping after the current story."
             self._bump()
 
     def _start(self, kind: str, spec: Any) -> str:
         with self._lock:
             if self.busy():
-                raise RuntimeError("A run is in work.")
+                raise RuntimeError("Another run is in progress.")
             run_id = storage.new_run_id(kind)
             self._stop = threading.Event()
             self._settings = load_settings()
@@ -256,7 +259,7 @@ class JobManager:
                 id=run_id,
                 kind=kind,
                 state="checking",
-                message="Checking the model server",
+                message="Checking Ollama",
                 started=time.time(),
             )
             self._bump()
@@ -353,7 +356,7 @@ class JobManager:
                         story.state = "not run"
                     elif story.state == "running":
                         story.state = "failed"
-                        story.error = story.error or "The run ended."
+                        story.error = story.error or RUN_ENDED
                 if error is not None:
                     message = _error_text(error, url)
                 run.state = state
@@ -379,7 +382,7 @@ class JobManager:
             pass
 
     def _prepare(self, run_id: str, spec: Any, manifest: dict) -> Path:
-        """Copy the story file, list the stories and check the model server."""
+        """Copy the story file, list the stories and check Ollama."""
         from secreqgen.application.inputs import (
             build_user_stories,
             check_input_file,
@@ -396,13 +399,13 @@ class JobManager:
         data = read_story_data(copy_path)
         items = data.get("user_stories") if isinstance(data, dict) else None
         if not isinstance(items, list):
-            raise RunFailedError("The story file has no list named user_stories.")
+            raise RunFailedError("The stories file needs a list named user_stories.")
         stories, _skipped = build_user_stories(items)
         if spec.story_ids:
             wanted = set(spec.story_ids)
             stories = [s for s in stories if s.id in wanted]
         if not stories:
-            raise RunFailedError("The story file holds no story to run.")
+            raise RunFailedError("The stories file has no story to run.")
         manifest["stories_total"] = len(stories)
         with self._lock:
             self._state.stories = [StoryState(s.id, s.title) for s in stories]
@@ -421,7 +424,10 @@ class JobManager:
         if spec.prompt_set is None:
             return None
         if not _SET_NAME.match(spec.prompt_set):
-            raise RunFailedError("The prompt set name is not valid.")
+            raise RunFailedError(
+                "The prompt set name is not allowed. "
+                "Use lowercase letters, digits, hyphens and underscores."
+            )
         folder = storage.prompt_sets_dir() / kind / spec.prompt_set
         if not folder.is_dir():
             raise RunFailedError(f"The prompt set {spec.prompt_set} does not exist.")
@@ -542,7 +548,7 @@ class JobManager:
             )
         elif stopped:
             self._finish(
-                run_id, manifest, "stopped", "stopped", message="Stopped by you."
+                run_id, manifest, "stopped", "stopped", message="You stopped the run."
             )
         else:
             self._finish(run_id, manifest, "done", "finished", message="Done.")
@@ -607,7 +613,9 @@ class JobManager:
             try:
                 context_text = Path(spec.system_context).read_text(encoding="utf-8")
             except (OSError, UnicodeError) as exc:
-                raise RunFailedError(f"The context file cannot be read: {exc}") from exc
+                raise RunFailedError(
+                    f"The system context file cannot be read: {exc}"
+                ) from exc
         with self._lock:
             self._state.state = "running"
             self._state.message = "Running"

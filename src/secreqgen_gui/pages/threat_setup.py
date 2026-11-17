@@ -8,6 +8,7 @@ from secreqgen.application.inputs import check_about
 
 from secreqgen_gui import jobs
 from secreqgen_gui.pages._setup_parts import (
+    UNTESTED_PROMPTS,
     DocsPart,
     Foot,
     StoriesPart,
@@ -24,7 +25,8 @@ from secreqgen_gui.settings import load_settings
 from secreqgen_gui.widgets import page_title
 
 ABOUT_LIMIT = 120
-SAME_MODEL = "The second model must be a different model."
+SAME_MODEL = "The checker must be a different model from the writer."
+ABOUT_HINT = "What the product does and who uses it. The writer reads this."
 
 
 def page(
@@ -34,11 +36,7 @@ def page(
 ) -> None:
     """Build the form. The query values stories, docs, product fill the fields."""
     defaults = load_settings()
-    page_title(
-        "Start a threat list",
-        "Choose the stories and the documentation of the product. "
-        "The defaults are the tested setup.",
-    )
+    page_title("New threat list")
     with ui.column().classes("w-full max-w-[680px] gap-6"):
         stories_part = StoriesPart(lambda: refresh(), initial_path(stories))
         docs_part = DocsPart(
@@ -48,32 +46,32 @@ def page(
             initial_product(product),
         )
 
-        body = section("Setup")
+        body = section("Options")
         with body:
             writer = (
-                ui.input("Writer model", value=defaults.writer_model)
-                .props("outlined dense")
+                ui.input("Writer", value=defaults.writer_model)
+                .props('outlined dense hint="The model that writes the threats."')
                 .classes("w-full")
             )
-            check = ui.switch("A second model checks each row", value=True)
+            check = ui.switch("Use a checker", value=True)
             checker = (
-                ui.input("Second model", value=defaults.checker_model)
-                .props("outlined dense")
+                ui.input("Checker", value=defaults.checker_model)
+                .props('outlined dense hint="The model that checks each threat."')
                 .classes("w-full")
             )
             same = message()
             labels = ui.switch(
-                "Threat actor and STRIDE category for each row", value=True
+                "Add a threat actor and a STRIDE category", value=True
             )
             about = (
-                ui.textarea("Paragraph about the product (optional)")
-                .props("outlined autogrow")
+                ui.textarea("About the product (optional)")
+                .props(f'outlined autogrow placeholder="{ABOUT_HINT}"')
                 .classes("w-full")
             )
             counter = ui.label().classes("sr-small")
             choices = prompt_set_choices("threats")
             prompt = ui.select(
-                choices, value=next(iter(choices)), label="Prompt set"
+                choices, value=next(iter(choices)), label="Prompts"
             ).props("outlined dense")
             prompt.classes("w-full")
             untested = message()
@@ -103,12 +101,13 @@ def page(
             checker.set_enabled(bool(check.value))
             set_message(same, SAME_MODEL if same_model() else "", "caution")
             over = words() > ABOUT_LIMIT
-            counter.set_text(f"{words()} of {ABOUT_LIMIT} words")
+            size = f"{words()} of {ABOUT_LIMIT} words"
+            counter.set_text(size + (". Shorten the paragraph." if over else ""))
             counter.classes(remove="text-negative")
             if over:
                 counter.classes(add="text-negative")
             chosen = prompt_set_value(prompt.value)
-            set_message(untested, "Not the tested setup" if chosen else "", "caution")
+            set_message(untested, UNTESTED_PROMPTS if chosen else "", "caution")
             foot.update()
 
         async def start() -> None:

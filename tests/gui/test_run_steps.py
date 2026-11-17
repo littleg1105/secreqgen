@@ -170,7 +170,7 @@ def _live_state(progress):
         state="running",
         message="Running",
         stories=[
-            StoryState("S-1", "First story", "done", 12.0, "2 rows"),
+            StoryState("S-1", "First story", "done", 12.0, "2 threats"),
             StoryState("S-2", "Second story", "running"),
             StoryState("S-3", "Third story"),
         ],
@@ -191,9 +191,11 @@ async def test_the_run_page_shows_the_story_in_work(user, monkeypatch):
     await user.open(f"/runs/{state.id}")
     await user.should_see("Steps")
     await user.should_see("Story 2 of 3: S-2 Second story")
-    await user.should_see("The writer model writes rows")
+    await user.should_see("The writer writes threats")
     await user.should_see("Group 2 of 3.")
-    await user.should_not_see("Replay the steps")
+    # Only the row of the finished story has a Replay link, not the steps line.
+    replays = [e for e in user.find(kind=ui.link).elements if e.text == "Replay"]
+    assert len(replays) == 1
 
 
 async def test_the_run_page_before_the_first_story(user, monkeypatch):
@@ -202,8 +204,8 @@ async def test_the_run_page_before_the_first_story(user, monkeypatch):
     state.stories = []
     monkeypatch.setattr(jobs, "manager", StandIn(state))
     await user.open(f"/runs/{state.id}")
-    await user.should_see("The run checks the model server.")
-    await user.should_see("No story is in work")
+    await user.should_see("Checking Ollama.")
+    await user.should_see("No story is running")
 
 
 async def test_the_run_page_when_the_run_reads_the_documentation(user, monkeypatch):
@@ -211,8 +213,8 @@ async def test_the_run_page_when_the_run_reads_the_documentation(user, monkeypat
     state = _live_state(None)
     monkeypatch.setattr(jobs, "manager", StandIn(state))
     await user.open(f"/runs/{state.id}")
-    await user.should_see("The run reads the documentation.")
-    await user.should_not_see("The run checks the model server.")
+    await user.should_see("Reading the documentation.")
+    await user.should_not_see("Checking Ollama.")
 
 
 def _stored_run(run_id="20261117-090000-threats"):
@@ -290,12 +292,12 @@ async def test_a_finished_run_from_disk_shows_the_last_story(user, monkeypatch):
     await user.open(f"/runs/{run_id}")
     await user.should_see("Steps")
     await user.should_see("Story S-1 First story")
-    await user.should_see("Replay the steps")
+    await user.should_see("Replay")
     address = f"/how-it-works?kind=threats&run={run_id}&story=S-1"
-    links = {e.text: e.props["href"] for e in user.find(kind=ui.link).elements}
-    assert links["Replay the steps"] == address
-    assert links["Steps"] == address
-    assert links["Read"] == f"/runs/{run_id}/stories/S-1"
+    links = [e for e in user.find(kind=ui.link).elements if e.text == "Replay"]
+    assert [e.props["href"] for e in links] == [address, address]
+    read = {e.text: e.props["href"] for e in user.find(kind=ui.link).elements}
+    assert read["Read"] == f"/runs/{run_id}/stories/S-1"
 
 
 async def test_a_run_with_no_stored_story_has_no_steps_section(user, monkeypatch):
@@ -311,13 +313,13 @@ async def test_a_run_with_no_stored_story_has_no_steps_section(user, monkeypatch
             "story_ids": ["S-1"],
             "not_run": ["S-1"],
             "per_story": [],
-            "error": {"message": "The model server does not answer."},
+            "error": {"message": "Ollama is not running at http://localhost:11434."},
         },
     )
     await user.open(f"/runs/{run_id}")
     await user.should_see("Failed:")
-    await user.should_not_see("Replay the steps")
-    await user.should_not_see("No story is in work")
+    await user.should_not_see("Replay")
+    await user.should_not_see("No story is running")
 
 
 # ---- the threat result page
@@ -327,12 +329,12 @@ async def test_the_threat_result_shows_the_numbers_of_the_steps(user):
     run_id = _stored_run()
     await user.open(f"/runs/{run_id}/stories/S-1")
     await user.should_see(
-        "Steps: 3 passages, 3 rows written, 1 removed by the tool code, "
-        "2 in the list."
+        "From 3 passages the writer wrote 3 threats. "
+        "1 failed the quote check and is not in the list."
     )
     links = {e.text: e.props["href"] for e in user.find(kind=ui.link).elements}
     address = f"/how-it-works?kind=threats&run={run_id}&story=S-1"
-    assert links["Replay the steps"] == address
+    assert links["Replay"] == address
 
 
 async def test_a_step_report_does_not_build_the_head_again(user, monkeypatch):

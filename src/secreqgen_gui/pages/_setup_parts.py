@@ -13,7 +13,11 @@ from pathlib import Path
 
 from nicegui import events, run, ui
 from secreqgen.application.errors import InputError
-from secreqgen.application.inputs import check_story_upload, read_story_file
+from secreqgen.application.inputs import (
+    UPLOAD_EXTENSIONS,
+    check_story_upload,
+    read_story_file,
+)
 from secreqgen.application.prompt_sets import list_user_prompt_sets
 
 from secreqgen_gui import jobs, storage
@@ -21,10 +25,12 @@ from secreqgen_gui.settings import expand_path, show_path
 from secreqgen_gui.widgets import path_field
 
 TESTED_SET = "__tested__"
-FOLDER_MISSING = (
-    "Folder not found. Choose the folder that holds the Markdown files of the product."
-)
-FOLDER_EMPTY = "The folder holds no Markdown file."
+FOLDER_MISSING = "Folder not found. Check the path or click Browse."
+FOLDER_EMPTY = "This folder has no Markdown files."
+WRONG_TYPE = "Use a .json, .yaml or .yml file."
+STORIES_HINT = "JSON or YAML, with a list named user_stories"
+BUSY = "Another run is in progress. Wait for it to end, or stop it."
+UNTESTED_PROMPTS = "A run with these prompts gets the tag: untested prompts."
 PRODUCT_NOTE = "Product name"
 PRODUCT_LIMIT = 80
 
@@ -79,7 +85,7 @@ def count_markdown(folder: Path) -> int:
 
 def prompt_set_choices(kind: str) -> dict[str, str]:
     """Return the choices of the prompt set select: tested first."""
-    choices = {TESTED_SET: "Tested setup"}
+    choices = {TESTED_SET: "Tested prompts"}
     try:
         sets = list_user_prompt_sets(storage.prompt_sets_dir(), kind)
     except (OSError, InputError, ValueError):
@@ -90,7 +96,7 @@ def prompt_set_choices(kind: str) -> dict[str, str]:
 
 
 def prompt_set_value(value: str | None) -> str | None:
-    """Return the name of a user set, or None for the tested setup."""
+    """Return the name of a user set, or None for the tested prompts."""
     return None if value in (None, "", TESTED_SET) else value
 
 
@@ -107,12 +113,12 @@ class StoriesPart:
         body = section("Stories")
         with body:
             with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
-                tab_file = ui.tab("File on this computer")
+                tab_file = ui.tab("File path")
                 tab_up = ui.tab("Upload")
-                tab_one = ui.tab("Type one story")
+                tab_one = ui.tab("Type a story")
             with ui.tab_panels(tabs, value=tab_file).classes("w-full"):
                 with ui.tab_panel(tab_file).classes("p-0 pt-3"):
-                    self.field = path_field("Stories file (JSON or YAML)", initial)
+                    self.field = path_field("Stories file", initial, hint=STORIES_HINT)
                 with ui.tab_panel(tab_up).classes("p-0 pt-3"):
                     self._upload_panel()
                 with ui.tab_panel(tab_one).classes("p-0 pt-3"):
@@ -134,12 +140,12 @@ class StoriesPart:
         ui.upload(
             on_upload=self._on_upload,
             on_rejected=lambda: set_message(
-                self.problem, "The file must be a .json, .yaml or .yml file.", "bad"
+                self.problem, WRONG_TYPE, "bad"
             ),
             max_file_size=storage.MAX_UPLOAD_BYTES,
             max_files=1,
             auto_upload=True,
-            label="Choose a stories file",
+            label="Pick a stories file",
         ).props('accept=".json,.yaml,.yml" flat bordered').classes("w-full")
 
     async def _on_upload(self, e: events.UploadEventArguments) -> None:
@@ -147,13 +153,19 @@ class StoriesPart:
             data = await e.file.read()
             check_story_upload(e.file.name, len(data))
             path = await run.io_bound(storage.save_upload, e.file.name, data)
-        except (InputError, ValueError) as exc:
-            set_message(self.problem, f"{exc} Choose another file.", "bad")
+        except InputError:
+            # The GUI shows its own text in place of the text of the tool.
+            wrong = Path(e.file.name).suffix.lower() not in UPLOAD_EXTENSIONS
+            reason = WRONG_TYPE if wrong else "The file is larger than 1 MB."
+            set_message(self.problem, f"{reason} Pick another file.", "bad")
+            return
+        except ValueError as exc:
+            set_message(self.problem, f"{exc} Pick another file.", "bad")
             return
         self.field.set_value(show_path(path))
 
     def _type_panel(self) -> None:
-        story_id = ui.input("Story id", value="US-001").props("outlined dense")
+        story_id = ui.input("Story ID", value="US-001").props("outlined dense")
         title = ui.input("Title").props("outlined dense").classes("w-full")
         story = (
             ui.textarea("Story")
@@ -162,7 +174,7 @@ class StoriesPart:
             .mark("story_text")
         )
         criteria = (
-            ui.textarea("Acceptance criteria, one in each line")
+            ui.textarea("Acceptance criteria (one in each line)")
             .props("outlined autogrow")
             .classes("w-full")
         )
@@ -171,9 +183,7 @@ class StoriesPart:
 
         async def use() -> None:
             if not story_id.value.strip() or not story.value.strip():
-                set_message(
-                    warn, "Give a story id and a story text, then choose again.", "bad"
-                )
+                set_message(warn, "Enter a story ID and the story text.", "bad")
                 return
             lines = [x.strip() for x in (criteria.value or "").splitlines()]
             item = {
@@ -219,14 +229,13 @@ class StoriesPart:
         self.project = result.project
         self.loaded = path
         set_message(self.problem, "")
-        set_message(
-            self.info, f"{plural(len(self.stories), 'story', 'stories')} in the file."
-        )
+        found = len(self.stories)
+        set_message(self.info, f"{plural(found, 'story', 'stories')} found.")
         skipped = len(result.skipped)
         set_message(
             self.skipped,
-            f"{plural(skipped, 'entry', 'entries')} of the file could not be read "
-            "and will not run."
+            f"{plural(skipped, 'story', 'stories')} could not be read "
+            f"and {'is' if skipped == 1 else 'are'} skipped."
             if skipped
             else "",
             "caution",
@@ -250,10 +259,10 @@ class StoriesPart:
         self.checks = {}
         with self.list_box:
             with ui.row().classes("gap-2"):
-                ui.button("Select all", on_click=lambda: self._set_all(True)).props(
+                ui.button("Pick all", on_click=lambda: self._set_all(True)).props(
                     "flat no-caps dense"
                 )
-                ui.button("Select none", on_click=lambda: self._set_all(False)).props(
+                ui.button("Pick none", on_click=lambda: self._set_all(False)).props(
                     "flat no-caps dense"
                 )
             with ui.column().classes("w-full gap-0 max-h-[240px] overflow-auto"):
@@ -338,7 +347,7 @@ class DocsPart:
         else:
             set_message(
                 self.info,
-                f"{plural(count, 'Markdown file', 'Markdown files')} in the folder.",
+                f"{plural(count, 'Markdown file', 'Markdown files')} found.",
             )
         self.on_change()
 
@@ -381,7 +390,7 @@ class Foot:
                 )
                 self.busy_row = ui.row().classes("items-center gap-2")
                 with self.busy_row:
-                    ui.label("A run is in work.").classes("sr-small").style(
+                    ui.label(BUSY).classes("sr-small").style(
                         "color: var(--sr-caution)"
                     )
                     self.link_slot = ui.element("span")
@@ -407,4 +416,4 @@ class Foot:
 def about_summary(count: int) -> str:
     """Return the line of the foot: the stories and the time."""
     stories = plural(count, "story", "stories")
-    return f"{stories}, about {plural(count, 'minute', 'minutes')}."
+    return f"{stories}, about {plural(count, 'minute', 'minutes')}"

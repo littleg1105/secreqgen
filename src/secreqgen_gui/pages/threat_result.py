@@ -1,7 +1,7 @@
 """The threat list of one story with the evidence panel.
 
 The list is on the left. The evidence of the chosen row is on the right and
-stays in view. All text of the result comes from a model or from the
+stays in view. The text of a threat comes from a model or from the
 documentation. It is shown with ui.label or the shared widgets, never as HTML.
 """
 
@@ -119,12 +119,35 @@ STYLE = """
 """
 
 VERDICT_COLOR = {"keep": "positive", "delete": "negative"}
-SECOND_MODEL_TEXT = {
-    "accepts": "accepts",
-    "refuses": "names a fault",
-}
-MODEL_CHOICE_ACTOR = "(the model's choice, not from the documentation)"
+CHECKER_TEXT = {"accepts": "accepted", "refuses": "flagged"}
+NOTICE = (
+    "This is a draft, not a complete threat model. It covers only what your "
+    "documentation says. Check each threat against its quote."
+)
 KIND_SHORT = {"attack": "Attack", "rule": "Rule breach"}
+KIND_HINT = {
+    "attack": "The documentation describes an attack.",
+    "rule": "Someone breaks a security rule of the documentation.",
+}
+CHOICE_HINT = "Chosen by the writer, not taken from the documentation."
+GROUP_TITLE = {
+    "accepts": "Accepted by the checker",
+    "refuses": "Flagged by the checker",
+    "no_verdict": "No answer from the checker",
+    "no_weak_sign": "Threats",
+    "weak_sign": "Weak support",
+}
+GROUP_NOTE = {
+    "refuses": (
+        "For example, the quote is about another feature, or the threat says "
+        "more than the passage. In the tests, flagged threats were wrong more "
+        "often than accepted ones."
+    ),
+    "weak_sign": (
+        "SecReqGen found a weak point in the support, for example a very short "
+        "quote. In the tests, these threats were wrong more often than the others."
+    ),
+}
 
 
 def _load(run_id: str, story_id: str) -> dict:
@@ -167,18 +190,50 @@ def _plural(count: int, word: str) -> str:
 def _steps_line(model: dict) -> str:
     """Return the line with the numbers of the steps of the story."""
     trace = threat_trace(model)
-    written = trace["check"]["kept"] + trace["check"]["removed"]
-    return (
-        f"Steps: {_plural(trace['search']['passages'], 'passage')}, "
-        f"{_plural(written, 'row')} written, "
-        f"{trace['check']['removed']} removed by the tool code, "
-        f"{trace['check']['kept']} in the list."
+    removed = trace["check"]["removed"]
+    written = trace["check"]["kept"] + removed
+    line = (
+        f"From {_plural(trace['search']['passages'], 'passage')} the writer "
+        f"wrote {_plural(written, 'threat')}."
     )
+    if removed == 1:
+        return line + " 1 failed the quote check and is not in the list."
+    if removed:
+        return (
+            f"{line} {removed} failed the quote check and are not in the list."
+        )
+    return line + " All passed the quote check." if written else line
+
+
+def _count_lines(rows: list[dict], has_checker: bool) -> str:
+    """Return the first line of counts: threats and the answers of the checker."""
+    line = _plural(len(rows), "threat")
+    if has_checker:
+        accepted = sum(1 for r in rows if r.get("second_model") == "accepts")
+        flagged = sum(1 for r in rows if r.get("second_model") == "refuses")
+        silent = len(rows) - accepted - flagged
+        line += f": {accepted} accepted, {flagged} flagged"
+        if silent:
+            line += f", {silent} with no answer"
+        return line
+    weak = sum(1 for r in rows if r.get("weak_signs"))
+    return f"{line}: {weak} with weak support" if weak else line
+
+
+def _decision_line(total: int, kept: int, deleted: int) -> str:
+    """Return the second line of counts: what the reader decided."""
+    if not kept and not deleted:
+        return "Keep or delete each threat."
+    left = total - kept - deleted
+    line = f"You kept {kept} and deleted {deleted}."
+    return f"{line} {left} left." if left else line
 
 
 def _short(label: str) -> str:
-    """Return the first words of a label, before the explanation in brackets."""
+    """Return the first words of a label, without a letter or an explanation."""
     head = label.split(" (")[0].strip()
+    if len(head) > 3 and head[1:3] == ", ":
+        head = head[3:]
     return head[:1].upper() + head[1:]
 
 
@@ -192,7 +247,7 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
     ui.add_css(STYLE)
     data = await run.io_bound(_load, run_id, story_id)
     if data.get("error") == "run":
-        empty_state("This run does not exist.", "Open the history", "/history")
+        empty_state("This run does not exist.", "Open History", "/history")
         return
     if data.get("error"):
         empty_state(
@@ -224,25 +279,12 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
     )
     story_path = f"/runs/{run_id}/stories/"
 
-    def counts() -> tuple[list[str], list[str]]:
+    def counts() -> tuple[str, str]:
         rows = [item["row"] for item in flat]
-        about = [_plural(len(rows), "row")]
-        if model.get("checker"):
-            accepted = sum(1 for r in rows if r.get("second_model") == "accepts")
-            fault = sum(1 for r in rows if r.get("second_model") == "refuses")
-            silent = len(rows) - accepted - fault
-            about.append(f"{accepted} accepted by the second model")
-            about.append(f"{fault} with a fault")
-            if silent:
-                about.append(f"{silent} with no verdict")
-        else:
-            weak = sum(1 for r in rows if r.get("weak_signs"))
-            about.append(f"{weak} with a weak sign")
+        about = _count_lines(rows, bool(model.get("checker")))
         verdicts = [state["verdicts"].get(r["id"]) for r in rows]
         kept = verdicts.count("keep")
-        deleted = verdicts.count("delete")
-        opened = len(rows) - kept - deleted
-        read = [f"{kept} kept", f"{deleted} deleted", f"{opened} open"]
+        read = _decision_line(len(rows), kept, verdicts.count("delete"))
         return about, read
 
     def set_verdict(row_id: str, verdict: str) -> None:
@@ -251,7 +293,7 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
             storage.write_verdict(run_id, story_id, row_id, new)
         except (ValueError, OSError):
             ui.notify(
-                "The verdict was not saved. Open the story again and try once more.",
+                "Could not save your choice. Reload the page and try again.",
                 type="negative",
             )
             return
@@ -307,14 +349,15 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
 
     def export(fmt: str) -> None:
         if "keep" not in state["verdicts"].values():
-            ui.notify("Mark a row as kept first.", type="warning")
+            ui.notify("Keep at least one threat before you export.", type="warning")
             return
         body = export_kept(model, state["verdicts"], fmt=fmt)
         if fmt == "json":
             data = body.encode("utf-8")
-            ui.download.content(data, "kept_rows.json", "application/json")
+            ui.download.content(data, "kept_threats.json", "application/json")
         else:
-            ui.download.content(body.encode("utf-8"), "kept_rows.md", "text/markdown")
+            data = body.encode("utf-8")
+            ui.download.content(data, "kept_threats.md", "text/markdown")
 
     async def download(name: str) -> None:
         def read() -> bytes | None:
@@ -331,7 +374,7 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
 
         body = await run.io_bound(read)
         if body is None:
-            ui.notify(f"The file {name} is not in the run folder.", type="negative")
+            ui.notify(f"{name} is not in the run folder.", type="negative")
             return
         media = "application/json" if name.endswith(".json") else "text/markdown"
         ui.download.content(body, name, media)
@@ -341,12 +384,9 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
     @ui.refreshable
     def counts_line() -> None:
         about, read = counts()
-        with ui.row().classes("items-center gap-x-5 gap-y-1"):
-            for part in about:
-                ui.label(part)
-            ui.label("").classes("w-2")
-            for part in read:
-                ui.label(part).classes("font-medium")
+        with ui.column().classes("gap-0"):
+            ui.label(about)
+            ui.label(read).classes("font-medium")
 
     def verdict_buttons(row_id: str, marker: str) -> None:
         current = state["verdicts"].get(row_id)
@@ -381,22 +421,23 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                     kind = item_row.get("type", "")
                     with ui.element("span"):
                         tag(KIND_SHORT.get(kind, str(kind).capitalize()))
-                        ui.tooltip(labels["kinds"].get(kind, ""))
+                        if kind in KIND_HINT:
+                            ui.tooltip(KIND_HINT[kind])
                     actor = labels["actors"].get(item_row.get("actor", ""))
                     if actor:
                         with ui.element("span"):
                             tag(_short(actor))
-                            ui.tooltip(f"{actor} {MODEL_CHOICE_ACTOR}")
+                            ui.tooltip(CHOICE_HINT)
                     stride = labels["stride"].get(item_row.get("stride", ""))
                     if stride:
                         with ui.element("span"):
                             tag(_short(stride))
-                            ui.tooltip(f"{stride} (the model's choice)")
+                            ui.tooltip(CHOICE_HINT)
                     if item_row.get("harm"):
                         tag(str(item_row["harm"]).capitalize())
                     if item_row.get("weak_signs"):
                         with ui.element("span"):
-                            tag("weak sign", "caution")
+                            tag("weak support", "caution")
                             ui.tooltip("; ".join(map(str, item_row["weak_signs"])))
                 folded = " ".join(str(item_row.get("quote", "")).split())
                 with ui.element("div").classes("sr-quote-box"):
@@ -405,31 +446,31 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                     part = passages.get(item_row.get("source"))
                     if part:
                         text(part["page"], "sr-small break-all")
-                    verdict = SECOND_MODEL_TEXT.get(item_row.get("second_model", ""))
-                    if verdict:
-                        fault = item_row["second_model"] == "refuses"
-                        ui.label(f"Second model: {verdict}").classes(
-                            "sr-small" + (" text-warning" if fault else "")
-                        )
             with ui.row().classes("sr-row-actions gap-1 no-wrap"):
                 verdict_buttons(row_id, "row")
 
     @ui.refreshable
     def list_view() -> None:
         for group in grouped["groups"]:
-            ui.label(group["title"]).classes("sr-group-title")
-            if group["note"]:
-                ui.label(group["note"]).classes("sr-group-note")
+            title = GROUP_TITLE.get(group["key"], str(group["title"]))
+            ui.label(f"{title} ({len(group['rows'])})").classes("sr-group-title")
+            if GROUP_NOTE.get(group["key"]):
+                ui.label(GROUP_NOTE[group["key"]]).classes("sr-group-note")
             with ui.column().classes("sr-group-box w-full gap-0"):
                 for item in group["rows"]:
                     row_view(item)
-        text(grouped["footer"], "sr-small mt-6")
+        if model.get("about"):
+            words = len(str(model["about"]).split())
+            ui.label(
+                f"The writer also read your paragraph about the product "
+                f"({words} words). It is background, not a source."
+            ).classes("sr-small mt-6")
 
     @ui.refreshable
     def evidence() -> None:
         item = by_id.get(state["chosen"])
         if item is None:
-            ui.label("Choose a row to see its evidence.").classes("text-[#5B6570]")
+            ui.label("Pick a threat to see its evidence.").classes("text-[#5B6570]")
             return
         item_row = item["row"]
         row_id = item_row["id"]
@@ -453,23 +494,22 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                 "}, 80)"
             )
         else:
-            marked_passage(" ".join(quote.split()), [])
             ui.label(
-                "The quote was not found in the stored passage. "
-                "Compare it with the page yourself."
+                "Cannot highlight the quote in this passage. The quote is below."
             ).classes("text-warning")
+            marked_passage(" ".join(quote.split()), [])
         if item_row.get("story_part"):
-            ui.label("Part of your story").classes("sr-ev-label")
+            ui.label("In your story").classes("sr-ev-label")
             text(f'"{item_row["story_part"]}"')
-        ui.label("Requirement").classes("sr-ev-label")
+        ui.label("Requirement for this threat").classes("sr-ev-label")
         text(item_row.get("requirement", ""))
-        ui.label("Second model").classes("sr-ev-label")
+        ui.label("Checker").classes("sr-ev-label")
         second = item_row.get("second_model", "")
-        ui.label(SECOND_MODEL_TEXT.get(second, "no verdict")).classes(
+        ui.label(CHECKER_TEXT.get(second, "no answer")).classes(
             "text-warning" if second == "refuses" else ""
         )
         if item_row.get("weak_signs"):
-            ui.label("Weak signs").classes("sr-ev-label")
+            ui.label("Why the support is weak").classes("sr-ev-label")
             with ui.column().classes("gap-1"):
                 for sign in item_row["weak_signs"]:
                     text(str(sign), "sr-sign")
@@ -477,10 +517,10 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
             verdict_buttons(row_id, "panel")
         with ui.row().classes("gap-2"):
             index = order.index(row_id)
-            previous_button = ui.button("Previous row", on_click=lambda: move(-1))
+            previous_button = ui.button("Previous threat", on_click=lambda: move(-1))
             previous_button.props("flat no-caps dense color=primary")
             previous_button.set_enabled(index > 0)
-            next_button = ui.button("Next row", on_click=lambda: move(1))
+            next_button = ui.button("Next threat", on_click=lambda: move(1))
             next_button.props("flat no-caps dense color=primary")
             next_button.set_enabled(index < len(order) - 1)
 
@@ -491,7 +531,7 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
             with ui.row().classes("w-full items-start justify-between no-wrap"):
                 with ui.column().classes("gap-0 min-w-0"):
                     page_title(
-                        f"Threat list of {story_id}", str(story.get("title", ""))
+                        f"Threat list: {story_id}", str(story.get("title", ""))
                     )
                 with ui.row().classes("gap-1 no-wrap"):
                     for label, target in (
@@ -507,35 +547,45 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                         button.set_enabled(target is not None)
             if story.get("story"):
                 text(str(story["story"]), "max-w-[76ch]")
-            text(str(model.get("draft_notice", "")), "sr-notice")
+            text(NOTICE, "sr-notice")
             with ui.row().classes("items-center gap-3"):
                 counts_line()
                 if _not_tested(model):
-                    tag("Not the tested setup", "caution")
+                    tag("untested prompts", "caution")
             with ui.row().classes("items-baseline gap-3"):
                 ui.label(_steps_line(model)).classes("sr-small").mark("steps-line")
                 address = (
                     f"/how-it-works?kind=threats&run={url_quote(run_id, safe='')}"
                     f"&story={url_quote(story_id, safe='')}"
                 )
-                ui.link("Replay the steps", address).classes("sr-small").style(
+                ui.link("Replay", address).classes("sr-small").style(
                     "color:var(--sr-blue)"
                 )
             with ui.row().classes("items-center gap-2 w-full"):
-                export_button = ui.button("Export kept rows")
+                export_button = ui.button("Export kept threats")
                 export_button.props("outline no-caps color=primary")
                 with export_button, ui.menu():
                     item = ui.menu_item("Markdown", lambda: export("markdown"))
                     item.mark("export-markdown")
                     item = ui.menu_item("JSON", lambda: export("json"))
                     item.mark("export-json")
+                ui.label("All threats:").classes("sr-small ml-3")
                 for name in ("threats.json", "threats.md"):
-                    ui.button(
-                        f"Download {name}", on_click=lambda n=name: download(n)
-                    ).props("flat no-caps color=primary")
-            for notice in grouped["notices"]:
-                warn = notice.startswith("WARNING")
-                text(notice, "sr-notice" + (" sr-warning" if warn else ""))
+                    link = ui.link(name, "#").classes("sr-small")
+                    link.style("color:var(--sr-blue)")
+                    link.on("click.prevent", lambda _e=None, n=name: download(n))
+            failed = sum(1 for c in model["calls"] if not c.get("ok"))
+            if failed:
+                text(
+                    f"{failed} of {len(model['calls'])} calls to the writer failed. "
+                    "This list is not complete.",
+                    "sr-notice sr-warning",
+                )
+            if not flat:
+                text(
+                    "No threats found for this story. Replay the steps to see why.",
+                    "sr-notice",
+                )
             list_view()
         with ui.column().classes("sr-evidence gap-3"):
             evidence()

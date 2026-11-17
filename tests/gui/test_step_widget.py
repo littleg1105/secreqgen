@@ -28,7 +28,7 @@ async def test_the_diagram_draws_only_when_the_board_changed(user: User) -> None
         # The same board again: no new picture, so the slip does not move again.
         assert not diagram.show(boards.live_board(progress), story_id=STORY)
         assert diagram.picture.content is first
-    await user.should_see("The tool code searches the documentation")
+    await user.should_see("SecReqGen searches the documentation")
 
     numbers = {"passages": 4, "groups": 1, "extra_passages": 0}
     boards.apply_event(progress, StepEvent(STORY, "search", "done", 0, 0, numbers))
@@ -38,11 +38,27 @@ async def test_the_diagram_draws_only_when_the_board_changed(user: User) -> None
     with user.client.content:
         assert diagram.show(boards.live_board(progress), story_id=STORY)
         assert "4 passages" in diagram.picture.content
-    await user.should_see("The writer model writes rows")
+    await user.should_see("The writer writes threats")
     await user.should_see("Group 1 of 1.")
     # The button and the hint of the full screen are parts of the diagram.
     await user.should_see("Full screen")
-    await user.should_see("Esc: leave the full screen.")
+    await user.should_see("Esc: exit.")
+
+
+async def test_the_details_show_only_where_a_page_asks_for_them(user: User) -> None:
+    await user.open("/")
+    board = boards.plain_board("threats", ("check", 0))
+    with user.client.content:
+        plain = StepDiagram()
+        plain.show(board, moving=False)
+        assert not plain.more.visible
+        with_details = StepDiagram(details=True)
+        with_details.show(board, moving=False)
+        assert with_details.more.visible
+        assert "60 words" in with_details.details.text
+        # A step with no details shows no "Details" part.
+        with_details.show(boards.plain_board("threats", ("labels", 0)), moving=False)
+        assert not with_details.more.visible
 
 
 async def test_without_moving_the_picture_has_no_slip(user: User) -> None:
