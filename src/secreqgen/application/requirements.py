@@ -23,6 +23,7 @@ from secreqgen.application.inputs import (
 )
 
 if TYPE_CHECKING:
+    from secreqgen.application.steps import StepCallback
     from secreqgen.config import SecReqGenConfig
     from secreqgen.generation import SecurityRequirementsGenerator
     from secreqgen.generation.schemas import UserStory
@@ -251,6 +252,7 @@ def run_requirements(
     on_progress: ProgressCallback | None = None,
     should_stop: Callable[[], bool] | None = None,
     on_story_start: Callable[[str, int, int], None] | None = None,
+    on_step: StepCallback | None = None,
 ) -> RequirementsRun:
     """Run the whole requirements pipeline. It writes no file.
 
@@ -261,7 +263,8 @@ def run_requirements(
     strict_input, a SearchError before the first story is an InputError, and
     the retriever is built before the check of the model server. With
     keep_finished, an error inside the story loop ends the loop and goes to
-    run.aborted, and the results that are done stay in the result.
+    run.aborted, and the results that are done stay in the result. With
+    on_step, the steps inside each story go to the callback as StepEvent.
     """
     from secreqgen.generation import GenerationMode
     from secreqgen.retrieval.word_search import SearchError
@@ -357,6 +360,10 @@ def run_requirements(
         prompt_set = f"user:{options.prompts_dir.name}"
         tested_prompts = is_tested("requirements", options.prompts_dir)
     generator = build_requirements_generator(llm_client, retriever, prompt_builder)
+    if on_step is not None:
+        from secreqgen.application.steps import watch_requirements_generator
+
+        generator = watch_requirements_generator(generator, on_step)
 
     loop = generate_stories_stoppable(
         generator,

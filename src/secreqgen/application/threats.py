@@ -26,6 +26,7 @@ from secreqgen.application.inputs import (
 )
 
 if TYPE_CHECKING:
+    from secreqgen.application.steps import StepCallback
     from secreqgen.config import SecReqGenConfig
     from secreqgen.generation.schemas import UserStory
 
@@ -265,6 +266,7 @@ def run_threat_lists(
     on_progress: ProgressCallback | None = None,
     should_stop: Callable[[], bool] | None = None,
     on_story_start: Callable[[str, int, int], None] | None = None,
+    on_step: StepCallback | None = None,
 ) -> ThreatRun:
     """Run the whole threat list pipeline.
 
@@ -277,7 +279,8 @@ def run_threat_lists(
     strict_input, the input errors before the first story are InputError. With
     keep_finished, an error inside the story loop ends the loop and goes to
     run.aborted, and the lists that are done stay in the result. should_stop is
-    asked before each story. on_story_start runs before each story.
+    asked before each story. on_story_start runs before each story. With
+    on_step, the steps inside each story go to the callback as StepEvent.
     """
     from secreqgen.exceptions import GenerationError
     from secreqgen.retrieval.word_search import SearchError
@@ -355,6 +358,11 @@ def run_threat_lists(
         generator = _build_generator(
             options, llm_client, checker, product, about, strict
         )
+
+    if on_step is not None:
+        from secreqgen.application.steps import watch_threat_generator
+
+        generator = watch_threat_generator(generator, on_step)
 
     run = ThreatRun(writer=writer, checker=checker_name, skipped=skipped)
     used_names: set[str] = set()
