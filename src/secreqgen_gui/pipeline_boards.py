@@ -37,9 +37,12 @@ TEXTS: dict[str, dict[str, tuple[str, str]]] = {
         "story": _STORY,
         "search": (
             "The tool code searches the documentation",
-            "A word search (BM25) takes the sections that fit the story best, at "
-            "most 3,000 tokens of text. The passages go into groups of 5. One more "
-            "group holds at most 5 sections that have a risk word.",
+            "A word search (BM25) puts the sections of the documentation in order. "
+            "The tool code takes at most 3,000 tokens of text, page by page. For "
+            "each page it takes the best sections first, then the other sections "
+            "of that page. The passages go into groups of 5. When more sections "
+            'have a risk word (for example "attack" or "bypass"), one more group '
+            "holds at most 5 of them.",
         ),
         "write": (
             "The writer model writes rows",
@@ -50,10 +53,11 @@ TEXTS: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "check": (
             "The tool code checks each row",
-            "These are fixed rules, with no AI. The quote must be in the passage "
-            "word for word. The note of the writer must say that the passage fits "
-            "the story. A row with a missing part, a quote that is too long, or a "
-            "second row for the same quote is removed.",
+            "These are fixed rules, with no AI. The quote must be in the passage. "
+            "The check ignores capital letters and Markdown marks. The writer must "
+            "name a passage of the group, and its note must say that the passage "
+            "fits the story, fully or partly. A row with a missing part, a quote "
+            "of more than 60 words, or a second row for the same quote is removed.",
         ),
         "labels": (
             "The writer model names a threat actor and a STRIDE category",
@@ -65,8 +69,8 @@ TEXTS: dict[str, dict[str, tuple[str, str]]] = {
             "The second model reads each row beside its passage. It looks for two "
             "clear faults: the quote is about a different feature than the story, "
             "or the threat says something that the passage does not say. It "
-            "answers OK or FAULT. A row with a fault stays in the list, in a group "
-            "of its own.",
+            'answers "OK" or "FAULT". A row with a fault stays in the list, in a '
+            "group of its own.",
         ),
         "weak_signs": (
             "The tool code marks weak signs",
@@ -85,8 +89,10 @@ TEXTS: dict[str, dict[str, tuple[str, str]]] = {
         "story": _STORY,
         "search": (
             "The tool code searches the documentation",
-            "A word search (BM25) takes the sections that fit the story best, at "
-            "most 3,000 tokens of text.",
+            "A word search (BM25) puts the sections of the documentation in order. "
+            "The tool code takes at most 3,000 tokens of text, page by page. For "
+            "each page it takes the best sections first, then the other sections "
+            "of that page.",
         ),
         "write": (
             "The model writes the requirements",
@@ -95,9 +101,9 @@ TEXTS: dict[str, dict[str, tuple[str, str]]] = {
             "answer, it asks again. It asks at most 3 times in all.",
         ),
         "parse": (
-            "The tool code reads the answer",
-            "The tool code puts each requirement into the fixed form: the text, "
-            "the ASVS category and the priority.",
+            "The tool code puts the answer into the fixed form",
+            "The tool code reads the answer of the model. It puts each requirement "
+            "into the fixed form: the text, the ASVS category and the priority.",
         ),
         "read": (
             "You read the requirements",
@@ -122,6 +128,19 @@ def lane_notes(
 def _number(numbers: Mapping, name: str) -> int:
     value = numbers.get(name, 0)
     return int(value) if isinstance(value, int | float) else 0
+
+
+def _second_lines(accepted: int, faults: int, open_rows: int) -> tuple[str, str]:
+    """Return the two lines of the second model box when the step is done.
+
+    A row with no verdict must show: with no such line, a step where every
+    call failed looks like a step with no fault.
+    """
+    if not open_rows:
+        return (f"{accepted} accepted", plural(faults, "fault"))
+    if not faults:
+        return (f"{accepted} accepted", f"{open_rows} no verdict")
+    return (f"{accepted} accepted", f"{faults + open_rows} not accepted")
 
 
 def _stays(count: int) -> str:
@@ -252,7 +271,7 @@ def _live_lines(kind: str, key: str, entry: Mapping) -> tuple[str, ...]:
         return (plural(attempt, "attempt"),) if attempt > 1 else ()
     if key == "check":
         if state == "partial":
-            return (f"{index} of {total} groups",) if total else ()
+            return (f"{index} of {total} checked",) if total else ()
         return (f"{n('kept')} kept", f"{n('removed')} removed")
     if key == "labels":
         if state == "active":
@@ -264,7 +283,7 @@ def _live_lines(kind: str, key: str, entry: Mapping) -> tuple[str, ...]:
             if n("accepted") or n("faults") or n("no_verdict"):
                 lines.append(f"{n('accepted')} accepted")
             return tuple(lines)
-        return (f"{n('accepted')} accepted", plural(n("faults"), "fault"))
+        return _second_lines(n("accepted"), n("faults"), n("no_verdict"))
     if key == "weak_signs":
         return (f"{n('with_sign')} with a sign", f"{n('clean')} with none")
     if key == "parse":
@@ -423,7 +442,7 @@ def _threat_frame(trace: Mapping, frame: tuple[str, int], verdicts) -> tuple:
             extra = _number(search, "extra_passages")
             if extra:
                 text += (
-                    f" The last group holds {plural(extra, 'section')} "
+                    f" The last group holds {plural(extra, 'passage')} "
                     "with a risk word."
                 )
     # the loop
@@ -483,7 +502,7 @@ def _threat_frame(trace: Mapping, frame: tuple[str, int], verdicts) -> tuple:
         line = f"{_number(labels, 'labelled')} of {_number(labels, 'rows')} rows"
         views["labels"] = StepView("active" if step == "labels" else "done", (line,))
         if step == "labels":
-            text = f" {line.capitalize()} have a label."
+            text = f" {line.capitalize()} have a threat actor and a STRIDE category."
     if second.get("on") and kept_all and (
         step == "second_model" or passed("second_model")
     ):
@@ -491,7 +510,7 @@ def _threat_frame(trace: Mapping, frame: tuple[str, int], verdicts) -> tuple:
         open_rows = _number(second, "no_verdict")
         views["second_model"] = StepView(
             "active" if step == "second_model" else "done",
-            (f"{accepted} accepted", plural(faults, "fault")),
+            _second_lines(accepted, faults, open_rows),
         )
         if step == "second_model":
             text = f" {accepted} accepted, {faults} with a fault"
@@ -511,14 +530,16 @@ def _threat_frame(trace: Mapping, frame: tuple[str, int], verdicts) -> tuple:
         lines: tuple[str, ...] = ()
         if verdicts is not None and kept_all:
             decided = sum(1 for v in verdicts.values() if v in ("keep", "delete"))
-            lines = (f"{decided} of {kept_all} decided",)
             kept_rows = sum(1 for v in verdicts.values() if v == "keep")
-            text = f" You decided {decided} of {plural(kept_all, 'row')}"
-            text += (
-                f": {kept_rows} kept, {decided - kept_rows} deleted."
-                if decided
-                else "."
-            )
+            if decided:
+                lines = (f"{decided} of {kept_all} decided",)
+                text = (
+                    f" You decided {decided} of {plural(kept_all, 'row')}: "
+                    f"{kept_rows} kept, {decided - kept_rows} deleted."
+                )
+            else:
+                lines = (f"{plural(kept_all, 'row')} to read",)
+                text = " No row is decided yet."
         views["read"] = StepView("active", lines)
     loop_used = (in_loop and group_no > 1) or (after_loop and total > 1)
     return views, loop_used, text

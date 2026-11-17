@@ -167,6 +167,13 @@ def _on_startup() -> None:
 
 def setup() -> None:
     """Set the colours and the start hooks. Call it before ui.run."""
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+    from secreqgen_gui.settings import allowed_hosts
+
     theme.apply_app()
+    # The server answers only a request that names this computer. This also
+    # covers the socket path of NiceGUI, which is mounted on the same app.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
     app.add_api_route("/healthz", healthz, methods=["GET"])
     app.on_startup(_on_startup)

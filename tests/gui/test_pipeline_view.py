@@ -177,7 +177,7 @@ def test_the_live_board_follows_the_reports_of_the_tool():
     board = board_after(8)  # group 2 starts
     assert board.part == 2 and board.loop_used
     assert board.steps["write"] == StepView("active", ("group 2 of 3",))
-    assert board.steps["check"] == StepView("partial", ("1 of 3 groups",))
+    assert board.steps["check"] == StepView("partial", ("1 of 3 checked",))
 
     board = board_after(14)  # the tool knows the rows that stay
     assert board.steps["write"] == StepView("done", ("11 rows",))
@@ -355,6 +355,52 @@ def test_the_result_board_has_every_step_done():
         "threats", TRACE, verdicts={"T1": "keep", "T2": "delete", "T3": "keep"}
     )
     assert done.steps["read"] == StepView("done", ("3 of 3 decided",))
+
+
+def test_rows_with_no_verdict_show_in_the_box_of_the_second_model():
+    second = {"on": True, "accepted": 0, "faults": 0, "no_verdict": 3}
+    board = boards.result_board("threats", dict(TRACE, second_model=second))
+    assert board.steps["second_model"].lines == ("0 accepted", "3 no verdict")
+    second = {"on": True, "accepted": 1, "faults": 1, "no_verdict": 1}
+    board = boards.replay_board(
+        "threats", dict(TRACE, second_model=second), ("second_model", 0)
+    )
+    assert board.steps["second_model"].lines == ("1 accepted", "2 not accepted")
+    assert board.facts == "1 accepted, 1 with a fault, 1 with no verdict."
+    # The live board gives the same lines.
+    progress = boards.new_progress("threats", STORY)
+    for item in threat_events()[:17]:
+        boards.apply_event(progress, item)
+    last = event("second_model", "done", 9, 9, accepted=0, faults=0, no_verdict=9)
+    boards.apply_event(progress, last)
+    live = boards.live_board(progress)
+    assert live.steps["second_model"] == StepView(
+        "done", ("0 accepted", "9 no verdict")
+    )
+
+
+def test_no_decision_yet_reads_as_work_to_do():
+    board = boards.result_board("threats", TRACE, verdicts={})
+    assert board.steps["read"] == StepView("partial", ("3 rows to read",))
+    assert board.facts == "No row is decided yet."
+
+
+def test_the_texts_hold_the_limits_of_the_code():
+    from secreqgen.retrieval.word_search import DEFAULT_BUDGET
+    from secreqgen.threats.pipeline import (
+        EXTRA_SECTIONS,
+        GROUP_SIZE,
+        MAX_JSON_ATTEMPTS,
+        QUOTE_LIMIT,
+    )
+
+    search = boards.TEXTS["threats"]["search"][1]
+    assert f"{DEFAULT_BUDGET:,} tokens" in search
+    assert f"groups of {GROUP_SIZE}" in search
+    assert f"at most {EXTRA_SECTIONS} of them" in search
+    assert f"more than {QUOTE_LIMIT} words" in boards.TEXTS["threats"]["check"][1]
+    assert f"{DEFAULT_BUDGET:,} tokens" in boards.TEXTS["requirements"]["search"][1]
+    assert MAX_JSON_ATTEMPTS == 3  # the design page names this limit
 
 
 def test_a_trace_with_options_off_and_an_empty_trace():

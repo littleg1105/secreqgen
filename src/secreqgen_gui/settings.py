@@ -10,6 +10,8 @@ from pathlib import Path
 HOME_ENV = "SECREQGEN_GUI_HOME"
 HOST_ENV = "SECREQGEN_GUI_HOST"
 PORT_ENV = "SECREQGEN_GUI_PORT"
+ALLOWED_HOSTS_ENV = "SECREQGEN_GUI_ALLOWED_HOSTS"
+LOCAL_HOSTS = ("127.0.0.1", "localhost")
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
 
@@ -118,6 +120,31 @@ def make_config(settings: GuiSettings | None = None):
 def server_host() -> str:
     """Return the address to listen on. The default is this computer only."""
     return os.environ.get(HOST_ENV, "").strip() or DEFAULT_HOST
+
+
+def allowed_hosts() -> list[str]:
+    """Return the host names that a request can name in its Host header.
+
+    The server refuses a request with a different name. So a page of a
+    different website cannot reach the GUI through a name that points to
+    this computer (DNS rebinding). The list holds the two local names, the
+    address that the server listens on, and the names of the environment
+    variable SECREQGEN_GUI_ALLOWED_HOSTS (separated by commas).
+    """
+    names = list(LOCAL_HOSTS)
+    host = server_host()
+    more = os.environ.get(ALLOWED_HOSTS_ENV, "").split(",")
+    for name in [host, *more]:
+        name = name.strip()
+        # An address that means "every network card" is not a name of a request.
+        if name and name not in ("0.0.0.0", "::") and name not in names:
+            names.append(name)
+    return names
+
+
+def listens_on_this_computer_only() -> bool:
+    """True when the server listens on a local address only."""
+    return server_host() in LOCAL_HOSTS
 
 
 def server_port() -> int:

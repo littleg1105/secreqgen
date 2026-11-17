@@ -78,3 +78,19 @@ async def test_settings_page_shows_short_data_folder(user, home, monkeypatch):
     monkeypatch.setenv("SECREQGEN_GUI_HOME", str(home / "data"))
     await user.open("/settings")
     await user.should_see("~/data")
+
+
+def test_the_allowed_host_names(monkeypatch):
+    from secreqgen_gui import settings
+
+    monkeypatch.delenv(settings.HOST_ENV, raising=False)
+    monkeypatch.delenv(settings.ALLOWED_HOSTS_ENV, raising=False)
+    assert settings.allowed_hosts() == ["127.0.0.1", "localhost"]
+    assert settings.listens_on_this_computer_only()
+    # An address for every network card is not a name of a request.
+    monkeypatch.setenv(settings.HOST_ENV, "0.0.0.0")
+    monkeypatch.setenv(settings.ALLOWED_HOSTS_ENV, " lab-pc , localhost,")
+    assert settings.allowed_hosts() == ["127.0.0.1", "localhost", "lab-pc"]
+    assert not settings.listens_on_this_computer_only()
+    monkeypatch.setenv(settings.HOST_ENV, "192.168.1.20")
+    assert "192.168.1.20" in settings.allowed_hosts()
