@@ -101,11 +101,17 @@ _SUFFIXES = ("ations", "ation", "ingly", "ments", "ment", "ness", "ing", "ies", 
 
 
 def _stem(word: str) -> str:
+    """A rough word stem: up to two endings are removed ("settings" and "setting" give "sett"), and a final "e"
+    ("store", "stores" and "stored" give "stor"). It only has to give the same stem for the forms of one word."""
     word = word.lower().strip("-_")
-    for suffix in _SUFFIXES:
-        if word.endswith(suffix) and len(word) - len(suffix) >= 4:
-            return word[: -len(suffix)]
-    return word
+    for _ in range(2):
+        for suffix in _SUFFIXES:
+            if word.endswith(suffix) and len(word) - len(suffix) >= 4:
+                word = word[: -len(suffix)]
+                break
+        else:
+            break
+    return word.rstrip("e") if len(word) > 4 else word
 
 
 _FREE_STEMS = frozenset(_stem(w) for w in _FREE)
@@ -143,3 +149,12 @@ def weak_signs(row_type: str, quote: str, threat: str, passage: str, story: str,
     if stride == "none":
         signs.append("the label step gave no STRIDE category: possibly no security threat")
     return signs
+
+
+_KEEP_DROP_RE = re.compile(r"\b(KEEP|DROP)\b", re.I)
+
+
+def keep_or_drop(answer: str) -> str:
+    """The last KEEP or DROP of a check answer, as "accepts" or "refuses". "" when the answer has neither."""
+    found = _KEEP_DROP_RE.findall(answer or "")
+    return {"KEEP": "accepts", "DROP": "refuses"}[found[-1].upper()] if found else ""

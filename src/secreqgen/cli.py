@@ -49,7 +49,7 @@ DOC_TYPE_MAP = {
 }
 
 
-def _ollama_client(cfg, tested_setup: bool):
+def _ollama_client(cfg, tested_setup: bool, model_name: Optional[str] = None):
     """Build the Ollama client of a generate command.
 
     A value in the settings (SECREQGEN_LLM_NUM_CTX, SECREQGEN_LLM_TIMEOUT,
@@ -69,7 +69,7 @@ def _ollama_client(cfg, tested_setup: bool):
             structured_output = False
     return OllamaClient(
         base_url=cfg.llm.base_url,
-        model_name=cfg.llm.model_name,
+        model_name=model_name or cfg.llm.model_name,
         temperature=cfg.llm.temperature,
         max_tokens=cfg.llm.max_tokens,
         timeout=timeout or DEFAULT_TIMEOUT_S,
@@ -1023,6 +1023,13 @@ def generate_threats(
             help="One short call for each story: a threat actor and a STRIDE category for each row",
         ),
     ] = True,
+    checker_model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--checker-model",
+            help="A second local model that checks each row (for example gemma4:26b). Accepted rows come first",
+        ),
+    ] = None,
     output: Annotated[
         Path,
         typer.Option("--output", "-o", help="Output folder"),
@@ -1082,6 +1089,8 @@ def generate_threats(
         raise typer.Exit(0)
 
     product_name = product if product is not None else data.get("project")
+    if product_name is not None and not isinstance(product_name, str):
+        product_name = str(product_name) if isinstance(product_name, (int, float)) else None
     cfg = get_config()
     try:
         llm_client = _ollama_client(cfg, tested_setup=True)
@@ -1091,7 +1100,22 @@ def generate_threats(
                 "Make sure Ollama is running: [cyan]ollama serve[/cyan]"
             )
             raise typer.Exit(1)
-        generator = ThreatListGenerator(llm_client, docs, product=product_name, name_labels=labels)
+        checker = None
+        if checker_model:
+            if checker_model == cfg.llm.model_name:
+                console.print(
+                    "[red]Error:[/red] --checker-model must be a different model than the model that writes the rows."
+                )
+                raise typer.Exit(1)
+            checker = _ollama_client(cfg, tested_setup=True, model_name=checker_model)
+            if not checker.check_health():
+                console.print(
+                    f"[red]Error:[/red] The checker model is not available in Ollama: {escape(checker_model)}"
+                )
+                raise typer.Exit(1)
+        generator = ThreatListGenerator(
+            llm_client, docs, product=product_name, name_labels=labels, checker=checker
+        )
     except LLMConnectionError as e:
         console.print(f"[red]LLM Connection Error:[/red] {e}")
         raise typer.Exit(1)
@@ -1100,27 +1124,44 @@ def generate_threats(
         raise typer.Exit(1)
 
     written = 0
+    used_names: set[str] = set()
     for story in user_stories:
         try:
             model = generator.generate(story)
+        except LLMConnectionError as e:
+            console.print(f"[red]LLM Connection Error:[/red] {escape(str(e))}")
+            raise typer.Exit(1)
         except (ThreatListError, SearchError, GenerationError) as e:
             console.print(
                 f"[yellow]Warning: no threat list for {escape(story.id)}: {escape(str(e))}[/yellow]"
             )
             continue
-        folder = output / (re.sub(r"[^A-Za-z0-9._-]", "_", story.id).strip(".") or "story")
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / "threats.json").write_text(
-            json.dumps(model, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
-        (folder / "threats.md").write_text(render_markdown(model), encoding="utf-8")
+        # Two story ids can give the same folder name ("A/1" and "A_1"): the second one gets a number.
+        base_name = re.sub(r"[^A-Za-z0-9._-]", "_", story.id).strip(".") or "story"
+        name, n = base_name, 1
+        while name in used_names:
+            n += 1
+            name = f"{base_name}_{n}"
+        used_names.add(name)
+        folder = output / name
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / "threats.json").write_text(
+                json.dumps(model, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            (folder / "threats.md").write_text(render_markdown(model), encoding="utf-8")
+        except OSError as e:
+            console.print(f"[red]Error:[/red] Cannot write to {escape(str(folder))}: {escape(str(e))}")
+            raise typer.Exit(1)
         written += 1
         rows = model["rows"]
         attacks = sum(1 for r in rows if r["type"] == "attack")
         clean = sum(1 for r in rows if not r.get("weak_signs"))
+        accepted = sum(1 for r in rows if r.get("second_model") == "accepts")
+        checked = f", {accepted} accepted by {checker_model}" if checker_model else ""
         console.print(
             f"[green]✓[/green] {escape(story.id)}: {len(rows)} rows ({attacks} attacks, "
-            f"{len(rows) - attacks} rules), {clean} with no weak sign, "
+            f"{len(rows) - attacks} rules), {clean} with no weak sign{checked}, "
             f"{len(model['dropped'])} removed by the script, {len(model['calls'])} calls, {model['seconds']} s"
         )
 

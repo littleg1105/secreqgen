@@ -12,6 +12,10 @@ Method (tested on 17 November 2026, see the lab notes of that day):
    the story part is a copy of words of the story. The harm is kept for an attack row only.
 5. One call for a story names a threat actor and a STRIDE category for each row, from closed lists. They are the
    model's choice from the threat sentence. They have no source in the documentation.
+7. Optional: a second local model checks each row with the passage in view (three yes/no questions). Rows that it
+   accepts come first on the page; no row is removed. In the test of 17 November 2026 (279 judged rows of the local
+   models) 14 of 100 accepted rows were wrong and 47 of 100 refused rows, when gemma4:26b checked the rows of
+   qwen3.8:27b. The check also refused 2 of 3 good rows, so it must not be used to remove rows.
 6. A script looks for the signs of a weak row (a rule row whose quote has no rule word, a threat sentence with
    words that are not in the passage, a quote that is a fragment, no STRIDE category). Rows with no such sign come
    first on the page; no row is removed. (A second model call that asked "is this sentence about the story?" was
@@ -45,6 +49,7 @@ from secreqgen.threats.checks import (
     check_quote,
     extract_json,
     has_risk_word,
+    keep_or_drop,
     normalise,
     weak_signs,
 )
@@ -58,6 +63,7 @@ EXTRA_SECTIONS = 5  # sections of the search pool with a risk word, in one more 
 EXTRA_TOKENS = 1000
 MAX_QUOTE_WORDS = 30  # the limit that the prompt names
 QUOTE_LIMIT = 60  # a longer quote is refused by the script
+CHECK_PASSAGE_CHARS = 12000  # the most text of one passage in a check call (a passage has 2,000 tokens at most)
 MAX_JSON_ATTEMPTS = 3
 HARMS = (
     "disclosure of data",
@@ -81,18 +87,26 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-_LABEL_LINE_RE = re.compile(r"(?m)^\W*(\d{1,3})\W{1,4}([A-Za-z_ ]+?)\s*[,;|/-]\s*\(?\s*(none|[STRIDE])\b", re.I)
+_LABEL_LINE_RE = re.compile(r"(?m)^\W*(\d{1,3})\W{1,4}([A-Za-z_ \-]+?)(?:\s*[,;|/]\s*|\s+-\s+)\(?\s*(none|[STRIDE])[a-z]*\b", re.I)
+_SOURCE_NAME_RE = re.compile(r"^\W*[Pp]\s*(\d+)\W*$")
 
 
 def parse_label_lines(answer: str) -> dict[int, tuple[str, str]]:
     """The actor and the STRIDE value of each numbered line of an answer. A value that is not in a list is ""."""
     out: dict[int, tuple[str, str]] = {}
     for match in _LABEL_LINE_RE.finditer(answer or ""):
-        actor = match.group(2).strip().lower().replace(" ", "_")
+        actor = re.sub(r"[\s\-]+", "_", match.group(2).strip().lower())
         stride = match.group(3)
         stride = "none" if stride.lower() == "none" else stride.upper()
         out.setdefault(int(match.group(1)), (actor if actor in ACTORS else "", stride if stride == "none" or stride in STRIDE else ""))
     return out
+
+
+def _source_name(value: Any) -> str:
+    """The source name of an answer in the form of the prompt: "[P3]", "p3" and " P3 " all give "P3"."""
+    text = _text(value)
+    match = _SOURCE_NAME_RE.match(text)
+    return f"P{int(match.group(1))}" if match else text
 
 
 class ThreatListGenerator:
@@ -105,14 +119,17 @@ class ThreatListGenerator:
         *,
         product: str | None = None,
         name_labels: bool = True,
+        checker: Any = None,
     ) -> None:
         self.llm = llm_client
         self.name_labels = name_labels
+        self.checker = checker  # a client of a second local model that checks each row, or None
         self.retriever = WordSearchRetriever(Path(docs_dir), product=product)
         try:
             self._system = (PROMPT_DIR / "system_prompt.txt").read_text(encoding="utf-8")
             self._user = string.Template((PROMPT_DIR / "user_prompt.txt").read_text(encoding="utf-8"))
             self._labels = string.Template((PROMPT_DIR / "labels_prompt.txt").read_text(encoding="utf-8"))
+            self._check = string.Template((PROMPT_DIR / "check_prompt.txt").read_text(encoding="utf-8"))
         except OSError as exc:
             raise ThreatListError(f"a prompt file is missing: {exc}") from exc
 
@@ -174,6 +191,32 @@ class ThreatListGenerator:
                 rows[number - 1]["actor"] = actor
                 rows[number - 1]["stride"] = stride
 
+    # ------------------------------------------------------------------ check by a second model
+    def _check_rows(self, user_story: Any, rows: list[dict], passages: list[dict]) -> None:
+        """One call of the second model for each row, with the passage in view: does it accept the row?"""
+        by_ref = {p["ref"]: p for p in passages}
+        criteria = "\n".join(f"- {c}" for c in user_story.acceptance_criteria)
+        for row in rows:
+            passage = by_ref.get(row["source"])
+            if passage is None:
+                continue
+            text = passage["text"]
+            body = text.split("\n", 1)[1] if text.startswith("### ") and "\n" in text else text
+            prompt = self._check.substitute(
+                story_title=user_story.title,
+                story_text=user_story.story,
+                acceptance_criteria=criteria,
+                header=passage["header"],
+                passage=body.strip()[:CHECK_PASSAGE_CHARS],
+                quote=" ".join(row["quote"].split()),
+                threat=row["threat"],
+                requirement=row["requirement"],
+            )
+            try:
+                row["second_model"] = keep_or_drop(self.checker.generate(prompt=prompt).content)
+            except Exception as exc:  # the row stays, with no verdict  # noqa: BLE001
+                logger.warning("threat list: the check call failed (%s)", type(exc).__name__)
+
     # ------------------------------------------------------------------ one story
     def generate(self, user_story: Any) -> dict:
         """The threat list of one user story, as a JSON-safe dict."""
@@ -201,23 +244,28 @@ class ThreatListGenerator:
             attempts = 0
             t0 = time.time()
             for attempts in range(1, MAX_JSON_ATTEMPTS + 1):
-                response = self.llm.generate(prompt=prompt, system_prompt=self._system, format="json")
                 try:
-                    answer = extract_json(response.content)
-                    break
+                    response = self.llm.generate(prompt=prompt, system_prompt=self._system, format="json")
+                    candidate = extract_json(response.content)
                 except ValueError:
                     continue
+                except Exception as exc:  # a failed call is a failed attempt; the other groups go on  # noqa: BLE001
+                    logger.warning("threat list: a model call failed (%s)", type(exc).__name__)
+                    continue
+                if isinstance(candidate.get("rows"), list):  # an object with no row list is no answer
+                    answer = candidate
+                    break
             calls.append({"group": number, "passages": len(group), "attempts": attempts, "ok": answer is not None, "seconds": round(time.time() - t0, 1)})
             if answer is None:
                 logger.warning("threat list: group %d of story %s gave no JSON answer", number, user_story.id)
                 continue
             notes = answer.get("passages") if isinstance(answer.get("passages"), list) else []
-            fits = {_text(n.get("source")): _text(n.get("fits_story")) for n in notes if isinstance(n, dict)}
+            fits = {_source_name(n.get("source")): _text(n.get("fits_story")).lower() for n in notes if isinstance(n, dict)}
             answer_rows = answer.get("rows") if isinstance(answer.get("rows"), list) else []
             for position, row in enumerate(answer_rows, start=1):
                 if not isinstance(row, dict):
                     continue
-                source, quote = _text(row.get("source")), _text(row.get("quote"))
+                source, quote = _source_name(row.get("source")), _text(row.get("quote"))
                 why = None
                 if not quote:
                     why = "no quote"
@@ -257,10 +305,13 @@ class ThreatListGenerator:
                         "actor": "",
                         "stride": "",
                         "weak_signs": [],
+                        "second_model": "",
                     }
                 )
         if self.name_labels and rows:
             self._name_labels(user_story, rows)
+        if self.checker is not None and rows:
+            self._check_rows(user_story, rows, passages)
         texts = {p["ref"]: p["text"] for p in passages}
         plain_story = " ".join([user_story.title, user_story.story, *criteria])
         for row in rows:
@@ -275,6 +326,7 @@ class ThreatListGenerator:
             "seconds": round(time.time() - start),
             "calls": calls,
             "label_step": self.name_labels,
+            "checker": getattr(self.checker, "model_name", None) if self.checker is not None else None,
             "extra_passages": n_extra,
             "passages": passages,
             "rows": rows,

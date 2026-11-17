@@ -16,6 +16,7 @@ PROMPT_HASHES = {
     "system_prompt.txt": "79b5b822179c49c56d9612eb427145e57cc760a18229a6bd295f5ddd2e614700",
     "user_prompt.txt": "f4b6516a3a3cea972176b185d96297d286d2fc43feb5a1d3a2e7bdcad7580956",
     "labels_prompt.txt": "8ee6692c35e669e9289a28a5da873ccd605c01a331f4b2b6e26302f49b6171a9",
+    "check_prompt.txt": "1c30797e226a04a76fd269a1b112a45b62778d3d5f6bf7db0099185805019377",
 }
 STORY = UserStory(
     id="US-1",
@@ -132,6 +133,8 @@ def test_new_words_ignores_the_words_of_the_passage_and_free_words() -> None:
     passage = "Rogue clients can set this header and trick Keycloak."
     assert checks.new_words("An attacker can set the header to trick Keycloak.", passage, "") == []
     assert checks.new_words("An attacker escalates privileges with the header.", passage, "") == ["escalat", "privileg"]
+    other_forms = "A client stores the token, validates the secret and changes the settings."
+    assert checks.new_words(other_forms, "Store the token. Validate the secret. Change the setting.", "") == []
 
 
 def test_has_risk_word() -> None:
@@ -155,6 +158,10 @@ def test_a_valid_row_is_kept_with_its_fields(docs: Path) -> None:
     assert model["model"] == "stand-in" and model["prompt_set"] == pipeline.PROMPT_SET
 
 
+SETTING = "Set `session-idle-timeout` to end a session after a time with no activity."
+BACKUP = "A backup runs each night."
+
+
 def test_rows_that_break_a_rule_are_dropped_with_the_reason(docs: Path) -> None:
     def rows(where: dict[str, str]) -> list[dict]:
         out = good_rows(where)
@@ -166,15 +173,92 @@ def test_rows_that_break_a_rule_are_dropped_with_the_reason(docs: Path) -> None:
             {**base, "source": src, "quote": "This sentence is not in the passage."},
             {**base, "source": "P99", "quote": WARNING},
             {**base, "source": out[0]["source"], "quote": out[0]["quote"]},
-            {**base, "source": src, "quote": "A backup runs each night.", "threat": ""},
+            {**base, "source": source_of(where, SETTING), "quote": SETTING, "threat": ""},
+            {**base, "source": source_of(where, BACKUP), "quote": BACKUP, "requirement": ""},
         ]
 
     model = ThreatListGenerator(StandIn(rows), docs).generate(STORY)
     reasons = [d["why"] for d in model["dropped"]]
-    assert any(r == "the quote is not in the passage" for r in reasons)
+    assert "the quote is not in the passage" in reasons
     assert any(r.startswith("unknown source name") for r in reasons)
-    assert any(r == "a second row for the same quote" for r in reasons)
+    assert "a second row for the same quote" in reasons
+    assert "no threat sentence" in reasons and "no requirement" in reasons
     assert {r["quote"] for r in model["rows"]} == {WARNING, RULE}
+
+
+def test_source_names_and_notes_are_read_in_any_usual_form(docs: Path) -> None:
+    class Loose(StandIn):
+        def generate(self, prompt, system_prompt=None, format=None):
+            reply = super().generate(prompt, system_prompt, format)
+            if not prompt.startswith("## Documentation passages"):
+                return reply
+            data = json.loads(reply.content)
+            for note in data["passages"]:
+                note["source"], note["fits_story"] = f"[{note['source']}]", "Yes"
+            for row in data["rows"]:
+                row["source"] = row["source"].lower()
+            return Reply(json.dumps(data))
+
+    model = ThreatListGenerator(Loose(good_rows), docs).generate(STORY)
+    assert {r["quote"] for r in model["rows"]} == {WARNING, RULE} and model["dropped"] == []
+    assert all(re.fullmatch(r"P\d+", r["source"]) for r in model["rows"])
+
+
+def test_an_object_with_no_row_list_is_no_answer(docs: Path) -> None:
+    llm = StandIn(good_rows, raw="{}")
+    model = ThreatListGenerator(llm, docs).generate(STORY)
+    assert all(c["ok"] is False and c["attempts"] == pipeline.MAX_JSON_ATTEMPTS for c in model["calls"])
+    page = render_markdown(model)
+    assert "model calls gave no valid answer" in page
+    assert "state no threat" not in page, "a failed run must not read as a clean result"
+
+
+def test_a_model_call_that_fails_does_not_stop_the_story(docs: Path) -> None:
+    class Broken(StandIn):
+        def generate(self, prompt, system_prompt=None, format=None):
+            raise RuntimeError("the server is gone")
+
+    model = ThreatListGenerator(Broken(good_rows), docs).generate(STORY)
+    assert model["rows"] == [] and all(c["ok"] is False for c in model["calls"])
+
+
+def test_the_label_call_and_the_check_call_can_fail(docs: Path) -> None:
+    class NoLabels(StandIn):
+        def generate(self, prompt, system_prompt=None, format=None):
+            if prompt.startswith("Task: choose a threat actor"):
+                raise RuntimeError("no answer")
+            return super().generate(prompt, system_prompt, format)
+
+    class BrokenChecker:
+        model_name = "broken"
+
+        def generate(self, prompt, system_prompt=None, format=None):
+            raise RuntimeError("no answer")
+
+    model = ThreatListGenerator(NoLabels(good_rows), docs, checker=BrokenChecker()).generate(STORY)
+    assert len(model["rows"]) == 2
+    assert all(r["actor"] == "" and r["stride"] == "" and r["second_model"] == "" for r in model["rows"])
+    page = render_markdown(model)
+    assert "Rows with no verdict of the second model (2)" in page
+    assert "accepts (0)" in page and "does not accept (0)" not in page
+
+
+def test_the_same_quote_in_two_groups_gives_one_row(tmp_path: Path) -> None:
+    folder = tmp_path / "many"
+    folder.mkdir()
+    same = "The session token must be kept secret."
+    text = "# Sessions\n\n" + "".join(f"## Part {i}\n\nThe session timeout rule number {i} ends an idle session. {same}\n\n" for i in range(1, 13))
+    (folder / "sessions.md").write_text(text, encoding="utf-8")
+
+    def rows(where: dict[str, str]) -> list[dict]:
+        name = next(iter(where))
+        return [{"source": name, "quote": same, "type": "rule", "threat": "The session token is not kept secret.", "harm": "not stated",
+                 "story_part": "", "requirement": "Keep the session token secret."}]
+
+    model = ThreatListGenerator(StandIn(rows), folder, name_labels=False).generate(STORY)
+    assert len(model["calls"]) >= 2
+    assert len(model["rows"]) == 1
+    assert [d["why"] for d in model["dropped"]] == ["a second row for the same quote"] * (len(model["calls"]) - 1)
 
 
 def test_a_row_from_a_passage_that_does_not_fit_is_dropped(docs: Path) -> None:
@@ -248,9 +332,55 @@ def test_no_label_call_when_the_step_is_off_or_there_is_no_row(docs: Path) -> No
     assert empty.actor_prompts == []
 
 
+def test_parse_label_lines_reads_words_and_other_spellings() -> None:
+    got = pipeline.parse_label_lines("1: external individual, Spoofing\n2: trusted-insider, Elevation of privilege\n3: accidental_actor; none")
+    assert got == {1: ("external_individual", "S"), 2: ("trusted_insider", "E"), 3: ("accidental_actor", "none")}
+
+
 def test_parse_label_lines() -> None:
     got = pipeline.parse_label_lines("1: external_individual, S\n2) trusted insider - none\n3: nobody, T\n4: OTHER, e\n4: nation_state, D")
     assert got == {1: ("external_individual", "S"), 2: ("trusted_insider", "none"), 3: ("", "T"), 4: ("other", "E")}
+
+
+class Checker:
+    """A stand-in for the second model: it accepts a row when the quote holds the word attacker."""
+
+    model_name = "checker-stand-in"
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def generate(self, prompt: str, system_prompt: str | None = None, format: str | None = None) -> Reply:
+        self.prompts.append(prompt)
+        quote = prompt.split('Quote: "', 1)[1].split('"\n', 1)[0]
+        return Reply("1. yes\n2. yes\n3. yes\nKEEP" if "attacker" in quote.lower() else "1. no\n2. yes\n3. yes\nDROP")
+
+
+def test_a_second_model_checks_each_row_and_orders_the_page(docs: Path) -> None:
+    checker = Checker()
+    model = ThreatListGenerator(StandIn(good_rows), docs, checker=checker).generate(STORY)
+    by_quote = {r["quote"]: r for r in model["rows"]}
+    assert by_quote[WARNING]["second_model"] == "accepts" and by_quote[RULE]["second_model"] == "refuses"
+    assert len(model["rows"]) == 2, "the check removes no row"
+    assert len(checker.prompts) == 2 and model["checker"] == "checker-stand-in"
+    assert any("Set `session-idle-timeout`" in p for p in checker.prompts), "the check call holds the passage, not only the quote"
+    page = render_markdown(model)
+    assert page.index("accepts (1)") < page.index("does not accept (1)")
+    assert page.index("An attacker who steals the session cookie") < page.index("The session cookie is sent with no Secure flag.")
+
+
+def test_no_check_call_with_no_second_model(docs: Path) -> None:
+    model = ThreatListGenerator(StandIn(good_rows), docs).generate(STORY)
+    assert model["checker"] is None and all(r["second_model"] == "" for r in model["rows"])
+    assert "second model" not in render_markdown(model)
+
+
+def test_keep_or_drop_takes_the_last_word() -> None:
+    assert checks.keep_or_drop("1. yes\n2. no\n3. yes\nDROP") == "refuses"
+    assert checks.keep_or_drop("I would KEEP it, but question 2 is no.\nDROP") == "refuses"
+    assert checks.keep_or_drop("1. yes\n2. yes\n3. yes\nKEEP") == "accepts"
+    assert checks.keep_or_drop("no verdict") == ""
+    assert checks.keep_or_drop("1. yes\n2. yes\n3. yes\nKeep") == "accepts"
 
 
 # ---------------------------------------------------------------------------------------------- page
@@ -281,7 +411,7 @@ def test_the_command_line_has_the_threats_command() -> None:
     result = CliRunner().invoke(app, ["generate", "threats", "--help"])
     assert result.exit_code == 0, result.output
     text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
-    assert "--docs" in text and "--no-labels" in text and "--story-id" in text
+    assert "--docs" in text and "--no-labels" in text and "--story-id" in text and "--checker-model" in text
 
 
 def test_the_command_line_refuses_a_missing_documentation_folder(tmp_path: Path) -> None:
@@ -293,3 +423,41 @@ def test_the_command_line_refuses_a_missing_documentation_folder(tmp_path: Path)
     result = CliRunner().invoke(app, ["generate", "threats", str(stories), "--docs", str(tmp_path / "nothing")])
     assert result.exit_code == 1, result.output
     assert "Documentation folder not found" in result.output and "Traceback" not in result.output
+
+
+class _Healthy:
+    model_name = "main-model"
+
+    def check_health(self) -> bool:
+        return True
+
+    def generate(self, prompt, system_prompt=None, format=None):
+        return Reply('{"passages": [], "rows": []}')
+
+
+def test_the_command_line_refuses_a_checker_that_is_the_main_model(docs: Path, tmp_path: Path, monkeypatch) -> None:
+    import secreqgen.cli as cli
+    from typer.testing import CliRunner
+
+    monkeypatch.setattr(cli, "_ollama_client", lambda cfg, tested_setup, model_name=None: _Healthy())
+    stories = tmp_path / "stories.json"
+    stories.write_text(json.dumps({"project": 2024, "user_stories": [{"id": "US-1", "title": "Session timeout", "story": "s", "acceptance_criteria": []}]}), encoding="utf-8")
+    main_model = cli.get_config().llm.model_name
+    result = CliRunner().invoke(cli.app, ["generate", "threats", str(stories), "--docs", str(docs), "--checker-model", main_model, "--output", str(tmp_path / "out")])
+    assert result.exit_code == 1, result.output
+    assert "must be a different model" in result.output and "Traceback" not in result.output
+
+
+def test_the_command_line_gives_each_story_its_own_folder(docs: Path, tmp_path: Path, monkeypatch) -> None:
+    import secreqgen.cli as cli
+    from typer.testing import CliRunner
+
+    monkeypatch.setattr(cli, "_ollama_client", lambda cfg, tested_setup, model_name=None: _Healthy())
+    stories = tmp_path / "stories.json"
+    story = {"title": "Session timeout", "story": "As a user I want the session to end.", "acceptance_criteria": []}
+    stories.write_text(json.dumps({"project": 2024, "user_stories": [{"id": "A/1", **story}, {"id": "A_1", **story}]}), encoding="utf-8")
+    out = tmp_path / "out"
+    result = CliRunner().invoke(cli.app, ["generate", "threats", str(stories), "--docs", str(docs), "--output", str(out)])
+    assert result.exit_code == 0, result.output
+    assert sorted(p.name for p in out.iterdir()) == ["A_1", "A_1_2"]
+    assert (out / "A_1_2" / "threats.md").is_file()
