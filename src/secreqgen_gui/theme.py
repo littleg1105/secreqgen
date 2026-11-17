@@ -158,6 +158,8 @@ body {{
   padding: 32px 0;
   color: var(--sr-slate);
 }}
+.sr-link {{ color: var(--sr-blue); }}
+.sr-link-button {{ color: var(--sr-blue); padding: 0; min-height: 0; }}
 .sr-steps {{ max-width: 1160px; }}
 .sr-steps-bar {{ min-height: 0; margin-bottom: 2px; }}
 .sr-steps-full {{ font-size: var(--sr-size-small); }}
@@ -172,12 +174,16 @@ body {{
 .sr-steps-hint {{ display: none; }}
 .sr-step-more {{ margin-top: 4px; max-width: 84ch; }}
 .sr-step-more .q-item {{
+  display: inline-flex;
   padding: 0;
-  min-height: 0;
+  min-height: 24px;
   color: var(--sr-blue);
   font-size: var(--sr-size-small);
+  background: none;
 }}
-.sr-step-more .q-item__section--side {{ padding-left: 4px; min-width: 0; }}
+.sr-step-more .q-focus-helper {{ display: none; }}
+.sr-step-more .q-item__section--main {{ flex: 0 0 auto; }}
+.sr-step-more .q-item__section--side {{ padding-left: 2px; min-width: 0; }}
 .sr-step-more .q-expansion-item__content {{ padding: 2px 0 0 0; }}
 """
 

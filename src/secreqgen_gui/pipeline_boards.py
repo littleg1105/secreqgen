@@ -79,11 +79,11 @@ TEXTS: dict[str, dict[str, tuple[str, str, str]]] = {
         ),
         "second_model": (
             "The checker reads each threat",
-            "The checker reads each threat next to its passage. It flags a "
-            "threat if the quote is about another feature, or if the threat says "
-            "more than the passage.",
-            'The checker answers "accepted" or "flagged". A flagged threat stays '
-            "in the list, in its own group.",
+            "The checker is a second model. It flags a threat if the quote is "
+            "about another feature, or if the threat says more than the passage.",
+            "The checker reads each threat next to its passage and answers OK or "
+            "FAULT. The GUI shows these answers as accepted and flagged. A "
+            "flagged threat stays in the list, in its own group.",
         ),
         "weak_signs": (
             "SecReqGen marks weak support",

@@ -65,7 +65,7 @@ def page(
             )
             about = (
                 ui.textarea("About the product (optional)")
-                .props(f'outlined autogrow placeholder="{ABOUT_HINT}"')
+                .props(f'outlined autogrow hint="{ABOUT_HINT}"')
                 .classes("w-full")
             )
             counter = ui.label().classes("sr-small")

@@ -227,7 +227,7 @@ _CSS = """
   border-left: 3px solid #1D3A6B; border-radius: 4px;
 }
 .sr-run-line {
-  display: grid; grid-template-columns: 150px 120px 1fr 100px 190px;
+  display: grid; grid-template-columns: 190px 120px 1fr 90px 110px;
   gap: 12px; align-items: baseline; padding: 9px 4px;
   border-bottom: 1px solid #D8DEE4; color: #1B1F23; text-decoration: none;
 }
