@@ -1,40 +1,43 @@
 # SecReqGen
 
-RAG-enhanced security requirements generator for Master's thesis.
+SecReqGen writes security requirements and a draft threat list for each user story. It reads
+the documentation of a product. It uses local language models that run in Ollama. With an
+Ollama server on your own computer, no data leaves your computer.
 
-## Overview
+## Requirements
 
-SecReqGen is a CLI tool that generates security requirements from user stories using:
-- RAG (Retrieval-Augmented Generation) with security knowledge bases
-- Zero-shot LLM generation for baseline comparison
+- Python 3.11, 3.12 or 3.13. The tested environment is Python 3.13. Python 3.14 is not supported.
+- [Ollama](https://ollama.com), running on your computer or on a server that you can reach.
+- The Ollama models that you want to use. The tested setup uses `gemma4:26b` and `qwen3.8:27b`
+  (see the two sections below). The tool does not download models. Pull them with `ollama pull`.
 
 ## Installation
 
+Run these commands in the folder of this repository.
+
 ```bash
-# Create virtual environment with Python 3.13
 python3.13 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install poetry
-poetry install
+.venv/bin/pip install --no-deps -r requirements-tested.txt
+export PYTHONPATH=src
+export TOKENIZERS_PARALLELISM=false
 ```
 
-## Usage
+- `requirements-tested.txt` lists the exact package versions of the tested environment. Use it first.
+- The second way is Poetry: `./scripts/setup-venv.sh`. It creates `.venv`, adds `PYTHONPATH` to the
+  activate script and runs `poetry install`. The file `poetry.lock` is older than `pyproject.toml`.
+- Set `PYTHONPATH=src` in each shell. On macOS, pip marks its `.pth` files as hidden, and Python
+  skips hidden `.pth` files. Then the editable install does not work.
+- Set `TOKENIZERS_PARALLELISM=false` for each command that embeds text.
+
+Check the install:
 
 ```bash
-# Show configuration
-secreqgen config
-
-# Ingest documents
-secreqgen ingest documents <directory> --type policies
-
-# Generate requirements
-secreqgen generate requirements <input> --output <file>
-
-# Evaluate results
-secreqgen evaluate compare <generated> <ground_truth>
+.venv/bin/python -m secreqgen --help
+.venv/bin/python -m secreqgen generate check-ollama
 ```
+
+The examples below write `secreqgen`. Use `.venv/bin/python -m secreqgen` in its place when the
+command `secreqgen` is not on your path.
 
 ### The tested setup: word search over a documentation folder
 
@@ -103,13 +106,62 @@ secreqgen generate threats stories.json --docs path/to/product/docs --output thr
   specific and supported by the documentation, 13 were general advice and 7 were wrong. With
   `qwen3.8:27b` as the writer and `gemma4:26b` as the checker: 30 of 102 rows in the first group were wrong.
 
+## Commands
+
+| Command | What it does |
+|---|---|
+| `version` | Shows the version. |
+| `config` | Shows the current settings. |
+| `ingest documents DIRECTORY` | Puts the documents of a folder in the vector store. Option `--type` (`policies`, `architecture` or `standards`). |
+| `ingest system-context FILE` | Loads a system context YAML file into the vector store. |
+| `ingest stats` | Shows statistics of the vector store. |
+| `ingest clear` | Removes all data from the vector store. |
+| `generate check-ollama` | Checks that Ollama runs and has the model. |
+| `generate requirements INPUT_FILE` | Writes requirements for the user stories of a file. Options `--docs`, `--product`, `--context`, `--baseline`, `--format`, `--output`. |
+| `generate single` | Writes requirements for one story. Options `--title`, `--story`, `--ac`, `--docs`, `--product`, `--context`, `--baseline`, `--format`. |
+| `generate threats INPUT_FILE` | Writes a draft threat list for each story. Needs `--docs`. Other options: `--product`, `--story-id`, `--labels`/`--no-labels`, `--model`, `--check`/`--no-check`, `--checker-model`, `--about-file`, `--output`. |
+| `evaluate run STORIES GROUND_TRUTH` | Runs the older RAG against zero-shot comparison. |
+| `evaluate compare-runs STORIES GROUND_TRUTH` | Repeats that comparison `--runs` times (default 20) and reports totals. Option `--pilot` runs 10. |
+| `evaluate compare GENERATED GROUND_TRUTH` | Matches a file of generated requirements against a ground truth file. |
+| `evaluate report RESULTS_FILE` | Builds reports from a saved evaluation result. |
+
+Run `secreqgen <group> <command> --help` to see all options of a command.
+
+## Settings
+
+- All settings have the prefix `SECREQGEN_`. Run `secreqgen config` to see the values in use.
+- The model settings are `SECREQGEN_LLM_<NAME>`, for example `SECREQGEN_LLM_MODEL_NAME`.
+  The form `SECREQGEN_LLM__<NAME>` also works.
+- `SECREQGEN_LLM_BASE_URL` sets the address of the Ollama server. The default is
+  `http://localhost:11434`.
+- `OLLAMA_HOST` has no effect on the command line. The commands always pass the value of
+  `SECREQGEN_LLM_BASE_URL` to the client, and this value has a default. To use another server,
+  set `SECREQGEN_LLM_BASE_URL`.
+- The retrieval similarity threshold of the vector-store path is 0.4 (`SECREQGEN_RETRIEVAL_SIMILARITY_THRESHOLD`).
+  Keep it at 0.4. A much higher value makes the search return no text.
+
+## Limits
+
+- The threat list is a draft for a person to check. It is not a complete threat model.
+- The vector-store path is the older path. It uses `ingest`, `generate` without `--docs`, and
+  `evaluate`. It is not the tested setup.
+- The options `--with-verification` and `--verification-threshold` of `evaluate run` are shown in
+  the start panel only. They do not change the run.
+- The default output folders depend on the working folder. The vector store is `./data/vectordb`,
+  `generate threats` writes to `./threat_lists`, and `evaluate run` writes to
+  `docs/evaluation_results` when you give no `--output`. Run the commands from the same folder
+  each time, or give the paths.
+
 ## Development
 
 ```bash
-# Run tests
-poetry run pytest tests/ -v
-
-# Format code
-poetry run black src/
-poetry run ruff check src/
+PYTHONPATH=src .venv/bin/python -m pytest tests/unit -m "not slow" -q
+.venv/bin/ruff check src tests
 ```
+
+The tests marked `slow` need a real model server or a model download. The fast run skips them.
+
+## More pages
+
+- `docs/README.md`: the documents of the project and which ones to trust.
+- `scripts/README.md`: the lab scripts that ran the experiments. They are a frozen record.

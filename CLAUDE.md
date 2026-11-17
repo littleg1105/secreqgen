@@ -1,107 +1,87 @@
-# SecReqGen - Claude Code Instructions
+# SecReqGen: instructions for an AI coding agent
 
-## Project Overview
-RAG-enhanced security requirements generator for Master's thesis. Compares RAG vs zero-shot LLM generation using Precision/Recall/F1 metrics.
+## What this repository is
 
-## Critical Rules
+SecReqGen is the tool of an MSc thesis. For one user story, it writes security requirements and a draft threat list. It uses the product documentation and local Ollama models. The thesis record (the experiments and their numbers) points at the files of this repository, so some files are frozen.
 
-1. **DOCUMENT EVERYTHING**: After each step, update `docs/log.md` with what/why/decisions
-2. **ONE STEP AT A TIME**: Complete and test each step before moving on
-3. **ASK BEFORE ASSUMING**: Unclear requirements → ask for clarification
-4. **COMMIT OFTEN**: Atomic commits after each logical unit
+## Read first
 
-## Tech Stack
-- Python 3.11-3.13 (3.14 not supported), Poetry, Typer (CLI)
-- LangChain, ChromaDB, sentence-transformers
-- Ollama (Llama 3 8B / Mistral 7B)
-- Pydantic 2.0 for schemas
+1. `docs/README.md`: which documents are current and which are old.
+2. `scripts/README.md`: the lab record. It explains each experiment script.
+3. The top block of `docs/HANDOFF.md` (the block that says "read this block first"). Lower blocks are history.
 
-## Development Environment
+Do not write entries in `docs/log.md`. It is an old file. It does not hold the current state.
 
-**Recommended: Use the setup script** (handles macOS .pth issues automatically):
-```bash
-./scripts/setup-venv.sh
-source .venv/bin/activate
-```
+## Do not touch
 
-**Manual setup** (if you prefer):
-```bash
-python3.13 -m venv .venv
-source .venv/bin/activate
-pip install poetry
-poetry install
-```
+Never edit, move or delete these files. This is the only copy of the list. Other pages point to it.
 
-## Project Structure
-```
-src/secreqgen/
-├── cli.py              # Typer CLI
-├── config.py           # Pydantic Settings
-├── ingestion/          # Doc loading, chunking, embeddings
-├── retrieval/          # ChromaDB, RAG retriever
-├── generation/         # LLM client, prompts, generator
-├── output/             # Formatters, exporters
-└── evaluation/         # Semantic matching, metrics
-```
+| Item | Reason |
+|---|---|
+| Everything that exists today in `scripts/`, `data/`, `docs/` and `configs/` | It is the record of the experiments. Some files are hash-pinned. |
+| `src/secreqgen/ingestion/*.py` | Hash-pinned. |
+| `src/secreqgen/threats/prompts/*` | Hash-pinned. They are the threat prompts that the tests used. |
+| `src/secreqgen/generation/prompt_sets/**` | Hash-pinned. They are the prompts of the experiments. |
+| `poetry.lock`, `requirements-tested.txt`, `pyproject.toml` | They fix the tested environment. |
+| `conftest.py` in the repository root | The tests depend on it. |
+| `src/secreqgen/retrieval/retriever.py` and `src/secreqgen/config.py` | The thesis numbers build reads them. |
+| `src/secreqgen/evaluation/semantic_matcher.py`, `metrics.py` and `multi_run.py` | Chapter 6 cites their lines. |
+| `src/secreqgen/generation/*.py` | `scripts/run_study2b.py` hashes them. |
+| `src/secreqgen/retrieval/word_search.py` and `passage_edits.py` | Tests check their source text. |
+| `src/secreqgen/threats/pipeline.py`, `checks.py` and `render.py` | They were tested on 17 November 2026. |
+| `tests/unit/test_cli.py` | The thesis numbers name it. |
+| `tests/unit/test_tuning_*.py`, `tests/unit/test_study2*.py` | They test the lab scripts and belong to the lab record. |
 
-## Current Phase
-Check `docs/log.md` for current implementation status.
+A task can name one of these files and order a change. Then change only that file.
+
+## Rules for a change
+
+- Behaviour stays the same. The same commands, options, defaults, help texts, console lines, written files and prompts stay. Change them only when the owner orders it.
+- Put no home-folder path in `src/`. Put no absolute path of one machine in any file.
+- Add no new dependency without the owner's word.
+- Never run a lab script again. It can overwrite the record or call a model for hours. Read it, do not run it.
+- The retrieval `similarity_threshold` is 0.4. It is never 0.7. The value 0.7 was the fault that the audit of 19 May 2026 found. With 0.7, every search returned the fallback text and no documentation.
+- Add new tests as new files. Change another existing test file only together with the code that it tests, and only when the owner orders a change of behaviour.
+- Write comments, docstrings and commit text in Simplified Technical English. Use no em-dash.
 
 ## Commands
-- Load phase details: `/phase N` (custom slash command)
-- Document step: Update `docs/log.md`
-- Run tests: `.venv/bin/python -m pytest tests/ -v`
-- Run CLI: `.venv/bin/python -m secreqgen <command>`
 
-## Troubleshooting
+Run all commands from the repository root.
 
-### "ModuleNotFoundError: No module named 'secreqgen'"
-The package must be installed in editable mode for imports to work. Run:
 ```bash
-.venv/bin/pip install -e .
-```
-This happens after:
-- Recreating the venv
-- Running `poetry install` (should do it automatically, but sometimes fails)
-- Any corruption of the venv's site-packages
-
-### macOS: Imports fail even after `pip install -e .`
-**Symptom:** Python shows `ModuleNotFoundError` even though `.pth` file exists in site-packages.
-
-**Root Cause:** This is a **Python security feature** (see [CPython Issue #113659](https://github.com/python/cpython/issues/113659)). Python 3.8+ intentionally skips .pth files with the BSD `hidden` flag to prevent malicious code execution. On macOS Sequoia, APFS may set this flag on pip-created files.
-
-**Best Solution - Use PYTHONPATH:**
-```bash
-# Recreate venv with the setup script (adds PYTHONPATH to activate)
-./scripts/setup-venv.sh
-source .venv/bin/activate
+./scripts/setup-venv.sh                      # make .venv (Python 3.13)
+PYTHONPATH=src .venv/bin/python -m pytest tests/unit -m "not slow" -q
+.venv/bin/ruff check src                     # report only
+PYTHONPATH=src .venv/bin/python -m secreqgen --help
 ```
 
-**Quick Fix - Remove hidden flag:**
+Old code has 294 ruff messages. Never run `ruff --fix`, `ruff format` or `black` on it. New code must have none.
+
+Set `PYTHONPATH=src` for every Python command. Set `TOKENIZERS_PARALLELISM=false` when a command embeds text.
+
+The command line has five top-level commands: `version`, `config`, `ingest`, `generate` and `evaluate`. Run `<group> --help` to see the sub-commands and options.
+
+The unit tests cannot reach a model server. A connection to port 11434 is refused, so a test that needs a model fails at once. Tests with a real model are in `tests/integration`.
+
+Four tests of the Study 2b runner are skipped in a copy of the repository. The script `scripts/run_study2.py` names the registered workspace as a fixed path, and the guards protect only that path. In a copy, the guards do not refuse the folders of the copy, and one of the four tests started real model calls.
+
+## macOS: imports fail
+
+Use `./scripts/setup-venv.sh`. It adds `PYTHONPATH` to `.venv/bin/activate`.
+
+Symptom: `ModuleNotFoundError: No module named 'secreqgen'`, even after `pip install -e .`.
+
+Cause: Python skips `.pth` files that have the BSD `hidden` flag (CPython issue 113659). On macOS, pip can set this flag. It can come back after any pip operation.
+
+Fix 1 (best): set `PYTHONPATH=src`. This does not use `.pth` files.
+
+Fix 2: remove the flag. First look for `hidden` in the flags column:
+
 ```bash
-# Check if .pth files have hidden flag
 ls -lO .venv/lib/python3.13/site-packages/*.pth
-# Look for "hidden" in the flags column
-
-# Remove hidden flag
 chflags -R nohidden .venv/lib/python3.13/site-packages/*.pth
 ```
 
-**Why PYTHONPATH is better:** The hidden flag can reappear after pip operations. Using PYTHONPATH completely bypasses .pth files, making imports reliable regardless of file flags.
+## Old slash commands
 
-## Key Design Decisions
-- **Embeddings**: all-mpnet-base-v2 (better semantic nuance)
-- **Similarity threshold**: 0.85 for matches, 0.70-0.85 for review
-- **Chunking**: 512 tokens max, 50 token overlap
-- **Always inject**: System context YAML into every prompt
-
-## Documentation Template
-After completing work, add to `docs/log.md`:
-```markdown
-## [Date] Step X.Y: [Name]
-**Files**: [list]
-**What**: [description]
-**Why**: [rationale]  
-**Decisions**: [choices made]
-**Next**: [what's next]
-```
+The files `.claude/commands/log.md`, `status.md` and `step.md` still name `docs/log.md`. Do not follow them. Use the "Read first" list above.
