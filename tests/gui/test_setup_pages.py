@@ -149,7 +149,7 @@ async def test_product_name_comes_from_the_story_file(user, tmp_path):
     await _ready(user, tmp_path)
     await user.should_see("2 stories found.")
     inputs = {e.props.get("label"): e for e in user.find(kind=ui.input).elements}
-    assert inputs["Product name"].value == "Demo"
+    assert inputs["Product name (optional)"].value == "Demo"
 
 
 async def _about(user, count):
@@ -325,3 +325,15 @@ async def test_skipped_stories_line_uses_the_singular_form(user, tmp_path):
     await user.open(_url("/threats/new", path, _docs(tmp_path)))
     await user.should_see("1 story found.")
     await user.should_see("1 story could not be read and is skipped.")
+
+
+async def test_the_example_stories_are_one_click_away(user):
+    await user.open("/threats/new")
+    await user.should_see("Use the example stories")
+    await user.should_see("Eight generic stories that fit most products.")
+    user.find("Use the example stories").click()
+    await user.should_see("8 stories found.")
+    await user.should_see("GEN-001")
+    await user.should_see("Webhooks and Integrations")
+    # The form asks for no product name: the stories fit any product.
+    await user.should_see("Product name (optional)")

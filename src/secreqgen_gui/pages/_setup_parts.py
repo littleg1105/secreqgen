@@ -29,9 +29,11 @@ FOLDER_MISSING = "Folder not found. Check the path or click Browse."
 FOLDER_EMPTY = "This folder has no Markdown files."
 WRONG_TYPE = "Use a .json, .yaml or .yml file."
 STORIES_HINT = "JSON or YAML, with a list named user_stories"
+EXAMPLES_HINT = "Eight generic stories that fit most products."
+DOCS_HINT = "The folder with the Markdown (.md) files of the product"
 BUSY = "Another run is in progress. Wait for it to end, or stop it."
 UNTESTED_PROMPTS = "A run with these prompts gets the tag: untested prompts."
-PRODUCT_NOTE = "Product name"
+PRODUCT_NOTE = "Product name (optional)"
 PRODUCT_LIMIT = 80
 
 
@@ -118,7 +120,17 @@ class StoriesPart:
                 tab_one = ui.tab("Type a story")
             with ui.tab_panels(tabs, value=tab_file).classes("w-full"):
                 with ui.tab_panel(tab_file).classes("p-0 pt-3"):
-                    self.field = path_field("Stories file", initial, hint=STORIES_HINT)
+                    self.field = path_field(
+                        "Stories file",
+                        initial,
+                        hint=STORIES_HINT,
+                        start=storage.examples_dir(),
+                    )
+                    with ui.row().classes("items-baseline gap-3 pt-5"):
+                        ui.button(
+                            "Use the example stories", on_click=self._use_examples
+                        ).props("flat dense no-caps").classes("sr-link-button")
+                        ui.label(EXAMPLES_HINT).classes("sr-small")
                 with ui.tab_panel(tab_up).classes("p-0 pt-3"):
                     self._upload_panel()
                 with ui.tab_panel(tab_one).classes("p-0 pt-3"):
@@ -135,6 +147,11 @@ class StoriesPart:
             ui.timer(0.05, self.read, once=True)
 
     # ways to give a file
+
+    async def _use_examples(self) -> None:
+        """Put the example stories of the GUI into the field."""
+        path = await run.io_bound(storage.ensure_examples)
+        self.field.set_value(show_path(path))
 
     def _upload_panel(self) -> None:
         ui.upload(
@@ -311,7 +328,9 @@ class DocsPart:
         self._auto_product = ""
         body = section("Documentation")
         with body:
-            self.field = path_field("Documentation folder", initial, folder=True)
+            self.field = path_field(
+                "Documentation folder", initial, folder=True, hint=DOCS_HINT
+            )
             self.info = message()
             self.info.set_visibility(False)
             self.product = (

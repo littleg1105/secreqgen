@@ -13,7 +13,9 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
-from secreqgen_gui.settings import data_home
+from secreqgen_gui.settings import data_home, packed_examples_dir
+
+EXAMPLE_STORIES = "generic_stories.json"
 
 MAX_UPLOAD_BYTES = 1_000_000
 UPLOAD_SUFFIXES = (".json", ".yaml", ".yml", ".txt", ".md")
@@ -101,6 +103,25 @@ def read_manifest(run_id: str) -> dict | None:
     """Return the manifest of a run, or None when it is missing or damaged."""
     data = _read_json(run_dir(run_id) / "run.json")
     return data if isinstance(data, dict) else None
+
+
+def examples_dir() -> Path:
+    """Return the folder of the example files in the data folder."""
+    return _sub_dir("examples")
+
+
+def ensure_examples() -> Path:
+    """Copy the example files into the data folder. Return the stories file.
+
+    A file that is in the data folder stays as it is: the person can change
+    the copy. A file that is missing there comes from the GUI again.
+    """
+    target = examples_dir()
+    for source in sorted(packed_examples_dir().glob("*.json")):
+        copy = target / source.name
+        if not copy.exists():
+            shutil.copyfile(source, copy)
+    return target / EXAMPLE_STORIES
 
 
 def run_date_text(item: dict) -> str:

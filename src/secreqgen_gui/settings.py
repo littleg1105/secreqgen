@@ -147,6 +147,11 @@ def listens_on_this_computer_only() -> bool:
     return server_host() in LOCAL_HOSTS
 
 
+def packed_examples_dir() -> Path:
+    """Return the folder of the example files that come with the GUI."""
+    return Path(__file__).resolve().parent / "examples"
+
+
 def server_port() -> int:
     """Return the port to listen on."""
     value = os.environ.get(PORT_ENV, "").strip()

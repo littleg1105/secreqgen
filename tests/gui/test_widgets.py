@@ -108,3 +108,69 @@ def test_list_folder_error_uses_the_new_text(tmp_path):
     entries, error = _list_folder(tmp_path / "missing", True)
     assert entries == []
     assert error.startswith("This folder cannot be read: ")
+
+
+def test_the_os_dialog_is_used_only_on_a_local_mac(monkeypatch):
+    from secreqgen_gui import settings, widgets
+
+    monkeypatch.delenv(settings.HOST_ENV, raising=False)
+    monkeypatch.setattr(widgets.sys, "platform", "darwin")
+    monkeypatch.setattr(widgets.shutil, "which", lambda name: "/usr/bin/" + name)
+    assert widgets.os_picker_available()
+    # Not on another system.
+    monkeypatch.setattr(widgets.sys, "platform", "linux")
+    assert not widgets.os_picker_available()
+    # Not when the GUI listens on a network address: the dialog would open on
+    # the screen of the server, not of the person.
+    monkeypatch.setattr(widgets.sys, "platform", "darwin")
+    monkeypatch.setenv(settings.HOST_ENV, "0.0.0.0")
+    assert not widgets.os_picker_available()
+
+
+def test_the_os_dialog_gets_its_values_as_arguments(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from secreqgen_gui import widgets
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout=str(tmp_path / "docs") + "/\n")
+
+    monkeypatch.setattr(widgets.subprocess, "run", fake_run)
+    start = tmp_path / 'a "name" with quotes'
+    picked = widgets.pick_with_os_dialog(start, "Pick the documentation folder", True)
+    assert picked == tmp_path / "docs"
+    command = calls[0]
+    # No shell. The script is the fixed text. The values follow as arguments.
+    assert command[:3] == ["osascript", "-e", widgets.PICK_SCRIPT]
+    assert command[3:] == [str(start), "Pick the documentation folder", "folder"]
+    assert str(start) not in widgets.PICK_SCRIPT
+
+
+def test_a_cancelled_os_dialog_gives_nothing(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from secreqgen_gui import widgets
+
+    cancelled = SimpleNamespace(returncode=1, stdout="")
+    monkeypatch.setattr(widgets.subprocess, "run", lambda *a, **k: cancelled)
+    assert widgets.pick_with_os_dialog(tmp_path, "Pick the stories file", False) is None
+
+    def missing(*args, **kwargs):
+        raise OSError("no such program")
+
+    monkeypatch.setattr(widgets.subprocess, "run", missing)
+    assert widgets.pick_with_os_dialog(tmp_path, "Pick the stories file", False) is None
+
+
+def test_a_dialog_starts_in_a_folder_that_exists(tmp_path):
+    from secreqgen_gui import widgets
+
+    file = tmp_path / "stories.json"
+    file.write_text("{}", encoding="utf-8")
+    assert widgets._start_place(str(file), None) == tmp_path
+    assert widgets._start_place("", tmp_path) == tmp_path
+    assert widgets._start_place(str(tmp_path / "missing"), tmp_path) == tmp_path
+    assert widgets._start_place("", None).is_dir()

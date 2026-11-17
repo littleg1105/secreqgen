@@ -207,3 +207,35 @@ def test_the_date_of_a_run_is_shown_in_local_time(monkeypatch):
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+def test_the_example_stories_come_with_the_gui():
+    import json
+
+    from secreqgen.application.inputs import build_user_stories
+    from secreqgen_gui import settings, storage
+
+    packed = settings.packed_examples_dir() / storage.EXAMPLE_STORIES
+    data = json.loads(packed.read_text(encoding="utf-8"))
+    stories, skipped = build_user_stories(data["user_stories"])
+    assert 5 <= len(stories) <= 10 and not skipped
+    assert len({story.id for story in stories}) == len(stories)
+    for story in stories:
+        assert story.title and story.story.startswith("As a")
+        assert len(story.acceptance_criteria) >= 3
+    # The stories fit any product, so the file names no product.
+    assert "project" not in data
+
+
+def test_the_examples_are_copied_one_time_and_a_changed_copy_stays():
+    from secreqgen_gui import storage
+
+    copy = storage.ensure_examples()
+    assert copy.name == storage.EXAMPLE_STORIES and copy.is_file()
+    assert copy.parent == storage.examples_dir()
+    copy.write_text('{"user_stories": []}', encoding="utf-8")
+    assert storage.ensure_examples().read_text(encoding="utf-8") == (
+        '{"user_stories": []}'
+    )
+    copy.unlink()
+    assert "GEN-001" in storage.ensure_examples().read_text(encoding="utf-8")

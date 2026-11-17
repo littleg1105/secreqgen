@@ -1,0 +1,93 @@
+{
+  "description": "Eight generic user stories for a first test on a new product. They name features that most products with user accounts have. They are examples. They are not part of the evaluation of the thesis.",
+  "user_stories": [
+    {
+      "id": "GEN-001",
+      "title": "User Login",
+      "story": "As a user, I want to log in to my account so I can use the product",
+      "acceptance_criteria": [
+        "Users log in with a username and a password",
+        "Repeated failed logins are limited",
+        "Multi-factor authentication can be turned on",
+        "Sessions end after a time with no activity"
+      ]
+    },
+    {
+      "id": "GEN-002",
+      "title": "Password Reset",
+      "story": "As a user, I want to reset a forgotten password so I can get back into my account",
+      "acceptance_criteria": [
+        "A reset link is sent to the email address of the account",
+        "The reset link expires",
+        "The new password must meet the password rules",
+        "Other sessions end after the reset"
+      ]
+    },
+    {
+      "id": "GEN-003",
+      "title": "Roles and Permissions",
+      "story": "As an admin, I want to give roles to users so each person has only the access they need",
+      "acceptance_criteria": [
+        "Roles can be given to users and taken away",
+        "Each role has a set of permissions",
+        "Only admins can change roles",
+        "A role change applies immediately"
+      ]
+    },
+    {
+      "id": "GEN-004",
+      "title": "API Access Tokens",
+      "story": "As a developer, I want to create an access token so I can call the API from a script",
+      "acceptance_criteria": [
+        "Tokens can be created and revoked",
+        "A token has a limited set of permissions",
+        "Tokens can expire",
+        "The token value is shown only once"
+      ]
+    },
+    {
+      "id": "GEN-005",
+      "title": "Single Sign-On",
+      "story": "As an admin, I want to connect the product to our identity provider so users sign in with their company account",
+      "acceptance_criteria": [
+        "An identity provider can be configured",
+        "Users are matched to existing accounts",
+        "Local password login can be turned off",
+        "Users who are removed at the identity provider lose access"
+      ]
+    },
+    {
+      "id": "GEN-006",
+      "title": "File Uploads",
+      "story": "As a user, I want to upload files so I can share them with other users",
+      "acceptance_criteria": [
+        "Files can be uploaded and downloaded",
+        "File type and file size are limited",
+        "Only users with access can open a file",
+        "Links to files can be turned off"
+      ]
+    },
+    {
+      "id": "GEN-007",
+      "title": "Audit Log",
+      "story": "As an admin, I want a log of important actions so I can find out who did what",
+      "acceptance_criteria": [
+        "Logins and admin actions are recorded",
+        "Each entry has the user and the time",
+        "Only admins can read the log",
+        "Log entries cannot be changed"
+      ]
+    },
+    {
+      "id": "GEN-008",
+      "title": "Webhooks and Integrations",
+      "story": "As an admin, I want to connect the product to other services so work happens automatically",
+      "acceptance_criteria": [
+        "Incoming and outgoing webhooks can be configured",
+        "Requests are checked with a secret or a token",
+        "An integration has only the permissions it needs",
+        "Integrations can be turned off"
+      ]
+    }
+  ]
+}

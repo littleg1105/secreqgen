@@ -9,20 +9,29 @@ pip install -r requirements-gui.txt        # one time, in the environment of the
 PYTHONPATH=src python -m secreqgen_gui
 ```
 
-Open `http://127.0.0.1:8080`. The model server (Ollama) must run and must hold the models of the settings page.
+Open `http://127.0.0.1:8080`. Ollama must run and must have the models of the Settings page.
+
+## Try it on a new product
+
+1. Open "Threat list" in the menu.
+2. In "Stories", click "Use the example stories". The GUI comes with 8 generic stories (login, password reset, roles, API tokens, single sign-on, file uploads, audit log, webhooks). Your copy is `examples/generic_stories.json` in the data folder. You can change it.
+3. In "Documentation", click "Browse" and pick the folder with the Markdown (`.md`) files of the product. The search reads `.md` files only.
+4. Click "Start threat list".
+
+On macOS, "Browse" opens the normal file dialog. On other systems, and when the GUI listens on a network address, "Browse" shows a list of folders in the page.
 
 ## Pages
 
 | Page | What it does |
 |---|---|
-| Home | State of the model server, the two entries, the newest runs |
+| Home | State of Ollama, the two entries, the recent runs |
 | Threat list, Requirements | The setup form of a run |
-| Run | The steps of the story in work, the stories, the stop button |
-| Result | The threat list of a story with the evidence beside each row, or the requirements of a run |
+| Run | The steps of the story that is running, the stories, the stop button |
+| Result | The threat list of a story with the evidence beside each threat, or the requirements of a run |
 | History | All runs |
 | Prompts | The tested prompt sets (read only) and your own sets |
 | How it works | The parts of the tool and the steps of one story, as a replay of a finished story |
-| Settings | Model server, models, data folder |
+| Settings | Ollama, models, data folder |
 
 ## The step diagram
 
@@ -43,7 +52,7 @@ The lanes are the parts of the tool. The boxes are the steps of one story, in th
 - The GUI has no login. It listens on `127.0.0.1`, so only this computer can reach it.
 - WARNING: with a different address in `SECREQGEN_GUI_HOST`, every computer that can reach that address can start runs and can read the files that the GUI can read. Do this only on a network that you trust.
 - The server refuses a request that names a host that is not in its list: `127.0.0.1`, `localhost`, the address of `SECREQGEN_GUI_HOST`, and the names of `SECREQGEN_GUI_ALLOWED_HOSTS`. This stops a page of a different website that tries to reach the GUI through a name that points to your computer.
-- The GUI calls one server only: the model server of the settings page.
+- The GUI calls one server only: Ollama, at the address of the Settings page.
 - Text of a story file, of the documentation and of a model is shown as text. It is never run as page code.
 - A script or a container asks `/healthz` to check that the server runs. It does not ask a page.
 
