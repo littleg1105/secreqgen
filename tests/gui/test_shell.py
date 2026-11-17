@@ -13,15 +13,15 @@ RUN = "20261117-214500-threats"
 
 ROUTES = [
     ("/", "Home"),
-    ("/threats/new", "This page is not built yet."),
-    ("/requirements/new", "This page is not built yet."),
-    (f"/runs/{RUN}", f"Run {RUN}"),
-    (f"/runs/{RUN}/stories/MM-US-007", "Threat list of MM-US-007"),
-    (f"/runs/{RUN}/requirements", "Requirements of the run"),
-    ("/history", "This page is not built yet."),
-    ("/prompts", "This page is not built yet."),
-    ("/prompts/threats/my-set", "Prompt set my-set"),
-    ("/settings", "This page is not built yet."),
+    ("/threats/new", "Start a threat list"),
+    ("/requirements/new", "Start requirements"),
+    (f"/runs/{RUN}", "This run does not exist"),
+    (f"/runs/{RUN}/stories/MM-US-007", "Threat list"),
+    (f"/runs/{RUN}/requirements", "Requirements"),
+    ("/history", "All runs in the data folder."),
+    ("/prompts", "Prompt sets"),
+    ("/prompts/threats/my-set", "This prompt set does not exist"),
+    ("/settings", "Settings"),
 ]
 
 
