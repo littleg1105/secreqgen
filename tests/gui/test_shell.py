@@ -1,4 +1,4 @@
-"""The shell shows the six entries, and each route opens its page."""
+"""The shell shows the seven entries, and each route opens its page."""
 
 from __future__ import annotations
 
@@ -8,7 +8,15 @@ pytest.importorskip("nicegui")
 
 pytestmark = pytest.mark.anyio
 
-ENTRIES = ["Home", "Threat list", "Requirements", "History", "Prompts", "Settings"]
+ENTRIES = [
+    "Home",
+    "Threat list",
+    "Requirements",
+    "History",
+    "Prompts",
+    "How it works",
+    "Settings",
+]
 RUN = "20261117-214500-threats"
 
 ROUTES = [
@@ -25,7 +33,7 @@ ROUTES = [
 ]
 
 
-async def test_rail_shows_six_entries(user):
+async def test_rail_shows_seven_entries(user):
     await user.open("/")
     await user.should_see("SecReqGen")
     for entry in ENTRIES:
@@ -51,6 +59,7 @@ def test_route_table_matches_the_design():
         "/history",
         "/prompts",
         "/prompts/{kind}/{name}",
+        "/how-it-works",
         "/settings",
     }
 

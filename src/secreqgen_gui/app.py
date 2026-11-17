@@ -22,6 +22,7 @@ from secreqgen_gui.jobs import (
 from secreqgen_gui.pages import (
     history,
     home,
+    how_it_works,
     prompts,
     requirements_result,
     requirements_setup,
@@ -48,6 +49,7 @@ NAV = (
     ("Requirements", "/requirements/new", ("/requirements",)),
     ("History", "/history", ("/history", "/runs")),
     ("Prompts", "/prompts", ("/prompts",)),
+    ("How it works", "/how-it-works", ("/how-it-works",)),
     ("Settings", "/settings", ("/settings",)),
 )
 
@@ -62,6 +64,7 @@ ROUTES = {
     "/history": history.page,
     "/prompts": prompts.page,
     "/prompts/{kind}/{name}": prompts.set_page,
+    "/how-it-works": how_it_works.page,
     "/settings": settings_page.page,
 }
 
