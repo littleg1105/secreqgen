@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import inspect
 import json
 import re
 import threading
@@ -19,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from secreqgen_gui import __version__, storage
+from secreqgen_gui import __version__, pipeline_boards, storage
 from secreqgen_gui.settings import expand_path, load_settings, make_config
 
 TESTED_THREAT_SET = "threats_v5b_labels"
@@ -54,6 +55,8 @@ class RunState:
     finished: float | None = None
     stop_requested: bool = False
     version: int = 0
+    # The progress of the story in work (see pipeline_boards.new_progress).
+    progress: dict | None = None
 
 
 @dataclass
@@ -411,7 +414,7 @@ class JobManager:
         return folder
 
     def _hooks(self, run_id: str, manifest: dict, checked: bool):
-        """Return the three callbacks of a run function."""
+        """Return the four callbacks of a run function."""
         started: dict[int, float] = {}
 
         def on_story_start(story_id: str, number: int, total: int) -> None:
@@ -420,6 +423,7 @@ class JobManager:
                 if run is None or not 0 < number <= len(run.stories):
                     return
                 run.stories[number - 1].state = "running"
+                run.progress = pipeline_boards.new_progress(run.kind, story_id)
                 started[number] = time.time()
                 self._bump()
 
@@ -461,10 +465,39 @@ class JobManager:
                     )
             self._save(run_id, manifest)
 
+        def on_step(event: Any) -> None:
+            """Keep the step reports. A problem here never stops the run."""
+            try:
+                with self._lock:
+                    run = self._state
+                    if run is None or run.id != run_id:
+                        return
+                    if run.progress is None:
+                        story_id = str(getattr(event, "story_id", "") or "")
+                        run.progress = pipeline_boards.new_progress(
+                            run.kind, story_id
+                        )
+                    pipeline_boards.apply_event(run.progress, event)
+                    self._bump()
+            except Exception:  # noqa: BLE001 - the run never depends on the view
+                pass
+
         def should_stop() -> bool:
             return self._stop.is_set()
 
-        return on_story_start, on_progress, should_stop
+        return on_story_start, on_progress, should_stop, on_step
+
+    @staticmethod
+    def _step_arguments(run_fn: Any, on_step: Any) -> dict:
+        """Return {"on_step": ...} when the run function takes the callback."""
+        try:
+            parameters = inspect.signature(run_fn).parameters.values()
+        except (TypeError, ValueError):
+            return {}
+        for parameter in parameters:
+            if parameter.name == "on_step" or parameter.kind is parameter.VAR_KEYWORD:
+                return {"on_step": on_step}
+        return {}
 
     @staticmethod
     def _summary(kind: str, outcome: Any, checked: bool) -> str:
@@ -536,7 +569,7 @@ class JobManager:
             known = {f.name for f in dataclasses.fields(ThreatOptions)}
             values = {k: v for k, v in values.items() if k in known}
         options = ThreatOptions(**values)
-        on_story_start, on_progress, should_stop = self._hooks(
+        on_story_start, on_progress, should_stop, on_step = self._hooks(
             run_id, manifest, bool(spec.check and spec.checker_model)
         )
         result = run_fn(
@@ -545,6 +578,7 @@ class JobManager:
             on_progress=on_progress,
             on_story_start=on_story_start,
             should_stop=should_stop,
+            **self._step_arguments(run_fn, on_step),
         )
         self._end_of_loop(run_id, manifest, result)
 
@@ -585,13 +619,16 @@ class JobManager:
             known = {f.name for f in dataclasses.fields(RequirementsOptions)}
             values = {k: v for k, v in values.items() if k in known}
         options = RequirementsOptions(**values)
-        on_story_start, on_progress, should_stop = self._hooks(run_id, manifest, False)
+        on_story_start, on_progress, should_stop, on_step = self._hooks(
+            run_id, manifest, False
+        )
         result = run_fn(
             options,
             cfg=make_config(self._settings),
             on_progress=on_progress,
             on_story_start=on_story_start,
             should_stop=should_stop,
+            **self._step_arguments(run_fn, on_step),
         )
         from secreqgen.application.serialise import requirements_run_to_dict
 

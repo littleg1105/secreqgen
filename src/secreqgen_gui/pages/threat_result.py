@@ -10,6 +10,7 @@ from __future__ import annotations
 from urllib.parse import quote as url_quote
 
 from nicegui import run, ui
+from secreqgen.application.steps import threat_trace
 from secreqgen.application.threat_view import (
     export_kept,
     group_threat_rows,
@@ -161,6 +162,18 @@ def _load(run_id: str, story_id: str) -> dict:
 
 def _plural(count: int, word: str) -> str:
     return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
+def _steps_line(model: dict) -> str:
+    """Return the line with the numbers of the steps of the story."""
+    trace = threat_trace(model)
+    written = trace["check"]["kept"] + trace["check"]["removed"]
+    return (
+        f"Steps: {_plural(trace['search']['passages'], 'passage')}, "
+        f"{_plural(written, 'row')} written, "
+        f"{trace['check']['removed']} removed by the tool code, "
+        f"{trace['check']['kept']} in the list."
+    )
 
 
 def _short(label: str) -> str:
@@ -499,6 +512,15 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                 counts_line()
                 if _not_tested(model):
                     tag("Not the tested setup", "caution")
+            with ui.row().classes("items-baseline gap-3"):
+                ui.label(_steps_line(model)).classes("sr-small").mark("steps-line")
+                address = (
+                    f"/how-it-works?kind=threats&run={url_quote(run_id, safe='')}"
+                    f"&story={url_quote(story_id, safe='')}"
+                )
+                ui.link("Replay the steps", address).classes("sr-small").style(
+                    "color:var(--sr-blue)"
+                )
             with ui.row().classes("items-center gap-2 w-full"):
                 export_button = ui.button("Export kept rows")
                 export_button.props("outline no-caps color=primary")

@@ -15,8 +15,10 @@ from pathlib import Path
 from urllib.parse import quote
 
 from nicegui import run, ui
+from secreqgen.application.steps import requirements_trace, threat_trace
 
-from secreqgen_gui import jobs, storage
+from secreqgen_gui import jobs, pipeline_boards, storage
+from secreqgen_gui.step_widget import StepDiagram
 from secreqgen_gui.widgets import empty_state, page_title, tag
 
 POLL_SECONDS = 0.5
@@ -24,6 +26,8 @@ ACTIVE = ("checking", "running")
 TAG_KIND = {"done": "keep", "failed": "delete"}
 FAILED_HINT = "Check the model server on the start page, then start the run again."
 ID_WIDTH = "width:112px;flex:none"
+READABLE = "max-width:960px"
+CHECKING_LINE = "The run checks the model server."
 
 
 @dataclass
@@ -47,6 +51,9 @@ class View:
     prompt_name: str = ""
     tested: bool = True
     has_results: bool = False
+    server: str = ""
+    labels: bool = True
+    progress: dict | None = None
 
 
 def _clock(seconds: float | None) -> str:
@@ -73,6 +80,8 @@ def _meta(view: View, manifest: dict | None) -> None:
     view.writer = str(manifest.get("writer") or "")
     view.checker = str(manifest.get("checker") or "")
     view.model = str(manifest.get("model") or "")
+    view.server = str(manifest.get("server") or "")
+    view.labels = bool(manifest.get("labels", True))
     prompt = manifest.get("prompt_set")
     if isinstance(prompt, dict):
         view.tested = bool(prompt.get("tested", True))
@@ -174,6 +183,7 @@ def _from_state(state: jobs.RunState, manifest: dict | None) -> View:
         stop_requested=state.stop_requested,
         version=state.version,
         live=state.state in ACTIVE,
+        progress=getattr(state, "progress", None),
     )
     _meta(view, manifest)
     view.has_results = any(s.state == "done" for s in view.stories)
@@ -253,6 +263,103 @@ def _head(view: View) -> None:
         )
 
 
+def _replay_address(view: View, story_id: str) -> str:
+    return (
+        f"/how-it-works?kind={view.kind}&run={quote(view.id, safe='')}"
+        f"&story={quote(story_id, safe='')}"
+    )
+
+
+def _story_title(view: View, story_id: str) -> str:
+    for story in view.stories:
+        if story.id == story_id:
+            return story.title
+    return ""
+
+
+def _notes(view: View) -> dict[str, str]:
+    if view.kind == "threats":
+        return pipeline_boards.lane_notes(
+            view.writer or None, view.checker or None, view.server or None
+        )
+    return pipeline_boards.lane_notes(view.model or None, None, view.server or None)
+
+
+def _stored_story(view: View) -> dict | None:
+    """Read the last story of the run that has a stored result.
+
+    It reads files, so a page calls it off the event loop.
+    """
+    if view.kind == "threats":
+        for story in reversed(view.stories):
+            if story.state != "done":
+                continue
+            model = storage.read_threats(view.id, story.id)
+            if model is None:
+                continue
+            return {
+                "id": story.id,
+                "title": story.title,
+                "trace": threat_trace(model),
+                "verdicts": storage.read_verdicts(view.id, story.id),
+            }
+        return None
+    data = storage.read_requirements(view.id)
+    results = data.get("results") if isinstance(data, dict) else None
+    for entry in reversed(results if isinstance(results, list) else []):
+        if not isinstance(entry, dict):
+            continue
+        trace = requirements_trace(entry)
+        if trace["story_id"]:
+            story = entry.get("user_story") or {}
+            title = str(story.get("title") or _story_title(view, trace["story_id"]))
+            return {
+                "id": trace["story_id"],
+                "title": title,
+                "trace": trace,
+                "verdicts": {},
+            }
+    return None
+
+
+def _steps_view(view: View, stored: dict | None) -> tuple | None:
+    """Return (board, story id, line, link, moving) or None for no section."""
+    notes = _notes(view)
+    if view.live:
+        progress = view.progress
+        if not progress or not progress.get("story_id"):
+            board = pipeline_boards.live_board(
+                pipeline_boards.new_progress(view.kind), notes=notes
+            )
+            return board, "", CHECKING_LINE, None, True
+        story_id = str(progress["story_id"])
+        ids = [s.id for s in view.stories]
+        number = ids.index(story_id) + 1 if story_id in ids else _position(view)
+        line = (
+            f"Story {number} of {len(view.stories)}: {story_id} "
+            f"{_story_title(view, story_id)}"
+        ).strip()
+        board = pipeline_boards.live_board(
+            progress, labels=view.labels, checker=bool(view.checker), notes=notes
+        )
+        return board, story_id, line, None, True
+    if stored is not None:
+        board = pipeline_boards.result_board(
+            view.kind, stored["trace"], verdicts=stored["verdicts"], notes=notes
+        )
+        line = f"Story {stored['id']} {stored['title']}".strip()
+        return board, stored["id"], line, _replay_address(view, stored["id"]), False
+    progress = view.progress
+    if progress and progress.get("story_id"):
+        story_id = str(progress["story_id"])
+        board = pipeline_boards.live_board(
+            progress, labels=view.labels, checker=bool(view.checker), notes=notes
+        )
+        line = f"Story {story_id} {_story_title(view, story_id)}".strip()
+        return board, story_id, line, None, False
+    return None
+
+
 def _story_row(view: View, story) -> None:
     with ui.column().classes("w-full gap-1 py-3").style(
         "border-bottom:1px solid var(--sr-line)"
@@ -270,6 +377,10 @@ def _story_row(view: View, story) -> None:
                 if view.kind == "threats" and story.state == "done":
                     target = f"/runs/{view.id}/stories/{quote(story.id, safe='')}"
                     ui.link("Read", target).style("color:var(--sr-blue)")
+            if story.state == "done":
+                ui.link("Steps", _replay_address(view, story.id)).classes(
+                    "sr-small"
+                ).style("width:40px;flex:none;color:var(--sr-blue)")
         if story.state == "failed" and story.error:
             _plain(story.error, "text-sm").style(
                 "color:var(--sr-delete);margin-left:128px"
@@ -278,7 +389,13 @@ def _story_row(view: View, story) -> None:
 
 def page(run_id: str) -> None:
     """Show one run. The page builds itself after a read off the event loop."""
-    holder: dict = {"view": None, "stop_clicked": False, "elapsed": None}
+    holder: dict = {
+        "view": None,
+        "stop_clicked": False,
+        "elapsed": None,
+        "stored": None,
+        "line": None,
+    }
 
     @ui.refreshable
     def head_view() -> None:
@@ -328,7 +445,7 @@ def page(run_id: str) -> None:
     def stories_view() -> None:
         view = holder["view"]
         with ui.column().classes("w-full gap-0 mt-6").style(
-            "border-top:1px solid var(--sr-line)"
+            f"border-top:1px solid var(--sr-line);{READABLE}"
         ):
             for story in view.stories:
                 _story_row(view, story)
@@ -344,7 +461,25 @@ def page(run_id: str) -> None:
         end = view.finished if view.finished is not None else time.time()
         return _clock(end - view.started)
 
-    def tick() -> None:
+    def show_steps(view: View) -> None:
+        """Draw the steps section. The diagram draws again only on a change."""
+        shown = _steps_view(view, holder["stored"])
+        holder["section"].set_visibility(shown is not None)
+        if shown is None:
+            return
+        board, story_id, line, link, moving = shown
+        holder["diagram"].show(board, story_id=story_id, moving=moving)
+        if holder["line"] != (line, link):
+            holder["line"] = (line, link)
+            holder["line_row"].clear()
+            with holder["line_row"]:
+                _plain(line, "sr-small")
+                if link:
+                    ui.link("Replay the steps", link).classes("sr-small").style(
+                        "color:var(--sr-blue)"
+                    )
+
+    async def tick() -> None:
         view = holder["view"]
         if view is None:
             return
@@ -355,19 +490,24 @@ def page(run_id: str) -> None:
         if state is None:
             return
         if state.version != view.version:
-            new = _from_state(state, storage.read_manifest(run_id))
+            manifest = await run.io_bound(storage.read_manifest, run_id)
+            new = _from_state(state, manifest)
             holder["view"] = new
             head_view.refresh()
             stories_view.refresh()
-            if not new.live:
+            if new.live:
+                show_steps(new)
+            else:
                 timer.deactivate()
+                holder["stored"] = await run.io_bound(_stored_story, new)
+                show_steps(new)  # the "run ended" form, one time
             return
         label = holder["elapsed"]
         if label is not None and not label.is_deleted:
             label.set_text(_elapsed(view))
 
     timer = ui.timer(POLL_SECONDS, tick, active=False)
-    body = ui.column().classes("w-full gap-0").style("max-width:960px")
+    body = ui.column().classes("w-full gap-0")
 
     async def build() -> None:
         view = await run.io_bound(_load, run_id)
@@ -379,7 +519,17 @@ def page(run_id: str) -> None:
                 )
                 return
             holder["view"] = view
-            head_view()
+            holder["stored"] = (
+                None if view.live else await run.io_bound(_stored_story, view)
+            )
+            with ui.column().classes("w-full gap-0").style(READABLE):
+                head_view()
+            with ui.column().classes("w-full gap-2 mt-6") as section:
+                ui.label("Steps").classes("sr-section-title")
+                holder["line_row"] = ui.row().classes("items-baseline gap-4")
+                holder["diagram"] = StepDiagram()
+            holder["section"] = section
+            show_steps(view)
             stories_view()
         if view.live:
             timer.activate()
