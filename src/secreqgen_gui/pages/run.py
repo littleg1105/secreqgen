@@ -19,7 +19,7 @@ from secreqgen.application.steps import requirements_trace, threat_trace
 
 from secreqgen_gui import jobs, pipeline_boards, storage
 from secreqgen_gui.step_widget import StepDiagram
-from secreqgen_gui.widgets import empty_state, page_title, tag
+from secreqgen_gui.widgets import context_tag, empty_state, formats_tag, page_title, tag
 
 POLL_SECONDS = 0.5
 ACTIVE = ("checking", "running")
@@ -53,6 +53,7 @@ class View:
     model: str = ""
     prompt_name: str = ""
     tested: bool = True
+    manifest: dict | None = None
     has_results: bool = False
     server: str = ""
     labels: bool = True
@@ -79,6 +80,7 @@ def _meta(view: View, manifest: dict | None) -> None:
     """Copy the product, the models and the prompt set from a manifest."""
     if not manifest:
         return
+    view.manifest = manifest
     view.product = str(manifest.get("product") or "")
     view.writer = str(manifest.get("writer") or "")
     view.checker = str(manifest.get("checker") or "")
@@ -268,6 +270,8 @@ def _head(view: View) -> None:
         ui.label(f"Untested prompts: {view.prompt_name}").style(
             "color:var(--sr-caution)"
         )
+    formats_tag(view.manifest)
+    context_tag(view.manifest)
 
 
 def _replay_address(view: View, story_id: str) -> str:

@@ -45,6 +45,16 @@ def prompt_sets_dir() -> Path:
     return _sub_dir("prompt_sets")
 
 
+def docs_cache_dir() -> Path:
+    """Return the folder that keeps the converted documentation."""
+    return _sub_dir("doc_cache")
+
+
+def contexts_dir() -> Path:
+    """Return the folder of the system contexts that a model wrote."""
+    return _sub_dir("contexts")
+
+
 def _check_run_id(run_id: str) -> str:
     if not isinstance(run_id, str) or not _RUN_ID.match(run_id):
         raise ValueError("The run id is not valid.")
@@ -351,3 +361,49 @@ def save_upload(name: str, data: bytes) -> Path:
         target = folder / f"{stem}-{number}{suffix}"
     target.write_bytes(data)
     return target
+
+
+def _safe_part(text: str) -> str:
+    """Keep letters, digits, dot, hyphen and underscore. Cut to 40 characters."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", str(text or ""))
+    return cleaned.strip("-._")[:40] or "context"
+
+
+def save_context(yaml_text: str, result: dict, name: str) -> Path:
+    """Write a system context and the result of its job beside it.
+
+    The file is <name>-<date and time>.yaml in the folder contexts. The result
+    goes to the .json file with the same name. Return the path of the YAML.
+    """
+    folder = contexts_dir()
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    base = f"{_safe_part(name)}-{stamp}"
+    number = 1
+    while True:
+        suffix = "" if number == 1 else f"-{number}"
+        target = folder / f"{base}{suffix}.yaml"
+        if not target.exists() and not target.with_suffix(".json").exists():
+            break
+        number += 1
+    _write_json(target.with_suffix(".json"), result)
+    target.write_text(yaml_text, encoding="utf-8")
+    return target
+
+
+def is_generated_context(path: str | Path | None) -> bool:
+    """Say if a file is a system context that a model wrote in the GUI.
+
+    It must lie in the folder contexts and have its .json file beside it.
+    """
+    if not path:
+        return False
+    try:
+        file = Path(path).expanduser().resolve()
+        return (
+            file.parent == contexts_dir().resolve()
+            and file.suffix == ".yaml"
+            and file.is_file()
+            and file.with_suffix(".json").is_file()
+        )
+    except (OSError, RuntimeError, ValueError):
+        return False

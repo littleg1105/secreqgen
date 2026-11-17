@@ -75,6 +75,7 @@ class ThreatRunSpec:
     labels: bool = True
     about: str | None = None
     prompt_set: str | None = None  # the name of a user prompt set
+    other_formats: bool = False  # convert files of other types to Markdown
 
 
 @dataclass
@@ -91,6 +92,7 @@ class RequirementsRunSpec:
     model: str = "gemma4:26b"
     system_context: str | None = None
     prompt_set: str | None = None  # the name of a user prompt set
+    other_formats: bool = False  # convert files of other types to Markdown
 
 
 class RunFailedError(Exception):
@@ -249,8 +251,10 @@ class JobManager:
             self._bump()
 
     def _start(self, kind: str, spec: Any) -> str:
+        from secreqgen_gui import context_job  # here: it imports this module
+
         with self._lock:
-            if self.busy():
+            if self.busy() or context_job.writer.busy():
                 raise RuntimeError("Another run is in progress.")
             run_id = storage.new_run_id(kind)
             self._stop = threading.Event()
@@ -314,6 +318,8 @@ class JobManager:
             )
         else:
             manifest["model"] = spec.model
+        if not threats and storage.is_generated_context(spec.system_context):
+            manifest["generated_context"] = True
         manifest.update(
             prompt_set={
                 "kind": kind,
@@ -529,8 +535,21 @@ class JobManager:
             return _threat_summary(outcome, checked)
         return _plural(len(outcome.requirements), "requirement")
 
+    @staticmethod
+    def _docs_formats(manifest: dict, result: Any) -> None:
+        """Note the converted files of the run in the manifest."""
+        report = getattr(result, "docs_report", None)
+        converted = getattr(report, "converted", None)
+        if report is None or not isinstance(converted, dict):
+            return
+        manifest["docs_formats"] = {
+            "converted": {str(k): int(v) for k, v in converted.items()},
+            "skipped": len(getattr(report, "skipped", None) or []),
+        }
+
     def _end_of_loop(self, run_id: str, manifest: dict, result: Any) -> None:
         """Set the final state from the result of a run function."""
+        self._docs_formats(manifest, result)
         aborted = getattr(result, "aborted", None)
         stopped = bool(getattr(result, "stopped", False))
         manifest["skipped"] = [
@@ -585,6 +604,8 @@ class JobManager:
             "strict_input": True,
             "keep_finished": True,
             "prompts_dir": prompts_dir,
+            "other_formats": spec.other_formats,
+            "docs_cache": storage.docs_cache_dir(),
         }
         if stand_in:
             # A stand-in may run before the new option fields exist.
@@ -638,6 +659,8 @@ class JobManager:
             "strict_input": True,
             "keep_finished": True,
             "prompts_dir": prompts_dir,
+            "other_formats": spec.other_formats,
+            "docs_cache": storage.docs_cache_dir(),
         }
         if stand_in:
             known = {f.name for f in dataclasses.fields(RequirementsOptions)}

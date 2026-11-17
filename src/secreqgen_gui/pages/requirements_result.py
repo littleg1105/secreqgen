@@ -5,9 +5,17 @@ from __future__ import annotations
 import json
 
 from nicegui import run, ui
+from secreqgen.application.documentation import shown_name
 
 from secreqgen_gui import storage
-from secreqgen_gui.widgets import empty_state, page_title, tag, text
+from secreqgen_gui.widgets import (
+    context_tag,
+    empty_state,
+    formats_tag,
+    page_title,
+    tag,
+    text,
+)
 
 LINE = "border-top: 1px solid var(--sr-line)"
 
@@ -118,6 +126,12 @@ def _requirement(req: dict) -> None:
             text(str(req["implementation_notes"]))
 
 
+def _shown_header(header: str) -> str:
+    """Show the real file name in the header "file > section"."""
+    name, divider, rest = header.partition(" > ")
+    return shown_name(name) + divider + rest
+
+
 def _passages(result: dict) -> None:
     passages = [_as_dict(p) for p in _as_list(result.get("passages"))]
     if not passages:
@@ -126,7 +140,9 @@ def _passages(result: dict) -> None:
     with ui.expansion(label).classes("w-full").style(LINE):
         for passage in passages:
             with ui.column().classes("w-full gap-1 py-2"):
-                ui.label(str(passage.get("header", ""))).classes("sr-small break-words")
+                ui.label(_shown_header(str(passage.get("header", "")))).classes(
+                    "sr-small break-words"
+                )
                 text(str(passage.get("text", "")), "sr-source")
 
 
@@ -200,6 +216,8 @@ async def page(run_id: str) -> None:
             text(f"Model: {model}", "sr-small")
         if not tested:
             tag("untested prompts", "caution")
+        formats_tag(manifest)
+        context_tag(manifest)
     with ui.row().classes("gap-2 mt-3 mb-4"):
         ui.button(
             "Download JSON",

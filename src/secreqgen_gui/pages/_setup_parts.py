@@ -12,6 +12,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from nicegui import events, run, ui
+from secreqgen.application.documentation import convertible_files
 from secreqgen.application.errors import InputError
 from secreqgen.application.inputs import (
     UPLOAD_EXTENSIONS,
@@ -20,32 +21,19 @@ from secreqgen.application.inputs import (
 )
 from secreqgen.application.prompt_sets import list_user_prompt_sets
 
-from secreqgen_gui import form_memory, jobs, storage
+from secreqgen_gui import context_job, form_memory, jobs, storage
 from secreqgen_gui.form_memory import COMMON
 from secreqgen_gui.settings import expand_path, show_path
 from secreqgen_gui.widgets import path_field
 
 TESTED_SET = "__tested__"
 FOLDER_MISSING = "Folder not found. Check the path or click Browse."
-FOLDER_EMPTY = "This folder has no Markdown files. The search reads .md files only."
-# Documentation files of other types. The search does not read them.
-OTHER_DOC_SUFFIXES = (
-    ".rst",
-    ".adoc",
-    ".asciidoc",
-    ".txt",
-    ".mdx",
-    ".markdown",
-    ".html",
-    ".htm",
-    ".org",
-    ".pdf",
-    ".docx",
-)
+NO_FILES = "This folder has no documentation files that the search can read."
 WRONG_TYPE = "Use a .json, .yaml or .yml file."
 STORIES_HINT = "JSON or YAML, with a list named user_stories"
 EXAMPLES_HINT = "Eight generic stories that fit most products."
-DOCS_HINT = "The folder with the Markdown (.md) files of the product"
+DOCS_HINT = "The folder with the documentation of the product"
+OTHER_SWITCH = "Read other file types too"
 BUSY = "Another run is in progress. Wait for it to end, or stop it."
 UNTESTED_PROMPTS = "A run with these prompts gets the tag: untested prompts."
 PRODUCT_NOTE = "Product name (optional)"
@@ -102,42 +90,47 @@ def set_message(label: ui.label, text: str, kind: str = "plain") -> None:
     label.set_visibility(bool(text))
 
 
-def count_docs(folder: Path) -> tuple[int, dict[str, int]]:
-    """Count the files that the search reads, and the other documentation files.
+def count_markdown(folder: Path) -> int:
+    """Count the Markdown files that the search reads.
 
     The search reads each file whose name ends in ".md" (small letters), in
-    the folder and in every folder below it. It reads no other file. The
-    second value counts the files of other documentation types by suffix.
+    the folder and in every folder below it.
     """
-    markdown = 0
-    others: dict[str, int] = {}
-    for _root, _dirs, names in os.walk(folder):
-        for name in names:
-            if name.endswith(".md"):
-                markdown += 1
-                continue
-            suffix = os.path.splitext(name)[1]
-            if suffix.lower() == ".md":
-                others[suffix] = others.get(suffix, 0) + 1  # for example ".MD"
-            elif suffix.lower() in OTHER_DOC_SUFFIXES:
-                others[suffix.lower()] = others.get(suffix.lower(), 0) + 1
-    return markdown, others
+    return sum(
+        1 for _root, _dirs, names in os.walk(folder) for n in names if n.endswith(".md")
+    )
 
 
-def count_markdown(folder: Path) -> int:
-    """Count the Markdown files that the search reads."""
-    return count_docs(folder)[0]
+def docs_line(markdown: int, others: dict[str, int], convert: bool) -> str:
+    """Return the line under the documentation folder field.
 
-
-def not_read_text(others: dict[str, int]) -> str:
-    """Return one sentence about the files of other types, or an empty text."""
+    Markdown is the count of .md files. Others counts the files of other
+    types by suffix. Convert is the state of the switch.
+    """
     total = sum(others.values())
     if not total:
-        return ""
+        if markdown:
+            return f"{plural(markdown, 'Markdown file', 'Markdown files')} found."
+        return NO_FILES
     kinds = ", ".join(sorted(others, key=lambda kind: (-others[kind], kind))[:3])
-    if total == 1:
-        return f" 1 file of another type is not read ({kinds})."
-    return f" {total} files of other types are not read ({kinds})."
+    one = total == 1
+    if not markdown:
+        if convert:
+            verb = "is" if one else "are"
+            return (
+                f"No Markdown files. {plural(total, 'file', 'files')} of "
+                f"{'another type' if one else 'other types'} {verb} converted "
+                f"({kinds})."
+            )
+        rest = f"the {total} other {'file' if one else 'files'}"
+        return (
+            "This folder has no Markdown files. "
+            f'Turn on "{OTHER_SWITCH}" to read {rest}.'
+        )
+    found = f"{plural(markdown, 'Markdown file', 'Markdown files')} found."
+    verb = ("is" if one else "are") + (" converted" if convert else " not read")
+    kind = "another type" if one else "other types"
+    return f"{found} {plural(total, 'file', 'files')} of {kind} {verb} ({kinds})."
 
 
 def prompt_set_choices(kind: str) -> dict[str, str]:
@@ -475,6 +468,8 @@ class DocsPart:
         self.on_change = on_change
         self.stories = stories
         self.files = 0
+        self.others: dict[str, int] = {}
+        self.isdir = False
         self._token = 0
         self._auto_product = ""
         self.muted = False
@@ -485,6 +480,8 @@ class DocsPart:
             self.field = path_field(
                 "Documentation folder", initial, folder=True, hint=DOCS_HINT
             )
+            on = bool(form_memory.recall(COMMON, "other_formats", True))
+            self.switch = ui.switch(OTHER_SWITCH, value=on).mark("other_formats")
             self.info = message()
             self.info.set_visibility(False)
             self.product = (
@@ -496,8 +493,26 @@ class DocsPart:
         self.field.on_value_change(self._field_changed)
         self.field.on_value_change(lambda _e: self.check())
         self.product.on_value_change(self._product_changed)
+        self.switch.on_value_change(self._switch_changed)
         if initial:
             ui.timer(0.05, self.check, once=True)
+
+    def _switch_changed(self, _e=None) -> None:
+        """Remember the switch and show the line again. No new scan."""
+        if not self.muted:
+            form_memory.remember(COMMON, "other_formats", bool(self.switch.value))
+        self._show()
+        self.on_change()
+
+    def _show(self) -> None:
+        """Show the line under the field from the last scan."""
+        if not (self.field.value or "").strip():
+            set_message(self.info, "")
+        elif not self.isdir:
+            set_message(self.info, FOLDER_MISSING, "bad")
+        else:
+            line = docs_line(self.files, self.others, bool(self.switch.value))
+            set_message(self.info, line, "plain" if self.ok else "bad")
 
     def _field_changed(self, _e=None) -> None:
         if not self.muted:
@@ -516,6 +531,7 @@ class DocsPart:
         self._auto_product = ""
         self.field.set_value("")
         self.product.set_value("")
+        self.switch.set_value(True)
         self.muted = False
 
     async def check(self) -> None:
@@ -524,27 +540,19 @@ class DocsPart:
         value = (self.field.value or "").strip()
         if not value:
             self.files = 0
+            self.others = {}
+            self.isdir = False
             set_message(self.info, "")
             self.on_change()
             return
         folder = expand_path(value)
         isdir = await run.io_bound(folder.is_dir)
-        count, others = (
-            await run.io_bound(count_docs, folder) if isdir else (0, {})
-        )
+        count = await run.io_bound(count_markdown, folder) if isdir else 0
+        others = await run.io_bound(convertible_files, folder) if isdir else {}
         if token != self._token:
             return
-        self.files = count
-        if not isdir:
-            set_message(self.info, FOLDER_MISSING, "bad")
-        elif count == 0:
-            set_message(self.info, FOLDER_EMPTY, "bad")
-        else:
-            set_message(
-                self.info,
-                f"{plural(count, 'Markdown file', 'Markdown files')} found."
-                + not_read_text(others),
-            )
+        self.files, self.others, self.isdir = count, others, isdir
+        self._show()
         self.on_change()
 
     def fill_product(self) -> None:
@@ -560,8 +568,15 @@ class DocsPart:
         return expand_path(value) if value else None
 
     @property
+    def other_formats(self) -> bool:
+        return bool(self.switch.value)
+
+    @property
     def ok(self) -> bool:
-        return self.files > 0
+        """True when the folder has files that the run can read."""
+        if self.files > 0:
+            return True
+        return bool(self.switch.value) and sum(self.others.values()) > 0
 
 
 class Foot:
@@ -596,10 +611,12 @@ class Foot:
 
     def update(self) -> None:
         """Show the summary and switch the button on or off."""
-        current = jobs.manager.busy()
+        running = jobs.manager.busy()
+        current = running or context_job.writer.busy()
         self.summary_label.set_text(self.summary())
         self.busy_row.set_visibility(current)
-        state = jobs.manager.current() if current else None
+        self.link_slot.set_visibility(running)
+        state = jobs.manager.current() if running else None
         run_id = state.id if state else ""
         if run_id != self._link_id:
             self._link_id = run_id

@@ -21,6 +21,8 @@ from secreqgen_gui.pages._setup_parts import (
     section,
     set_message,
 )
+from secreqgen_gui.pages.context_dialog import BUTTON as CONTEXT_BUTTON
+from secreqgen_gui.pages.context_dialog import open_context_dialog
 from secreqgen_gui.settings import expand_path, load_settings
 from secreqgen_gui.widgets import page_title, path_field
 
@@ -60,6 +62,16 @@ def page(
                 "System context file (optional)",
                 saved(REQUIREMENTS, "context_file", ""),
             )
+            ui.button(
+                CONTEXT_BUTTON,
+                on_click=lambda: open_context_dialog(
+                    saved(REQUIREMENTS, "context_folder", ""),
+                    (docs_part.product.value or "").strip(),
+                    context.set_value,
+                ),
+            ).props("outline no-caps unelevated color=primary").mark(
+                "context-write-open"
+            ).classes("self-start")
             choices = prompt_set_choices("requirements")
             old_set = saved(REQUIREMENTS, "prompts")
             prompt = ui.select(
@@ -97,6 +109,7 @@ def page(
                 model=model.value.strip(),
                 system_context=context_path,
                 prompt_set=prompt_set_value(prompt.value),
+                other_formats=docs_part.other_formats,
             )
             try:
                 run_id = await run.io_bound(jobs.manager.start_requirements, spec)

@@ -32,6 +32,36 @@ def tag(text: str, kind: str = "plain") -> None:
     ui.label(text).classes(f"sr-tag sr-tag-{kind}")
 
 
+FORMATS_HINT = (
+    "This run read files that were converted to Markdown. "
+    "The thesis tests used Markdown files only."
+)
+
+
+def formats_tag(manifest: dict | None) -> None:
+    """Show the tag "untested file types" when the run converted files."""
+    if not manifest or not isinstance(manifest.get("docs_formats"), dict):
+        return
+    with ui.element("span").mark("tag-file-types"):
+        tag("untested file types", "caution")
+        ui.tooltip(FORMATS_HINT)
+
+
+CONTEXT_HINT = (
+    "A model wrote the system context of this run. "
+    "The thesis tests used files written by a person."
+)
+
+
+def context_tag(manifest: dict | None) -> None:
+    """Show the tag "generated context" when a model wrote the context."""
+    if not manifest or not manifest.get("generated_context"):
+        return
+    with ui.element("span").mark("tag-generated-context"):
+        tag("generated context", "caution")
+        ui.tooltip(CONTEXT_HINT)
+
+
 def text(value: str, classes: str = "") -> None:
     """Show untrusted text as text. Line breaks stay."""
     ui.label(str(value)).classes(f"whitespace-pre-wrap break-words {classes}".strip())
