@@ -16,7 +16,7 @@ PROMPT_HASHES = {
     "system_prompt.txt": "79b5b822179c49c56d9612eb427145e57cc760a18229a6bd295f5ddd2e614700",
     "user_prompt.txt": "f4b6516a3a3cea972176b185d96297d286d2fc43feb5a1d3a2e7bdcad7580956",
     "labels_prompt.txt": "8ee6692c35e669e9289a28a5da873ccd605c01a331f4b2b6e26302f49b6171a9",
-    "check_prompt.txt": "1c30797e226a04a76fd269a1b112a45b62778d3d5f6bf7db0099185805019377",
+    "check_prompt.txt": "9f97aabdae2e33fd0bb6d5f815d6d8827968dcf8487e900225672d6657ed6245",
 }
 STORY = UserStory(
     id="US-1",
@@ -240,7 +240,7 @@ def test_the_label_call_and_the_check_call_can_fail(docs: Path) -> None:
     assert all(r["actor"] == "" and r["stride"] == "" and r["second_model"] == "" for r in model["rows"])
     page = render_markdown(model)
     assert "Rows with no verdict of the second model (2)" in page
-    assert "accepts (0)" in page and "does not accept (0)" not in page
+    assert "accepts (0)" in page and "sees a fault (0)" not in page
 
 
 def test_the_same_quote_in_two_groups_gives_one_row(tmp_path: Path) -> None:
@@ -353,7 +353,7 @@ class Checker:
     def generate(self, prompt: str, system_prompt: str | None = None, format: str | None = None) -> Reply:
         self.prompts.append(prompt)
         quote = prompt.split('Quote: "', 1)[1].split('"\n', 1)[0]
-        return Reply("1. yes\n2. yes\n3. yes\nKEEP" if "attacker" in quote.lower() else "1. no\n2. yes\n3. yes\nDROP")
+        return Reply("The row has no fault.\nOK" if "attacker" in quote.lower() else "The sentence is about backups.\nFAULT")
 
 
 def test_a_second_model_checks_each_row_and_orders_the_page(docs: Path) -> None:
@@ -365,7 +365,7 @@ def test_a_second_model_checks_each_row_and_orders_the_page(docs: Path) -> None:
     assert len(checker.prompts) == 2 and model["checker"] == "checker-stand-in"
     assert any("Set `session-idle-timeout`" in p for p in checker.prompts), "the check call holds the passage, not only the quote"
     page = render_markdown(model)
-    assert page.index("accepts (1)") < page.index("does not accept (1)")
+    assert page.index("accepts (1)") < page.index("sees a fault (1)")
     assert page.index("An attacker who steals the session cookie") < page.index("The session cookie is sent with no Secure flag.")
 
 
@@ -375,12 +375,11 @@ def test_no_check_call_with_no_second_model(docs: Path) -> None:
     assert "second model" not in render_markdown(model)
 
 
-def test_keep_or_drop_takes_the_last_word() -> None:
-    assert checks.keep_or_drop("1. yes\n2. no\n3. yes\nDROP") == "refuses"
-    assert checks.keep_or_drop("I would KEEP it, but question 2 is no.\nDROP") == "refuses"
-    assert checks.keep_or_drop("1. yes\n2. yes\n3. yes\nKEEP") == "accepts"
-    assert checks.keep_or_drop("no verdict") == ""
-    assert checks.keep_or_drop("1. yes\n2. yes\n3. yes\nKeep") == "accepts"
+def test_keep_or_drop_takes_the_last_verdict_word() -> None:
+    assert checks.keep_or_drop("The sentence is about another flow.\nFAULT") == "refuses"
+    assert checks.keep_or_drop("At first it looks like a FAULT, but the passage states it.\nOK") == "accepts"
+    assert checks.keep_or_drop("The row is ok, I think.") == "", "a small ok in a sentence is no verdict"
+    assert checks.keep_or_drop("") == ""
 
 
 # ---------------------------------------------------------------------------------------------- page

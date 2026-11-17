@@ -12,10 +12,13 @@ Method (tested on 17 November 2026, see the lab notes of that day):
    the story part is a copy of words of the story. The harm is kept for an attack row only.
 5. One call for a story names a threat actor and a STRIDE category for each row, from closed lists. They are the
    model's choice from the threat sentence. They have no source in the documentation.
-7. Optional: a second local model checks each row with the passage in view (three yes/no questions). Rows that it
-   accepts come first on the page; no row is removed. In the test of 17 November 2026 (279 judged rows of the local
-   models) 14 of 100 accepted rows were wrong and 47 of 100 refused rows, when gemma4:26b checked the rows of
-   qwen3.8:27b. The check also refused 2 of 3 good rows, so it must not be used to remove rows.
+7. Optional: a second local model checks each row with the passage in view. It names a fault only when it is sure
+   (the sentence is about a different feature, or the threat says something that the passage does not say).
+   Rows with no fault come first on the page; no row is removed. In the test of 17 November 2026 (279 judged rows
+   of the local models): gemma4:26b as the checker of qwen3.8:27b accepted 104 of 187 rows, 23 of them wrong
+   (22 of 100), and refused 83, 42 of them wrong; it refused 30 of 91 good rows. qwen3.8:27b as the checker of
+   gemma4:26b accepted 65 of 92 rows, 7 wrong (11 of 100), and refused 27, 12 wrong; it refused 13 of 49 good rows.
+   A first, stricter prompt (three yes/no questions, all must be yes) refused 2 of 3 good rows.
 6. A script looks for the signs of a weak row (a rule row whose quote has no rule word, a threat sentence with
    words that are not in the passage, a quote that is a fragment, no STRIDE category). Rows with no such sign come
    first on the page; no row is removed. (A second model call that asked "is this sentence about the story?" was

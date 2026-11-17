@@ -12,8 +12,8 @@ Quote: "$quote"
 Threat: $threat
 Requirement: $requirement
 
-Check the row. Answer three questions with yes or no, one line each:
-1. Is the quoted sentence about something that this user story builds, sets up or uses? (No, when it is about another feature, another mode or another flow.)
-2. Is the threat a harm to security that the passage states, or the breach of a security rule that the passage states? (No, when the quoted sentence is a plain fact about the product, an option, or a feature that does not work.)
-3. Does the threat say only what the passage says? (No, when it adds a result, a way of attack or a detail.)
-Then write KEEP alone on the last line if all three answers are yes. If not, write DROP alone on the last line.
+Look for one of these two clear faults:
+A. The quoted sentence is about a different feature, mode or flow than the one of the user story.
+B. The threat says something that the passage does not say.
+Write FAULT only when you are sure that the row has fault A or fault B. When the row has no such fault, or when you are not sure, write OK.
+Write one short sentence. Then write OK or FAULT alone on the last line.

@@ -151,10 +151,13 @@ def weak_signs(row_type: str, quote: str, threat: str, passage: str, story: str,
     return signs
 
 
-_KEEP_DROP_RE = re.compile(r"\b(KEEP|DROP)\b", re.I)
+_VERDICT_RE = re.compile(r"\b(OK|FAULT)\b")
 
 
 def keep_or_drop(answer: str) -> str:
-    """The last KEEP or DROP of a check answer, as "accepts" or "refuses". "" when the answer has neither."""
-    found = _KEEP_DROP_RE.findall(answer or "")
-    return {"KEEP": "accepts", "DROP": "refuses"}[found[-1].upper()] if found else ""
+    """The last OK or FAULT of a check answer, as "accepts" or "refuses". "" when the answer has neither.
+
+    The words must be in capital letters, as the prompt asks: "ok" in a sentence is not a verdict.
+    """
+    found = _VERDICT_RE.findall(answer or "")
+    return {"OK": "accepts", "FAULT": "refuses"}[found[-1]] if found else ""
