@@ -10,6 +10,7 @@ from __future__ import annotations
 from urllib.parse import quote as url_quote
 
 from nicegui import run, ui
+from secreqgen.application.documentation import shown_name
 from secreqgen.application.steps import threat_trace
 from secreqgen.application.threat_view import (
     export_kept,
@@ -20,7 +21,14 @@ from secreqgen.application.threat_view import (
 )
 
 from secreqgen_gui import storage
-from secreqgen_gui.widgets import empty_state, marked_passage, page_title, tag, text
+from secreqgen_gui.widgets import (
+    empty_state,
+    formats_tag,
+    marked_passage,
+    page_title,
+    tag,
+    text,
+)
 
 STYLE = """
 .sr-main:has(.sr-result) { max-width: none; margin: 0; padding: 0; }
@@ -264,6 +272,8 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
     passages = {
         p.get("ref"): split_passage(p) for p in model["passages"] if isinstance(p, dict)
     }
+    for part in passages.values():
+        part["page"] = shown_name(part["page"])
     flat = [item for group in grouped["groups"] for item in group["rows"]]
     order = [item["row"]["id"] for item in flat]
     by_id = {item["row"]["id"]: item for item in flat}
@@ -565,6 +575,7 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                 counts_line()
                 if _not_tested(model):
                     tag("untested prompts", "caution")
+                formats_tag(data["manifest"])
             with ui.row().classes("items-baseline gap-3"):
                 ui.label(_steps_line(model)).classes("sr-small").mark("steps-line")
                 address = (

@@ -147,6 +147,7 @@ def page(
                 labels=bool(labels.value),
                 about=about_text,
                 prompt_set=prompt_set_value(prompt.value),
+                other_formats=docs_part.other_formats,
             )
             try:
                 run_id = await run.io_bound(jobs.manager.start_threats, spec)

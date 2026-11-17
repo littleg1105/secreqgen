@@ -141,8 +141,8 @@ async def test_form_options_stay_in_their_form(user, tmp_path):
     assert "A tool for tests." not in {
         e.value for e in user.find(kind=ui.textarea).elements
     }
-    with pytest.raises(AssertionError):
-        user.find(kind=ui.switch)  # the requirements form has no switch
+    # only the threat form has this switch
+    assert "Use a checker" not in {e.text for e in user.find(kind=ui.switch).elements}
     await user.open("/threats/new")
     about = [e for e in user.find(kind=ui.textarea).elements
              if e.label == "About the product (optional)"][0]
