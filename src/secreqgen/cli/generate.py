@@ -531,56 +531,45 @@ def generate_threats(
     states. Default setup (the tested one): gemma4:26b writes the rows and
     qwen3.8:27b checks them.
     """
-    import json
-    import re
-
-    import yaml as yaml_lib
     from rich.markup import escape
 
-    from secreqgen.exceptions import GenerationError, LLMConnectionError
-    from secreqgen.generation.schemas import UserStory
-    from secreqgen.retrieval.word_search import SearchError
-    from secreqgen.threats import (
-        ThreatListError,
-        ThreatListGenerator,
-        choose_models,
-        render_markdown,
+    from secreqgen.application.errors import InputError
+    from secreqgen.application.inputs import (
+        build_user_stories,
+        check_docs_folder,
+        check_input_file,
+        read_story_data,
     )
+    from secreqgen.application.threats import (
+        resolve_threat_models,
+        select_stories,
+        summarise_threat_list,
+        threat_folder_name,
+        threat_product_name,
+        write_threat_files,
+    )
+    from secreqgen.exceptions import GenerationError, LLMConnectionError
+    from secreqgen.retrieval.word_search import SearchError
+    from secreqgen.threats import ThreatListError, ThreatListGenerator
     from secreqgen.threats.pipeline import DRAFT_NOTICE
 
-    if not input_file.exists():
-        console.print(f"[red]Error:[/red] Input file not found: {input_file}")
-        raise typer.Exit(1)
-    if not docs.is_dir():
-        console.print(f"[red]Error:[/red] Documentation folder not found: {docs}")
+    try:
+        check_input_file(input_file)
+        check_docs_folder(docs)
+    except InputError as e:
+        console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
     try:
-        text = input_file.read_text(encoding="utf-8")
-        if input_file.suffix.lower() in [".yaml", ".yml"]:
-            data = yaml_lib.safe_load(text)
-        else:
-            data = json.loads(text)
-        if not isinstance(data, dict):
-            raise ValueError("the file must hold an object")
+        data = read_story_data(input_file, encoding="utf-8", require_object=True)
     except Exception as e:
         console.print(f"[red]Error parsing input file:[/red] {e}")
         raise typer.Exit(1)
 
-    user_stories = []
-    for i, story_data in enumerate(data.get("user_stories", []) or []):
-        try:
-            user_stories.append(
-                UserStory(
-                    id=story_data.get("id", f"US-{i+1:03d}"),
-                    title=story_data.get("title", "Untitled"),
-                    story=story_data.get("story", ""),
-                    acceptance_criteria=story_data.get("acceptance_criteria", []),
-                )
-            )
-        except Exception as e:
-            console.print(f"[yellow]Warning: Skipping invalid story {i+1}: {e}[/yellow]")
+    user_stories, skipped = build_user_stories(data.get("user_stories", []) or [])
+    for number, e in skipped:
+        console.print(f"[yellow]Warning: Skipping invalid story {number}: {e}[/yellow]")
     if story_id is not None:
-        user_stories = [s for s in user_stories if s.id == story_id]
+        user_stories = select_stories(user_stories, story_id)
         if not user_stories:
             console.print(f"[red]Error:[/red] Story not found in the input file: {story_id}")
             raise typer.Exit(1)
@@ -588,18 +577,11 @@ def generate_threats(
         console.print("[yellow]No user stories found in input file.[/yellow]")
         raise typer.Exit(0)
 
-    product_name = product if product is not None else data.get("project")
-    if product_name is not None and not isinstance(product_name, str):
-        product_name = str(product_name) if isinstance(product_name, (int, float)) else None
+    product_name = threat_product_name(product, data)
     cfg = get_config()
-    # A model name in the settings counts only when the user set it. The value
-    # that the settings have with no user input (llama3:8b) was never tested here.
-    settings_model = (
-        cfg.llm.model_name if "model_name" in cfg.llm.model_fields_set else None
-    )
     try:
-        writer_name, checker_name = choose_models(
-            writer_model, settings_model, checker_model, check
+        writer_name, checker_name = resolve_threat_models(
+            cfg, writer_model, checker_model, check
         )
     except ThreatListError as e:
         console.print(f"[red]Error:[/red] {escape(str(e))}")
@@ -676,32 +658,21 @@ def generate_threats(
             )
             continue
         # Two story ids can give the same folder name ("A/1" and "A_1"): the second one gets a number.
-        base_name = re.sub(r"[^A-Za-z0-9._-]", "_", story.id).strip(".") or "story"
-        name, n = base_name, 1
-        while name in used_names:
-            n += 1
-            name = f"{base_name}_{n}"
-        used_names.add(name)
-        folder = output / name
+        folder = output / threat_folder_name(story.id, used_names)
         try:
-            folder.mkdir(parents=True, exist_ok=True)
-            (folder / "threats.json").write_text(
-                json.dumps(model, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
-            (folder / "threats.md").write_text(render_markdown(model), encoding="utf-8")
+            write_threat_files(folder, model)
         except OSError as e:
             console.print(f"[red]Error:[/red] Cannot write to {escape(str(folder))}: {escape(str(e))}")
             raise typer.Exit(1)
         written += 1
-        rows = model["rows"]
-        attacks = sum(1 for r in rows if r["type"] == "attack")
-        clean = sum(1 for r in rows if not r.get("weak_signs"))
-        accepted = sum(1 for r in rows if r.get("second_model") == "accepts")
-        checked = f", {accepted} accepted by {checker_name}" if checker_name else ""
+        summary = summarise_threat_list(model)
+        checked = (
+            f", {summary.accepted} accepted by {checker_name}" if checker_name else ""
+        )
         console.print(
-            f"[green]✓[/green] {escape(story.id)}: {len(rows)} rows ({attacks} attacks, "
-            f"{len(rows) - attacks} rules), {clean} with no weak sign{checked}, "
-            f"{len(model['dropped'])} removed by the script, {len(model['calls'])} calls, {model['seconds']} s"
+            f"[green]✓[/green] {escape(story.id)}: {summary.rows} rows ({summary.attacks} attacks, "
+            f"{summary.rules} rules), {summary.clean} with no weak sign{checked}, "
+            f"{summary.dropped} removed by the script, {summary.calls} calls, {summary.seconds} s"
         )
 
     if written == 0:
