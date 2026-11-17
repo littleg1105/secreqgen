@@ -103,14 +103,13 @@ def evaluate_run(
     Example:
         secreqgen evaluate run stories.json ground_truth.json -o docs/evaluation_results
     """
+    from secreqgen.application.clients import build_evaluation_client
+    from secreqgen.application.retrievers import build_vector_retriever
     from secreqgen.evaluation import (
         EvaluationPipeline,
         EvaluationReportGenerator,
     )
     from secreqgen.exceptions import GenerationError, LLMConnectionError
-    from secreqgen.generation import OllamaClient
-    from secreqgen.ingestion import DocumentEmbedder
-    from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
 
     # Validate files
     if not stories.exists():
@@ -163,12 +162,7 @@ def evaluate_run(
             progress.add_task("Initializing components...", total=None)
 
             # Initialize LLM client with specified model
-            llm_client = OllamaClient(
-                base_url=cfg.llm.base_url,
-                model_name=model_name,
-                temperature=cfg.llm.temperature,
-                max_tokens=cfg.llm.max_tokens,
-            )
+            llm_client = build_evaluation_client(cfg, model_name)
 
             if not llm_client.check_health():
                 console.print(
@@ -178,20 +172,7 @@ def evaluate_run(
                 raise typer.Exit(1)
 
             # Initialize retriever
-            embedder = DocumentEmbedder(
-                model_name=cfg.embedding.model_name,
-                device=cfg.embedding.device,
-            )
-            vectorstore = SecReqGenVectorStore(
-                persist_directory=cfg.vectorstore.persist_directory,
-                collection_prefix=cfg.vectorstore.collection_prefix,
-            )
-            retriever = SimpleRetriever(
-                vectorstore=vectorstore,
-                embedder=embedder,
-                top_k=cfg.retrieval.top_k,
-                similarity_threshold=cfg.retrieval.similarity_threshold,
-            )
+            retriever = build_vector_retriever(cfg)
 
             # Initialize pipeline
             pipeline = EvaluationPipeline(
@@ -353,6 +334,8 @@ def evaluate_compare_runs(
     Example:
         secreqgen evaluate compare-runs stories.json ground_truth.json --runs 20
     """
+    from secreqgen.application.clients import build_evaluation_client
+    from secreqgen.application.retrievers import build_vector_retriever
     from secreqgen.evaluation import (
         EvaluationPipeline,
         build_multi_run_report,
@@ -361,9 +344,6 @@ def evaluate_compare_runs(
         serialize_report,
     )
     from secreqgen.exceptions import GenerationError, LLMConnectionError
-    from secreqgen.generation import OllamaClient
-    from secreqgen.ingestion import DocumentEmbedder
-    from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
 
     # Validate input files BEFORE any heavy initialization so the command
     # fails fast on bad paths without spinning up Ollama or the embedder.
@@ -415,12 +395,7 @@ def evaluate_compare_runs(
         ) as progress:
             progress.add_task("Initializing components...", total=None)
 
-            llm_client = OllamaClient(
-                base_url=cfg.llm.base_url,
-                model_name=model_name,
-                temperature=cfg.llm.temperature,
-                max_tokens=cfg.llm.max_tokens,
-            )
+            llm_client = build_evaluation_client(cfg, model_name)
 
             if not llm_client.check_health():
                 console.print(
@@ -429,20 +404,7 @@ def evaluate_compare_runs(
                 )
                 raise typer.Exit(1)
 
-            embedder = DocumentEmbedder(
-                model_name=cfg.embedding.model_name,
-                device=cfg.embedding.device,
-            )
-            vectorstore = SecReqGenVectorStore(
-                persist_directory=cfg.vectorstore.persist_directory,
-                collection_prefix=cfg.vectorstore.collection_prefix,
-            )
-            retriever = SimpleRetriever(
-                vectorstore=vectorstore,
-                embedder=embedder,
-                top_k=cfg.retrieval.top_k,
-                similarity_threshold=cfg.retrieval.similarity_threshold,
-            )
+            retriever = build_vector_retriever(cfg)
 
             pipeline = EvaluationPipeline(
                 llm_client=llm_client,

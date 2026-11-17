@@ -27,17 +27,14 @@ def _client(cfg, **kwargs):
 @generate_app.command("check-ollama")
 def check_ollama() -> None:
     """Check if Ollama is running and model is available."""
-    from secreqgen.generation import OllamaClient
+    from secreqgen.application.clients import build_health_client
 
     cfg = get_config()
 
     console.print(f"[cyan]Checking Ollama at:[/cyan] {cfg.llm.base_url}")
     console.print(f"[cyan]Model:[/cyan] {cfg.llm.model_name}")
 
-    client = OllamaClient(
-        base_url=cfg.llm.base_url,
-        model_name=cfg.llm.model_name,
-    )
+    client = build_health_client(cfg)
 
     if client.check_health():
         console.print("[green]✓[/green] Ollama is running and model is available!")
@@ -124,6 +121,10 @@ def generate_requirements(
     import json
     import yaml as yaml_lib
 
+    from secreqgen.application.retrievers import (
+        build_vector_retriever,
+        build_word_retriever,
+    )
     from secreqgen.exceptions import GenerationError, LLMConnectionError
     from secreqgen.generation import (
         GenerationMode,
@@ -131,9 +132,7 @@ def generate_requirements(
         SecurityRequirementsPromptBuilder,
     )
     from secreqgen.generation.schemas import UserStory
-    from secreqgen.ingestion import DocumentEmbedder
-    from secreqgen.output import OutputFormat, RequirementsExporter, RequirementsFormatter
-    from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
+    from secreqgen.output import OutputFormat, RequirementsFormatter
     from secreqgen.retrieval.word_search import SearchError
 
     # Validate input file
@@ -264,27 +263,12 @@ def generate_requirements(
                 # The tested setup: word search over the documentation folder.
                 # The product name comes from --product, or from the key
                 # "project" of the input file.
-                from secreqgen.retrieval.word_search import WordSearchRetriever
-
                 product_name = product
                 if product_name is None and isinstance(data, dict):
                     product_name = data.get("project")
-                retriever = WordSearchRetriever(docs, product=product_name)
+                retriever = build_word_retriever(docs, product_name)
             elif mode == GenerationMode.RAG:
-                embedder = DocumentEmbedder(
-                    model_name=cfg.embedding.model_name,
-                    device=cfg.embedding.device,
-                )
-                vectorstore = SecReqGenVectorStore(
-                    persist_directory=cfg.vectorstore.persist_directory,
-                    collection_prefix=cfg.vectorstore.collection_prefix,
-                )
-                retriever = SimpleRetriever(
-                    vectorstore=vectorstore,
-                    embedder=embedder,
-                    top_k=cfg.retrieval.top_k,
-                    similarity_threshold=cfg.retrieval.similarity_threshold,
-                )
+                retriever = build_vector_retriever(cfg)
 
             # Initialize generator. With --docs the prompt is the tested prompt set.
             prompts_dir = None
@@ -406,6 +390,10 @@ def generate_single(
     """Generate requirements for a single user story (interactive mode)."""
     import uuid
 
+    from secreqgen.application.retrievers import (
+        build_vector_retriever,
+        build_word_retriever,
+    )
     from secreqgen.exceptions import GenerationError, LLMConnectionError
     from secreqgen.generation import (
         GenerationMode,
@@ -413,9 +401,7 @@ def generate_single(
         SecurityRequirementsPromptBuilder,
     )
     from secreqgen.generation.schemas import UserStory
-    from secreqgen.ingestion import DocumentEmbedder
     from secreqgen.output import OutputFormat, RequirementsFormatter
-    from secreqgen.retrieval import SecReqGenVectorStore, SimpleRetriever
     from secreqgen.retrieval.word_search import SearchError
 
     # Validate format
@@ -487,26 +473,9 @@ def generate_single(
                     prompts_dir=TESTED_PROMPT_SET
                 )
             if mode == GenerationMode.RAG and docs is not None:
-                from secreqgen.retrieval.word_search import WordSearchRetriever
-
-                retriever = WordSearchRetriever(
-                    docs, product=product, system_context_file=context
-                )
+                retriever = build_word_retriever(docs, product, context)
             elif mode == GenerationMode.RAG:
-                embedder = DocumentEmbedder(
-                    model_name=cfg.embedding.model_name,
-                    device=cfg.embedding.device,
-                )
-                vectorstore = SecReqGenVectorStore(
-                    persist_directory=cfg.vectorstore.persist_directory,
-                    collection_prefix=cfg.vectorstore.collection_prefix,
-                )
-                retriever = SimpleRetriever(
-                    vectorstore=vectorstore,
-                    embedder=embedder,
-                    top_k=cfg.retrieval.top_k,
-                    similarity_threshold=cfg.retrieval.similarity_threshold,
-                )
+                retriever = build_vector_retriever(cfg)
 
             generator = SecurityRequirementsGenerator(
                 llm_client=llm_client,

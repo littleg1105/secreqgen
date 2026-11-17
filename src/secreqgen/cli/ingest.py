@@ -36,14 +36,13 @@ def ingest_documents(
     Pipeline: load → chunk → tag → embed → store
     """
     # Lazy imports to avoid slow startup
+    from secreqgen.application.retrievers import build_embedder, build_vector_store
     from secreqgen.ingestion import (
         ArchitectureAwareChunker,
-        DocumentEmbedder,
         DocumentLoaderRegistry,
         MetadataExtractor,
     )
     from secreqgen.ingestion.metadata import DocumentType
-    from secreqgen.retrieval import SecReqGenVectorStore
 
     # Validate directory
     if not directory.exists():
@@ -81,15 +80,8 @@ def ingest_documents(
     loader_registry = DocumentLoaderRegistry()
     chunker = ArchitectureAwareChunker()
     metadata_extractor = MetadataExtractor()
-    embedder = DocumentEmbedder(
-        model_name=cfg.embedding.model_name,
-        device=cfg.embedding.device,
-        batch_size=cfg.embedding.batch_size,
-    )
-    vector_store = SecReqGenVectorStore(
-        persist_directory=cfg.vectorstore.persist_directory,
-        collection_prefix=cfg.vectorstore.collection_prefix,
-    )
+    embedder = build_embedder(cfg, batch_size=cfg.embedding.batch_size)
+    vector_store = build_vector_store(cfg)
 
     try:
         # Step 1: Load documents
@@ -209,13 +201,12 @@ def ingest_system_context(
 ) -> None:
     """Load system context from a YAML file into the vector store."""
     # Lazy imports
+    from secreqgen.application.retrievers import build_embedder, build_vector_store
     from secreqgen.ingestion import (
         ArchitectureAwareChunker,
-        DocumentEmbedder,
         DocumentLoaderRegistry,
     )
     from secreqgen.ingestion.metadata import DocumentType
-    from secreqgen.retrieval import SecReqGenVectorStore
 
     # Validate file
     if not file.exists():
@@ -244,15 +235,8 @@ def ingest_system_context(
     # Initialize components
     loader_registry = DocumentLoaderRegistry()
     chunker = ArchitectureAwareChunker()
-    embedder = DocumentEmbedder(
-        model_name=cfg.embedding.model_name,
-        device=cfg.embedding.device,
-        batch_size=cfg.embedding.batch_size,
-    )
-    vector_store = SecReqGenVectorStore(
-        persist_directory=cfg.vectorstore.persist_directory,
-        collection_prefix=cfg.vectorstore.collection_prefix,
-    )
+    embedder = build_embedder(cfg, batch_size=cfg.embedding.batch_size)
+    vector_store = build_vector_store(cfg)
 
     try:
         # Load YAML file
@@ -317,7 +301,7 @@ def ingest_system_context(
 @ingest_app.command("stats")
 def ingest_stats() -> None:
     """Show vector store statistics."""
-    from secreqgen.retrieval import SecReqGenVectorStore
+    from secreqgen.application.retrievers import build_vector_store
 
     cfg = get_config()
 
@@ -329,10 +313,7 @@ def ingest_stats() -> None:
         )
         raise typer.Exit(0)
 
-    vector_store = SecReqGenVectorStore(
-        persist_directory=cfg.vectorstore.persist_directory,
-        collection_prefix=cfg.vectorstore.collection_prefix,
-    )
+    vector_store = build_vector_store(cfg)
 
     stats = vector_store.get_stats()
 
@@ -358,7 +339,7 @@ def ingest_clear(
     ] = False,
 ) -> None:
     """Clear all data from the vector store."""
-    from secreqgen.retrieval import SecReqGenVectorStore
+    from secreqgen.application.retrievers import build_vector_store
 
     cfg = get_config()
 
@@ -374,10 +355,7 @@ def ingest_clear(
             console.print("[yellow]Aborted.[/yellow]")
             raise typer.Exit(0)
 
-    vector_store = SecReqGenVectorStore(
-        persist_directory=cfg.vectorstore.persist_directory,
-        collection_prefix=cfg.vectorstore.collection_prefix,
-    )
+    vector_store = build_vector_store(cfg)
 
     vector_store.clear()
     console.print("[green]✓[/green] Vector store cleared.")

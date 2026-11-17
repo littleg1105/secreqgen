@@ -109,3 +109,11 @@ def test_unknown_name_raises_attribute_error():
 
     with pytest.raises(AttributeError):
         retrieval.NoSuchName
+
+
+def test_application_builders_import_is_light():
+    found = forbidden_loaded(
+        ["secreqgen.application.clients", "secreqgen.application.retrievers"],
+        HEAVY + ["secreqgen.ingestion", "secreqgen.retrieval"],
+    )
+    assert found == []
