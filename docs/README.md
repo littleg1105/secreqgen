@@ -64,4 +64,4 @@ These files are dated after the audit, or HANDOFF.md lists them in its post-audi
 
 ## About docs/log.md
 
-The last real entry of docs/log.md is from January 2026. Do not add entries to it. It does not agree with later results. The file CLAUDE.md in the repository root still points to it. So do three of the four commands in `.claude/commands/` (log, status, step). They are older than the audit.
+The last real entry of docs/log.md is from January 2026. Do not add entries to it. It does not agree with later results. The file CLAUDE.md in the repository root says the same. Three of the four commands in `.claude/commands/` (log, status, step) still name docs/log.md. They are older than the audit. Do not follow them.
