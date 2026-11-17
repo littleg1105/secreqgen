@@ -486,11 +486,24 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
         if part and spans:
             with ui.element("div").classes("sr-ev-passage").props("id=sr-ev-passage"):
                 marked_passage(part["body"], spans)
+            # Scroll to the quote. Two lines of text stay in view above it,
+            # and the top edge of the box is at the start of a line.
             ui.run_javascript(
                 "setTimeout(() => {"
                 "const box = document.getElementById('sr-ev-passage');"
                 "const mark = box && box.querySelector('.sr-mark');"
-                "if (mark) { box.scrollTop = Math.max(0, mark.offsetTop - 60); }"
+                "if (!mark) { return; }"
+                "const line = parseFloat(getComputedStyle(mark).lineHeight) || 24;"
+                "const pad = parseFloat(getComputedStyle(box).paddingTop) || 0;"
+                # A box that scrolls gets a height of whole lines, so the
+                # last scroll position is also at the start of a line.
+                "if (box.scrollHeight > box.clientHeight) {"
+                "const rows = Math.floor((box.clientHeight - pad - 4) / line);"
+                "const edge = box.offsetHeight - box.clientHeight;"
+                "box.style.maxHeight = (rows * line + pad + 4 + edge) + 'px';"
+                "}"
+                "const above = Math.round((mark.offsetTop - pad) / line) - 2;"
+                "box.scrollTop = above > 0 ? pad + above * line - 4 : 0;"
                 "}, 80)"
             )
         else:
