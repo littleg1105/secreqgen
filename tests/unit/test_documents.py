@@ -344,3 +344,36 @@ def test_search_reads_a_mirror(tmp_path: Path) -> None:
     (only_md / "b.md").write_text("Plain text without heading.\n")
     mirror = build_mirror(only_md, tmp_path / "m2")
     assert chunk_keys(load_chunks(mirror.folder)) == chunk_keys(load_chunks(only_md))
+
+
+def test_rst_footnotes_and_citations_stay_in_the_text(tmp_path):
+    """A footnote is text for the reader. A comment is not."""
+    source = tmp_path / "page.rst"
+    source.write_text(
+        "Data set\n"
+        "========\n"
+        "\n"
+        "The data comes from a contest [1]_ and from a study [CIT2002]_.\n"
+        "\n"
+        ".. this line is a comment and no reader sees it\n"
+        "\n"
+        ".. rubric:: References\n"
+        "\n"
+        ".. [1] Analysis and Results of the 1999 Intrusion\n"
+        "   Detection Evaluation, Richard Lippmann.\n"
+        "\n"
+        ".. [CIT2002] A book about data, 2002.\n"
+        "\n"
+        ".. |product| replace:: the Example product\n"
+        "\n"
+        ".. |logo| image:: logo.png\n",
+        encoding="utf-8",
+    )
+    text = to_markdown(source)
+    assert "[1] Analysis and Results of the 1999 Intrusion" in text
+    assert "Detection Evaluation, Richard Lippmann." in text
+    assert "[CIT2002] A book about data, 2002." in text
+    assert "References" in text
+    assert "the Example product" in text
+    assert "comment" not in text
+    assert "logo.png" not in text

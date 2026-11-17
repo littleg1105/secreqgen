@@ -127,6 +127,10 @@ _RST_ADORN = re.compile(r"^([!-/:-@\[-`{-~])\1+$")
 _RST_DIRECTIVE = re.compile(r"^(\s*)\.\. ([\w:+-]+)::\s*(.*)$")
 _RST_TARGET = re.compile(r"^\s*\.\. _[^:]+:")
 _RST_COMMENT = re.compile(r"^(\s*)\.\.(\s.*)?$")
+# A footnote or a citation: ".. [1] text". Its text is text for the reader.
+_RST_NOTE = re.compile(r"^(\s*)\.\. (\[[^\]]+\])\s*(.*)$")
+# A substitution: ".. |name| replace:: text". Only "replace" holds text.
+_RST_SUBSTITUTION = re.compile(r"^(\s*)\.\. \|[^|]+\| ([\w-]+)::\s*(.*)$")
 _RST_OPTION = re.compile(r"^\s*:[\w-]+:(\s.*)?$")
 _RST_CODE = ("code-block", "sourcecode", "code")
 _RST_DROP = ("toctree", "image", "figure", "include", "contents", "raw")
@@ -226,6 +230,22 @@ def _rst_convert(lines: list[str], styles: list[tuple[str, str]]) -> list[str]:
             out.append("")
             out.extend(_rst_convert(_dedent(block), styles))
             out.append("")
+            continue
+        found = _RST_NOTE.match(line)
+        if found:
+            block, i = _rst_block(lines, i + 1, len(found.group(1)))
+            first = f"{found.group(2)} {_rst_inline(found.group(3))}".rstrip()
+            out.extend(["", first])
+            out.extend(_rst_inline(part.strip()) for part in block if part.strip())
+            out.append("")
+            continue
+        found = _RST_SUBSTITUTION.match(line)
+        if found:
+            block, i = _rst_block(lines, i + 1, len(found.group(1)))
+            if found.group(2).lower() == "replace":
+                out.extend(["", _rst_inline(found.group(3))])
+                out.extend(_rst_inline(part.strip()) for part in block if part.strip())
+                out.append("")
             continue
         found = _RST_COMMENT.match(line)
         if found:
