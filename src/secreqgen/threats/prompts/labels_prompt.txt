@@ -1,0 +1,29 @@
+Task: choose a threat actor and a STRIDE category for each threat.
+
+User story: $story_title. $story_text
+
+Threats (each has a number):
+$threats
+
+For each threat choose two values.
+
+The threat actor: who would most likely cause the threat. One value of this list:
+- external_individual: one person outside the organisation that runs the system
+- external_group: persons outside the organisation who work together, for example a criminal group
+- external_organization: a different organisation with a connection to the system, for example a partner, a supplier or a competitor
+- nation_state: a government or an agency of a state
+- trusted_insider: a person with ordinary access, for example an employee or a member
+- privileged_insider: a person with administrator or operator rights
+- accidental_actor: a user or an administrator who causes harm by mistake
+- other: none of these fits
+
+The STRIDE category: what the threat does to security. One letter of this list:
+- S (spoofing): somebody uses a false identity
+- T (tampering): data or code is changed with no permission
+- R (repudiation): somebody can deny an action, because there is no record of it
+- I (information disclosure): data is shown to somebody who must not see it
+- D (denial of service): the service stops or becomes too slow
+- E (elevation of privilege): somebody gets rights or access that they must not have
+- none: the sentence is no security threat, for example a feature that does not work or a plain fact about the product
+
+Answer with one line for each threat and nothing else: the number, a colon, the actor, a comma and the STRIDE value. Example: 1: external_individual, S

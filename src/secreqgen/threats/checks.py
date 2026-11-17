@@ -81,13 +81,65 @@ def has_risk_word(text: str) -> bool:
     return _RISK_RE.search(text.replace("*", "").replace("`", "")) is not None
 
 
-def signal_of(quote: str) -> str:
-    """"risk" when the quote holds a risk word, "rule" when it holds a rule word (must, never, only ...), else "".
+_STOP = frozenset(
+    """a an the of to and or in on for with is are be as that this it its by at from so if then not no do does did each all any which who whom
+what how when where there their them his her our your my me us into than too very only also both more most such own same other some these those
+has have had having been being was were am but nor over under again once here about against between through during before after above below up
+down out off further can could may might will would should must shall cannot without within while because until via per using used use uses""".split()
+)
+# Words that a threat sentence can add with no source: the actor and the plain verbs of a breach.
+_FREE = frozenset(
+    """attacker attackers attack attacks user users administrator administrators admin admins operator operators developer developers client
+clients server servers system systems application applications service services person persons somebody someone anyone organisation organization
+product feature features does perform performs performed allow allows allowed allowing fail fails failed failing leading lead leads result results
+resulting cause causes causing access accesses accessed accessing gain gains obtain obtains read reads send sends sent use request requests data
+information security threat threats breach instead rather properly correctly incorrectly improperly required requirement rule rules documentation
+passage story""".split()
+)
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z_\-]{3,}")
+_SUFFIXES = ("ations", "ation", "ingly", "ments", "ment", "ness", "ing", "ies", "ied", "ed", "es", "ly", "s")
 
-    In the tests of 17 November 2026 a row with no such word was wrong about two times more often.
-    The value orders the rows of the page. It removes no row.
+
+def _stem(word: str) -> str:
+    word = word.lower().strip("-_")
+    for suffix in _SUFFIXES:
+        if word.endswith(suffix) and len(word) - len(suffix) >= 4:
+            return word[: -len(suffix)]
+    return word
+
+
+_FREE_STEMS = frozenset(_stem(w) for w in _FREE)
+
+
+def new_words(threat: str, passage: str, story: str) -> list[str]:
+    """The content words of a threat sentence that are not in its passage and not in the story (as word stems)."""
+    known = {_stem(w) for w in _WORD_RE.findall(passage + " " + story)}
+    out: list[str] = []
+    for word in _WORD_RE.findall(threat):
+        stem = _stem(word)
+        if word.lower() in _STOP or word.lower() in _FREE or stem in _FREE_STEMS or stem in known:
+            continue
+        if stem not in out:
+            out.append(stem)
+    return out
+
+
+def weak_signs(row_type: str, quote: str, threat: str, passage: str, story: str, stride: str = "") -> list[str]:
+    """The signs of a weak row that a script can see. They order the rows of the page; they remove no row.
+
+    In the tests of 17 November 2026 (215 judged rows) a row with no such sign was wrong for 12 to 32 of 100 rows,
+    a row with a sign for 38 to 62 of 100. Most faults that no script can see are sentences about a part of the
+    product that the story does not use.
     """
     plain = quote.replace("*", "").replace("`", "")
-    if _RISK_RE.search(plain):
-        return "risk"
-    return "rule" if _RULE_RE.search(plain) else ""
+    signs: list[str] = []
+    if row_type != "attack" and not (_RULE_RE.search(plain) or _RISK_RE.search(plain)):
+        signs.append("the row is a rule row, but its quote has no rule word (must, never, only ...) and no risk word")
+    added = new_words(threat, passage, story)
+    if len(added) >= 2:
+        signs.append("the threat sentence holds words that are not in the passage: " + ", ".join(added[:4]))
+    if len(plain.split()) <= 5:
+        signs.append("the quote is a fragment of 5 words or fewer")
+    if stride == "none":
+        signs.append("the label step gave no STRIDE category: possibly no security threat")
+    return signs

@@ -10,11 +10,12 @@ Method (tested on 17 November 2026, see the lab notes of that day):
    one row for each: type (attack or rule), threat, harm, the part of the story, requirement.
 4. A script checks each row: the quote is in its passage, the passage fits the story, one row for one quote,
    the story part is a copy of words of the story. The harm is kept for an attack row only.
-5. A script marks each row whose quote holds a warning word or a rule word. These rows come first on the page;
-   no row is removed. (A second model call that asked "is this sentence about the story?" was tested and gave
-   no gain on the local models, so it is not part of the tool.)
-6. One call for a story names a threat actor for each row, from a closed list. The actor is the model's choice
-   from the threat sentence. It has no source in the documentation.
+5. One call for a story names a threat actor and a STRIDE category for each row, from closed lists. They are the
+   model's choice from the threat sentence. They have no source in the documentation.
+6. A script looks for the signs of a weak row (a rule row whose quote has no rule word, a threat sentence with
+   words that are not in the passage, a quote that is a fragment, no STRIDE category). Rows with no such sign come
+   first on the page; no row is removed. (A second model call that asked "is this sentence about the story?" was
+   tested and gave no gain on the local models, so it is not part of the tool.)
 """
 
 from __future__ import annotations
@@ -39,19 +40,19 @@ from secreqgen.retrieval.word_search import (
     clean_query,
     format_block,
 )
-from secreqgen.threats.actors import ACTORS
+from secreqgen.threats.actors import ACTORS, STRIDE
 from secreqgen.threats.checks import (
     check_quote,
     extract_json,
     has_risk_word,
     normalise,
-    signal_of,
+    weak_signs,
 )
 
 logger = logging.getLogger(__name__)
 
 PROMPT_DIR = Path(__file__).parent / "prompts"
-PROMPT_SET = "threats_v5b"
+PROMPT_SET = "threats_v5b_labels"
 GROUP_SIZE = 5  # passages in one call
 EXTRA_SECTIONS = 5  # sections of the search pool with a risk word, in one more group
 EXTRA_TOKENS = 1000
@@ -80,16 +81,17 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-_ACTOR_LINE_RE = re.compile(r"(?m)^\W*(\d{1,2})\W{1,4}([A-Za-z_ ]+?)\W*$")
+_LABEL_LINE_RE = re.compile(r"(?m)^\W*(\d{1,3})\W{1,4}([A-Za-z_ ]+?)\s*[,;|/-]\s*\(?\s*(none|[STRIDE])\b", re.I)
 
 
-def parse_actor_lines(answer: str) -> dict[int, str]:
-    """The actor of each numbered line of an answer. A value that is not in the list is left out."""
-    out: dict[int, str] = {}
-    for match in _ACTOR_LINE_RE.finditer(answer or ""):
-        value = match.group(2).strip().lower().replace(" ", "_")
-        if value in ACTORS:
-            out.setdefault(int(match.group(1)), value)
+def parse_label_lines(answer: str) -> dict[int, tuple[str, str]]:
+    """The actor and the STRIDE value of each numbered line of an answer. A value that is not in a list is ""."""
+    out: dict[int, tuple[str, str]] = {}
+    for match in _LABEL_LINE_RE.finditer(answer or ""):
+        actor = match.group(2).strip().lower().replace(" ", "_")
+        stride = match.group(3)
+        stride = "none" if stride.lower() == "none" else stride.upper()
+        out.setdefault(int(match.group(1)), (actor if actor in ACTORS else "", stride if stride == "none" or stride in STRIDE else ""))
     return out
 
 
@@ -102,15 +104,15 @@ class ThreatListGenerator:
         docs_dir: Path,
         *,
         product: str | None = None,
-        name_actor: bool = True,
+        name_labels: bool = True,
     ) -> None:
         self.llm = llm_client
-        self.name_actor = name_actor
+        self.name_labels = name_labels
         self.retriever = WordSearchRetriever(Path(docs_dir), product=product)
         try:
             self._system = (PROMPT_DIR / "system_prompt.txt").read_text(encoding="utf-8")
             self._user = string.Template((PROMPT_DIR / "user_prompt.txt").read_text(encoding="utf-8"))
-            self._actor = string.Template((PROMPT_DIR / "actor_prompt.txt").read_text(encoding="utf-8"))
+            self._labels = string.Template((PROMPT_DIR / "labels_prompt.txt").read_text(encoding="utf-8"))
         except OSError as exc:
             raise ThreatListError(f"a prompt file is missing: {exc}") from exc
 
@@ -154,22 +156,23 @@ class ThreatListGenerator:
             parts.append(f"### [{p['ref']}] {p['header']}\n{body}")
         return SEPARATOR.join(parts)
 
-    # ------------------------------------------------------------------ threat actors
-    def _name_actors(self, user_story: Any, rows: list[dict]) -> None:
-        """One call for a story: the model chooses a threat actor of the closed list for each row."""
-        prompt = self._actor.substitute(
+    # ------------------------------------------------------------------ labels
+    def _name_labels(self, user_story: Any, rows: list[dict]) -> None:
+        """One call for a story: the model chooses a threat actor and a STRIDE category for each row, from closed lists."""
+        prompt = self._labels.substitute(
             story_title=user_story.title,
             story_text=user_story.story,
             threats="\n".join(f"{n}. {row['threat']}" for n, row in enumerate(rows, start=1)),
         )
         try:
             answer = self.llm.generate(prompt=prompt).content
-        except Exception as exc:  # the list is still useful with no actor  # noqa: BLE001
-            logger.warning("threat list: the actor call failed (%s)", type(exc).__name__)
+        except Exception as exc:  # the list is still useful with no labels  # noqa: BLE001
+            logger.warning("threat list: the label call failed (%s)", type(exc).__name__)
             return
-        for number, value in parse_actor_lines(answer).items():
+        for number, (actor, stride) in parse_label_lines(answer).items():
             if 1 <= number <= len(rows):
-                rows[number - 1]["actor"] = value
+                rows[number - 1]["actor"] = actor
+                rows[number - 1]["stride"] = stride
 
     # ------------------------------------------------------------------ one story
     def generate(self, user_story: Any) -> dict:
@@ -251,12 +254,17 @@ class ThreatListGenerator:
                         "quote": quote,
                         "requirement": _text(row.get("requirement")),
                         "from_extra_group": bool(n_extra) and number == len(groups),
-                        "signal": signal_of(quote),
                         "actor": "",
+                        "stride": "",
+                        "weak_signs": [],
                     }
                 )
-        if self.name_actor and rows:
-            self._name_actors(user_story, rows)
+        if self.name_labels and rows:
+            self._name_labels(user_story, rows)
+        texts = {p["ref"]: p["text"] for p in passages}
+        plain_story = " ".join([user_story.title, user_story.story, *criteria])
+        for row in rows:
+            row["weak_signs"] = weak_signs(row["type"], row["quote"], row["threat"], texts.get(row["source"], ""), plain_story, row["stride"])
         model_name = getattr(self.llm, "model_name", None)
         return {
             "draft_notice": DRAFT_NOTICE,
@@ -266,7 +274,7 @@ class ThreatListGenerator:
             "story": {"id": user_story.id, "title": user_story.title, "story": user_story.story, "acceptance_criteria": criteria},
             "seconds": round(time.time() - start),
             "calls": calls,
-            "actor_step": self.name_actor,
+            "label_step": self.name_labels,
             "extra_passages": n_extra,
             "passages": passages,
             "rows": rows,

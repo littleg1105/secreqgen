@@ -15,7 +15,7 @@ from secreqgen.threats import ThreatListGenerator, checks, pipeline, render_mark
 PROMPT_HASHES = {
     "system_prompt.txt": "79b5b822179c49c56d9612eb427145e57cc760a18229a6bd295f5ddd2e614700",
     "user_prompt.txt": "f4b6516a3a3cea972176b185d96297d286d2fc43feb5a1d3a2e7bdcad7580956",
-    "actor_prompt.txt": "952d1b2142ec1264e3baae95bbf98d9b8cd183df410e947858d07ede13644833",
+    "labels_prompt.txt": "8ee6692c35e669e9289a28a5da873ccd605c01a331f4b2b6e26302f49b6171a9",
 }
 STORY = UserStory(
     id="US-1",
@@ -55,10 +55,10 @@ class StandIn:
         self.raw = raw
         self.threat_prompts: list[str] = []
         self.actor_prompts: list[str] = []
-        self.actors = "1: external_individual\n2. Privileged insider\n3: somebody"
+        self.actors = "1: external_individual, E\n2. Privileged insider, I\n3: somebody, S"
 
     def generate(self, prompt: str, system_prompt: str | None = None, format: str | None = None) -> Reply:
-        if prompt.startswith("Task: choose a threat actor"):
+        if prompt.startswith("Task: choose a threat actor and a STRIDE category"):
             self.actor_prompts.append(prompt)
             return Reply(self.actors)
         self.threat_prompts.append(prompt)
@@ -111,11 +111,27 @@ def test_check_quote_ignores_markdown_marks_and_letter_case() -> None:
     assert not checks.check_quote("", passage)
 
 
-def test_signal_of_marks_warning_words_and_rule_words() -> None:
-    assert checks.signal_of("Rogue clients can set this header.") == "risk"
-    assert checks.signal_of("Do **not** use the request object.") == "rule"
-    assert checks.signal_of("The request must be signed, or an attacker can read it.") == "risk"
-    assert checks.signal_of("The token revocation endpoint is used to revoke tokens.") == ""
+def test_weak_signs_of_a_row() -> None:
+    passage = "The token revocation endpoint is used to revoke tokens. Each request to it must be signed."
+    story = "As a resource server, I want to revoke tokens."
+    none = checks.weak_signs("rule", "Each request to it must be signed.", "A client sends a request that is not signed.", passage, story)
+    assert none == []
+    no_rule_word = checks.weak_signs("rule", "The token revocation endpoint is used to revoke tokens.", "A client does not revoke tokens.", passage, story)
+    assert len(no_rule_word) == 1 and "no rule word" in no_rule_word[0]
+    attack = checks.weak_signs("attack", "The token revocation endpoint is used to revoke tokens.", "An attacker can revoke tokens.", passage, story)
+    assert attack == [], "an attack row needs no rule word"
+    added = checks.weak_signs("rule", "Each request to it must be signed.", "An attacker injects malicious payloads and escalates privileges.", passage, story)
+    assert any("not in the passage" in sign for sign in added)
+    fragment = checks.weak_signs("attack", "Logged in only", "An attacker can read posts.", "Logged in only. An attacker can read posts.", story)
+    assert any("fragment" in sign for sign in fragment)
+    no_stride = checks.weak_signs("rule", "Each request to it must be signed.", "A client sends a request that is not signed.", passage, story, "none")
+    assert any("STRIDE" in sign for sign in no_stride)
+
+
+def test_new_words_ignores_the_words_of_the_passage_and_free_words() -> None:
+    passage = "Rogue clients can set this header and trick Keycloak."
+    assert checks.new_words("An attacker can set the header to trick Keycloak.", passage, "") == []
+    assert checks.new_words("An attacker escalates privileges with the header.", passage, "") == ["escalat", "privileg"]
 
 
 def test_has_risk_word() -> None:
@@ -131,7 +147,7 @@ def test_a_valid_row_is_kept_with_its_fields(docs: Path) -> None:
     attack, rule = rows[WARNING], rows[RULE]
     assert attack["type"] == "attack" and attack["harm"] == "access with no permission"
     assert attack["story_part"] == "The session ends after a time with no activity."
-    assert attack["signal"] == "risk" and rule["signal"] == "rule"
+    assert attack["weak_signs"] == [] and rule["weak_signs"] == []
     assert rule["type"] == "rule"
     assert rule["harm"] == "", "the harm of a rule row is not kept"
     assert rule["story_part"] == "", "a story part that is not a copy of the story is not kept"
@@ -200,46 +216,52 @@ def test_a_group_has_at_most_group_size_passages(tmp_path: Path) -> None:
     assert len(llm.threat_prompts) == len(groups), "one call for each group"
 
 
-def test_each_row_gets_a_threat_actor_of_the_closed_list(docs: Path) -> None:
+def test_each_row_gets_a_threat_actor_and_a_stride_category(docs: Path) -> None:
     llm = StandIn(good_rows)
     model = ThreatListGenerator(llm, docs).generate(STORY)
     assert [r["actor"] for r in model["rows"]] == ["external_individual", "privileged_insider"]
-    assert len(llm.actor_prompts) == 1, "one actor call for a story"
+    assert [r["stride"] for r in model["rows"]] == ["E", "I"]
+    assert len(llm.actor_prompts) == 1, "one label call for a story"
     assert "1. " in llm.actor_prompts[0] and "2. " in llm.actor_prompts[0]
     page = render_markdown(model)
     assert "- Threat actor: external individual" in page and "not from the documentation" in page
+    assert "- STRIDE: E, elevation of privilege" in page
 
 
-def test_an_actor_that_is_not_in_the_list_is_left_empty(docs: Path) -> None:
+def test_a_label_that_is_not_in_a_list_is_left_empty(docs: Path) -> None:
     llm = StandIn(good_rows)
-    llm.actors = "1: hacker\n2: the user"
+    llm.actors = "1: hacker, X\n2: the user, none"
     model = ThreatListGenerator(llm, docs).generate(STORY)
     assert [r["actor"] for r in model["rows"]] == ["", ""]
-    assert "Threat actor" not in render_markdown(model)
+    assert [r["stride"] for r in model["rows"]] == ["", "none"]
+    page = render_markdown(model)
+    assert "Threat actor" not in page and "- STRIDE:" not in page
+    assert "no STRIDE category" in page, "a row with the value none gets a weak sign"
 
 
-def test_no_actor_call_when_the_step_is_off_or_there_is_no_row(docs: Path) -> None:
+def test_no_label_call_when_the_step_is_off_or_there_is_no_row(docs: Path) -> None:
     llm = StandIn(good_rows)
-    ThreatListGenerator(llm, docs, name_actor=False).generate(STORY)
+    ThreatListGenerator(llm, docs, name_labels=False).generate(STORY)
     assert llm.actor_prompts == []
     empty = StandIn(lambda where: [])
     ThreatListGenerator(empty, docs).generate(STORY)
     assert empty.actor_prompts == []
 
 
-def test_parse_actor_lines() -> None:
-    got = pipeline.parse_actor_lines("1: external_individual\n2) trusted insider\n3 - nobody\n4: OTHER\n4: nation_state")
-    assert got == {1: "external_individual", 2: "trusted_insider", 4: "other"}
+def test_parse_label_lines() -> None:
+    got = pipeline.parse_label_lines("1: external_individual, S\n2) trusted insider - none\n3: nobody, T\n4: OTHER, e\n4: nation_state, D")
+    assert got == {1: ("external_individual", "S"), 2: ("trusted_insider", "none"), 3: ("", "T"), 4: ("other", "E")}
 
 
 # ---------------------------------------------------------------------------------------------- page
-def test_the_page_shows_warning_and_rule_rows_first_and_attacks_before_rules(docs: Path) -> None:
+def test_the_page_shows_rows_with_no_weak_sign_first_and_attacks_before_rules(docs: Path) -> None:
     model = ThreatListGenerator(StandIn(good_rows), docs).generate(STORY)
     by_quote = {r["quote"]: r for r in model["rows"]}
-    by_quote[WARNING]["signal"] = ""
+    by_quote[WARNING]["weak_signs"] = ["the quote is a fragment of 5 words or fewer"]
     page = render_markdown(model)
-    assert page.index("## Rows from a warning or a rule of the documentation (1)") < page.index("## Rows from other sentences of the documentation (1)")
+    assert page.index("## Rows with no weak sign (1)") < page.index("## Rows with a weak sign (1)")
     assert page.index("The session cookie is sent with no Secure flag.") < page.index("An attacker who steals the session cookie")
+    assert "- Weak sign: the quote is a fragment" in page
     assert "Your verdict:" in page and model["draft_notice"] in page
     assert "- Harm: access with no permission" in page
 
@@ -248,7 +270,7 @@ def test_the_page_says_so_when_there_is_no_row(docs: Path) -> None:
     model = ThreatListGenerator(StandIn(lambda where: []), docs).generate(STORY)
     page = render_markdown(model)
     assert "state no threat and no security rule for this story" in page
-    assert "other sentences of the documentation" not in page
+    assert "Rows with a weak sign" not in page
 
 
 # ---------------------------------------------------------------------------------------------- command line
@@ -259,7 +281,7 @@ def test_the_command_line_has_the_threats_command() -> None:
     result = CliRunner().invoke(app, ["generate", "threats", "--help"])
     assert result.exit_code == 0, result.output
     text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
-    assert "--docs" in text and "--no-actor" in text and "--story-id" in text
+    assert "--docs" in text and "--no-labels" in text and "--story-id" in text
 
 
 def test_the_command_line_refuses_a_missing_documentation_folder(tmp_path: Path) -> None:

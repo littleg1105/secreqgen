@@ -1016,11 +1016,11 @@ def generate_threats(
         Optional[str],
         typer.Option("--story-id", help="Write the threat list of this story only"),
     ] = None,
-    actor: Annotated[
+    labels: Annotated[
         bool,
         typer.Option(
-            "--actor/--no-actor",
-            help="One short call for each story: a threat actor for each row, from a fixed list",
+            "--labels/--no-labels",
+            help="One short call for each story: a threat actor and a STRIDE category for each row",
         ),
     ] = True,
     output: Annotated[
@@ -1091,7 +1091,7 @@ def generate_threats(
                 "Make sure Ollama is running: [cyan]ollama serve[/cyan]"
             )
             raise typer.Exit(1)
-        generator = ThreatListGenerator(llm_client, docs, product=product_name, name_actor=actor)
+        generator = ThreatListGenerator(llm_client, docs, product=product_name, name_labels=labels)
     except LLMConnectionError as e:
         console.print(f"[red]LLM Connection Error:[/red] {e}")
         raise typer.Exit(1)
@@ -1117,10 +1117,10 @@ def generate_threats(
         written += 1
         rows = model["rows"]
         attacks = sum(1 for r in rows if r["type"] == "attack")
-        marked = sum(1 for r in rows if r.get("signal"))
+        clean = sum(1 for r in rows if not r.get("weak_signs"))
         console.print(
             f"[green]✓[/green] {escape(story.id)}: {len(rows)} rows ({attacks} attacks, "
-            f"{len(rows) - attacks} rules), {marked} from a warning or a rule, "
+            f"{len(rows) - attacks} rules), {clean} with no weak sign, "
             f"{len(model['dropped'])} removed by the script, {len(model['calls'])} calls, {model['seconds']} s"
         )
 
