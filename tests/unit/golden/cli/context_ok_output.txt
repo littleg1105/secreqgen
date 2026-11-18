@@ -2,6 +2,11 @@ exit=0
 Writing a system context for shop with gemma4:26b
 2 files scanned. 3 parts read.
 Kept: 1 technology, 1 feature in 1 group, 1 kind of data.
+Each line and its source:
+- tech_stack: framework: Express  <- package.json
+- features: Orders: Orders  <- README.md
+- data_sensitivity: critical: Passwords  <- package.json
+- security_profile: Medium - holds orders  <- Chosen by the model, not taken from a file.
 Wrote out/shop.yaml
 
 DRAFT for a person to check. A model wrote this system context from the files of the product. Check each line against its source before you use it.

@@ -26,15 +26,19 @@ src/secreqgen/
     events.py                `ProgressEvent`, `ProgressCallback`
     inputs.py                checks and readers for input files
     requirements.py          stages, `RequirementsOptions`, `RequirementsRun`, `run_requirements`
-    threats.py               stages, `ThreatOptions`, `ThreatRun`, `run_threat_lists`
-    documentation.py         `prepare_documentation`, `PreparedDocs`, `docs_note` (other file types)
-    system_context.py        `ContextOptions`, `ContextRun`, `run_system_context`
+    threats.py               stages, `ThreatOptions`, `ThreatRun`, `run_threat_lists`, `real_file_names`
+    documentation.py         `prepare_documentation`, `PreparedDocs`, `docs_note`, `count_documentation`,
+                             `shown_name` (other file types)
+    system_context.py        `ContextOptions`, `ContextRun`, `run_system_context`, `check_output_path`,
+                             `context_lines`
   generation/                prompts, Ollama client, generator, schemas, `prompt_sets/`
   retrieval/                 `__init__.py` loads names on first use; vector store, retriever,
                              reranker, `word_search.py`, `passage_edits.py`
   threats/                   threat list: `actors.py`, `checks.py`, `pipeline.py`, `render.py`, `prompts/`
-  documents/                 other file types to Markdown: `formats.py`, `mirror.py`
-  context/                   system context of a codebase: `scan.py`, `checks.py`, `pipeline.py`, `render.py`, `prompts/`
+  documents/                 other file types to Markdown: `formats.py` (one converter for each type),
+                             `mirror.py` (the copy of a folder that the search reads; `MIRROR_VERSION`)
+  context/                   system context of a codebase: `scan.py` (plain code reads the folder and
+                             replaces secrets), `checks.py`, `pipeline.py`, `render.py`, `prompts/`
   ingestion/                 loader, chunker, embedder, metadata
   evaluation/                baseline, metrics, semantic matcher, `multi_run.py`, pipeline, report
   output/                    formatter and exporter

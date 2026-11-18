@@ -2,6 +2,11 @@ exit=0
 Writing a system context for shop with gemma4:26b
 2 files scanned. 3 parts read.
 Kept: 1 technology, 1 feature in 1 group, 1 kind of data.
+Each line and its source:
+- tech_stack: framework: Express  <- package.json
+- features: Orders: Orders  <- README.md
+- data_sensitivity: critical: Passwords  <- package.json
+- security_profile: Medium - holds orders  <- Chosen by the model, not taken from a file.
 project:
   name: Shop
   description: A web shop for small stores.

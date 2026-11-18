@@ -1,0 +1,6 @@
+exit=1
+Writing a system context for shop with gemma4:26b
+Error: The output file exists: out/shop.yaml. Give the name of a new file, or delete the file first.
+
+--- file out/shop.yaml
+MY HAND EDITED CONTEXT

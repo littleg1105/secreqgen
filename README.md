@@ -74,8 +74,12 @@ secreqgen generate single --title "Session timeout" \
 - The unit test `tests/unit/test_word_search.py` checks that the search, the passage edits and the whole prompt
   equal the lab code and the stored lab prompts.
 - `--other-formats` (on `generate requirements` and `generate threats`) lets the search also read `.rst`, `.adoc`,
-  `.txt`, `.mdx`, `.html`, `.pdf` and `.docx` files. The tool converts each file to Markdown in a temporary folder
-  and removes the folder at the end. Only the markup changes: no word of the text is added or removed. The
+  `.asciidoc`, `.txt`, `.mdx`, `.markdown`, `.html`, `.htm`, `.pdf` and `.docx` files. The tool converts each file
+  to Markdown in a temporary folder and removes the folder at the end. The conversion changes the markup. The
+  words of the body text stay. Navigation, page headers and footers, metadata and the labels of notes are left
+  out. PDF text is less exact: a PDF has no headings, and a word that the page splits at the end of a line stays
+  split. Files that are not documentation are left out: files in dependency, build, test and template folders, and
+  files such as `LICENSE.txt` or `requirements.txt`. A file that cannot be read is skipped, and the note names it. The
   `.md` files are used as they are. The command prints one note with the number of converted files. This is
   outside the tested setup, because the final test read `.md` files only. A folder with `.md` files only
   gives the same run as without the option.
@@ -83,16 +87,24 @@ secreqgen generate single --title "Session timeout" \
 ### A system context for a new codebase
 
 `secreqgen generate context FOLDER` writes a draft system context file for a codebase. Plain code
-collects the facts of the folder: the file tree, the README, the manifests and the container files.
-The writer model reads these facts and writes the context. Plain code then removes each item that has
-no source in the files. The file is a draft for a person to check before use. The tool never reads a
-secret file (for example `.env` or a key file).
+collects the facts of the folder: the file tree, the README, the file paths with security words, the
+names of the files in the largest code folders, the manifests, the container files and the API files.
+The writer model reads these facts and writes the context. Plain code then removes each item that names
+no real part of these facts, and each technology that no file names. The code does not check that a
+part says what a feature or a kind of data says: the command prints the source of each line, and a
+person checks it. The security rating is the judgement of the model. The file is a draft.
+
+The scan skips secret files by their name (for example `.env`, key files and credential files) and does
+not show their names. In the files that it reads, it replaces values that look like secrets (a value
+after a name such as `password` or `token`, a password in a URL, a key block, a long random text). These
+rules lower the risk. They are not a proof that no secret reaches the local model.
 
 ```bash
 secreqgen generate context path/to/codebase --output system_context.yaml
 ```
 
-- Without `--output` the YAML text goes to the console.
+- Without `--output` the YAML text goes to the console. With it, the file must be a new file: a file that
+  exists is never replaced.
 - `--model NAME` changes the writer. `--product NAME` gives the name of the product.
 - A run that uses a context of this kind is outside the tested setup.
 

@@ -1,0 +1,3 @@
+exit=1
+Writing a system context for shop with gemma4:26b
+Error: Cannot write to shop/README.md/x.yaml: shop/README.md is not a folder to write in.

@@ -41,8 +41,7 @@ class ContextStandIn:
         if self.script is not None:
             return SimpleNamespace(content=self.script)
         refs = {
-            path: ref
-            for ref, path in re.findall(r"(?m)^### \[(F\d+)\] (\S+)", prompt)
+            path: ref for ref, path in re.findall(r"(?m)^### \[(F\d+)\] (\S+)", prompt)
         }
         readme, package = refs["README.md"], refs["package.json"]
         tech = [{"kind": "framework", "value": "Express", "source": package}]
@@ -135,6 +134,53 @@ def test_context_bad_answers(monkeypatch):
     use_context_client(monkeypatch, ContextStandIn(script="not json at all"))
     folder = small_codebase()
     g.run_case("context_bad_answers", [*CONTEXT, folder])
+
+
+def test_context_output_exists(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    folder = small_codebase()
+    Path("out").mkdir()
+    g.write("out/shop.yaml", "MY HAND EDITED CONTEXT\n")
+    g.run_case(
+        "context_output_exists",
+        [*CONTEXT, folder, "--output", "out/shop.yaml"],
+        files=("out/shop.yaml",),
+    )
+
+
+def test_context_output_below_a_file(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    folder = small_codebase()
+    g.run_case(
+        "context_output_below_a_file",
+        [*CONTEXT, folder, "--output", "shop/README.md/x.yaml"],
+    )
+
+
+def test_context_yaml_on_a_narrow_console_is_valid(monkeypatch):
+    """A long line of the YAML text stays one line on the console."""
+    import secreqgen.cli
+    import yaml
+
+    long_text = "A web shop for small stores that sells goods to customers " * 3
+    answer = {
+        "name": "Shop",
+        "description": long_text.strip(),
+        "tech_stack": [{"kind": "framework", "value": "Express", "source": "F3"}],
+        "security_profile": "Medium - holds orders",
+        "features": [
+            {"group": "Orders", "items": [{"text": "Orders", "source": "F2"}]}
+        ],
+        "data_sensitivity": {"critical": [], "high": [], "medium": []},
+    }
+    use_context_client(monkeypatch, ContextStandIn(script=json.dumps(answer)))
+    monkeypatch.setattr(secreqgen.cli.console, "_width", 60)
+    folder = small_codebase()
+    lines = "\n".join(g.describe([*CONTEXT, folder])).splitlines()
+    start = lines.index("project:")
+    end = next(i for i in range(start, len(lines)) if lines[i].startswith("DRAFT"))
+    loaded = yaml.safe_load("\n".join(lines[start:end]))
+    assert loaded["project"]["description"] == long_text.strip()
 
 
 def mixed_docs() -> str:

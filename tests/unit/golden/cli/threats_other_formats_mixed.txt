@@ -36,14 +36,14 @@ DRAFT for a person to check. Each row comes from one sentence of the product doc
   "passages": [
     {
       "ref": "P1",
-      "header": "sessions.rst.md > Sessions > Idle timeout",
-      "text": "### [1] sessions.rst.md > Sessions > Idle timeout (Relevance: 0.50)\nSection: Sessions > Idle timeout\n\nSet `session-idle-timeout` to end a session after a time with no activity.\n\nAn attacker who steals the session cookie can use the session until the idle timeout ends it.",
+      "header": "sessions.rst > Sessions > Idle timeout",
+      "text": "### [1] sessions.rst > Sessions > Idle timeout (Relevance: 0.50)\nSection: Sessions > Idle timeout\n\nSet `session-idle-timeout` to end a session after a time with no activity.\n\nAn attacker who steals the session cookie can use the session until the idle timeout ends it.",
       "group": 1
     },
     {
       "ref": "P2",
-      "header": "sessions.rst.md > Sessions > Cookies",
-      "text": "### [2] sessions.rst.md > Sessions > Cookies (Relevance: 0.50)\nSection: Sessions > Cookies\n\nThe session cookie must have the Secure flag.",
+      "header": "sessions.rst > Sessions > Cookies",
+      "text": "### [2] sessions.rst > Sessions > Cookies (Relevance: 0.50)\nSection: Sessions > Cookies\n\nThe session cookie must have the Secure flag.",
       "group": 1
     },
     {
@@ -104,7 +104,7 @@ Read the evidence of each row, then write "keep" or "delete" as your verdict.
 - STRIDE: E, elevation of privilege (rights or access that somebody must not have) (the model's choice)
 - Harm: access with no permission
 - Part of your story: "The session ends after a time with no activity."
-- Evidence: "An attacker who steals the session cookie can use the session until the idle timeout ends it." (sessions.rst.md > Sessions > Idle timeout)
+- Evidence: "An attacker who steals the session cookie can use the session until the idle timeout ends it." (sessions.rst > Sessions > Idle timeout)
 - Requirement: Set `session-idle-timeout`.
 - Your verdict: 
 
@@ -113,7 +113,7 @@ Read the evidence of each row, then write "keep" or "delete" as your verdict.
 - Kind: breach of a security rule of the documentation
 - Threat actor: privileged insider (a person with administrator or operator rights) (the model's choice, not from the documentation)
 - STRIDE: I, information disclosure (data is shown to somebody who must not see it) (the model's choice)
-- Evidence: "The session cookie must have the Secure flag." (sessions.rst.md > Sessions > Cookies)
+- Evidence: "The session cookie must have the Secure flag." (sessions.rst > Sessions > Cookies)
 - Requirement: Keep the Secure flag on the session cookie.
 - Your verdict: 
 

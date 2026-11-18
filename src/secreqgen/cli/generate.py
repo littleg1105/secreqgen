@@ -113,8 +113,9 @@ def generate_requirements(
         typer.Option(
             "--other-formats",
             help=(
-                "Also read .rst, .adoc, .txt, .mdx, .html, .pdf and .docx files "
-                "(converted to Markdown). Outside the tested setup."
+                "Also read .rst, .adoc, .asciidoc, .txt, .mdx, .markdown, .html, .htm, "
+                ".pdf and .docx files (converted to Markdown). Outside the tested "
+                "setup."
             ),
         ),
     ] = False,
@@ -564,8 +565,9 @@ def generate_threats(
         typer.Option(
             "--other-formats",
             help=(
-                "Also read .rst, .adoc, .txt, .mdx, .html, .pdf and .docx files "
-                "(converted to Markdown). Outside the tested setup."
+                "Also read .rst, .adoc, .asciidoc, .txt, .mdx, .markdown, .html, .htm, "
+                ".pdf and .docx files (converted to Markdown). Outside the tested "
+                "setup."
             ),
         ),
     ] = False,
@@ -590,6 +592,7 @@ def generate_threats(
         read_story_data,
     )
     from secreqgen.application.threats import (
+        real_file_names,
         resolve_threat_models,
         select_stories,
         summarise_threat_list,
@@ -728,6 +731,8 @@ def generate_threats(
                     f"[yellow]Warning: no threat list for {escape(story.id)}: {escape(str(e))}[/yellow]"
                 )
                 continue
+            if prepared is not None and prepared.report is not None:
+                model = real_file_names(model)
             # Two story ids can give the same folder name ("A/1" and "A_1"): the second one gets a number.
             folder = output / threat_folder_name(story.id, used_names)
             try:
@@ -776,8 +781,8 @@ def generate_context(
             "--output",
             "-o",
             help=(
-                "Write the YAML text to this file. "
-                "Without it the text goes to the console."
+                "Write the YAML text to this new file (a file that exists is "
+                "never replaced). Without it the text goes to the console."
             ),
         ),
     ] = None,
@@ -807,7 +812,7 @@ def generate_context(
         resolve_context_model,
         run_system_context,
     )
-    from secreqgen.context import DRAFT_NOTICE, ContextError
+    from secreqgen.context import DRAFT_NOTICE, ContextError, source_lines
     from secreqgen.exceptions import LLMConnectionError
 
     cfg = get_config()
@@ -859,7 +864,11 @@ def generate_context(
     )
     secret = facts["secret_files_skipped"]
     if secret:
-        scanned += f" {count(secret, 'secret file', 'secret files')} not read."
+        one, many = "file that can hold secrets", "files that can hold secrets"
+        verb = "was" if secret == 1 else "were"
+        scanned += f" {count(secret, one, many)} {verb} skipped."
+    if facts.get("stopped_early"):
+        scanned += " The folder has more files: the scan stopped at this number."
     console.print(scanned)
     context = result["context"]
     features = sum(len(g["items"]) for g in context["features"])
@@ -875,8 +884,17 @@ def generate_context(
         console.print(f"Dropped: {count(len(dropped), 'item', 'items')}.")
         for item in dropped[:MAX_DROPPED_LINES]:
             console.print(f"- {escape(str(item['what']))}: {escape(str(item['why']))}")
+    console.print("Each line and its source:")
+    for line in source_lines(context):
+        console.print(
+            f"- {line['where']}: {line['text']}  <- {line['path']}",
+            markup=False,
+            highlight=False,
+            soft_wrap=True,
+        )
     if run.output is not None:
         console.print(f"Wrote {escape(str(run.output))}")
     else:
-        console.print(result["yaml"], markup=False, highlight=False)
+        # soft_wrap: a long line stays one line, so that a copy is valid YAML
+        console.print(result["yaml"], markup=False, highlight=False, soft_wrap=True)
     console.print(f"\n[bold]{DRAFT_NOTICE}[/bold]")
