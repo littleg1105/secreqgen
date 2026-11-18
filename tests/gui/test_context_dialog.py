@@ -155,17 +155,17 @@ async def test_write_shows_the_three_lines_and_then_the_result(user, tmp_path, j
     await _open_dialog(user, folder)
     user.find(marker="context-write").click()
     await asyncio.sleep(1.2)  # the timer of the dialog ticks every 0.5 s
-    await user.should_see("Read the folder")
+    await user.should_see("Scan the folder")
     await user.should_see("Write the context")
     await user.should_see("Check each line")
-    await user.should_see("42 files, 7 parts")
-    await user.should_see("attempt 2")
+    await user.should_see("42 files")
+    await user.should_see("try 2 of 3")
     assert not _field(user, "context-write").enabled
     gate.set()
     running.join(10)
     await asyncio.sleep(1.2)
-    await user.should_see("42 files scanned. 2 secret files were not read.")
-    await user.should_see("5 kept, 1 removed")
+    await user.should_see("2 files that can hold secrets are not read.")
+    await user.should_see("5 of 6 passed")
     await user.should_see(
         "This is a draft. Check each line against its source before you use it."
     )
@@ -175,7 +175,7 @@ async def test_write_shows_the_three_lines_and_then_the_result(user, tmp_path, j
     await user.should_see("pyproject.toml")
     await user.should_see("features: messaging")
     await user.should_see("Users send messages.")
-    await user.should_see("Removed by the check (1)")
+    await user.should_see("Not in the draft (1)")
     assert _field(user, "context-yaml").value == YAML_TEXT
 
 
@@ -185,13 +185,11 @@ async def test_no_secret_sentence_when_no_secret_file(user, tmp_path, job):
     running = job(result=data)
     await _open_dialog(user, _open(user, tmp_path))
     await _write_and_wait(user, running)
-    await user.should_see("42 files scanned.")
-    await user.should_not_see("secret files")
+    await user.should_not_see("can hold secrets")
+    await user.should_not_see("The scan stopped")
 
 
-async def test_save_and_use_writes_the_files_and_fills_the_field(
-    user, tmp_path, job
-):
+async def test_save_and_use_writes_the_files_and_fills_the_field(user, tmp_path, job):
     from secreqgen_gui import form_memory, storage
 
     running = job()
@@ -261,9 +259,7 @@ async def test_the_dialog_says_when_a_run_is_in_progress(user, tmp_path, job):
     )
     await _open_dialog(user, _open(user, tmp_path))
     await asyncio.sleep(1.2)
-    await user.should_see(
-        "Another run is in progress. Wait for it to end, or stop it."
-    )
+    await user.should_see("Another run is in progress. Wait for it to end, or stop it.")
     assert not _field(user, "context-write").enabled
 
 
@@ -389,15 +385,23 @@ async def test_the_pages_show_the_generated_context_tag(user):
     await user.should_not_see("generated context")
 
 
-def test_source_rows_cover_the_three_places():
-    from secreqgen_gui.pages.context_dialog import source_rows
+def test_grouped_lines_use_the_lines_of_the_tool():
+    from secreqgen_gui.pages.context_dialog import grouped_lines
 
-    context = json.loads(json.dumps(RESULT["context"]))
-    context["data_sensitivity"]["high"] = [
+    result = json.loads(json.dumps(RESULT))
+    result["context"]["data_sensitivity"]["high"] = [
         {"text": "Passwords", "source": "F1", "path": "README.md"}
     ]
-    assert source_rows(context) == [
-        ("tech_stack", "language: Python", "pyproject.toml"),
-        ("features: messaging", "Users send messages.", "README.md"),
-        ("data_sensitivity: high", "Passwords", "README.md"),
+    groups = grouped_lines(result)
+    assert [place for place, _lines in groups] == [
+        "tech_stack",
+        "features: messaging",
+        "data_sensitivity: high",
+        "security_profile",
     ]
+    assert groups[0][1][0] == {
+        "where": "tech_stack",
+        "text": "language: Python",
+        "path": "pyproject.toml",
+    }
+    assert groups[3][1][0]["path"] == "Chosen by the model, not taken from a file."

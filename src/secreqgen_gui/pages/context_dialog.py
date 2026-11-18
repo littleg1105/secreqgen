@@ -11,10 +11,11 @@ from pathlib import Path
 
 import yaml
 from nicegui import run, ui
+from secreqgen.application.system_context import context_lines
 
 from secreqgen_gui import context_job, form_memory, jobs, storage
 from secreqgen_gui.form_memory import REQUIREMENTS
-from secreqgen_gui.settings import expand_path, load_settings, show_path
+from secreqgen_gui.settings import data_home, expand_path, load_settings, show_path
 from secreqgen_gui.widgets import path_field
 
 BUTTON = "Write one with the model"
@@ -29,48 +30,63 @@ NO_FOLDER = "Enter the codebase folder."
 BAD_YAML = "This is not valid YAML. Correct it, then save again."
 SAVED = "Saved."
 LINES_TITLE = "Lines and their sources"
+STOPPED_EARLY = (
+    "The scan stopped at {n} files. Pick a smaller folder to scan all files."
+)
 CAUTION = "color: var(--sr-caution)"
 
 
-def source_rows(context: dict) -> list[tuple[str, str, str]]:
-    """Return (place, text, file path) for each line of a context dict."""
-    rows: list[tuple[str, str, str]] = []
-    for item in context.get("tech_stack") or []:
-        text = f"{item.get('kind', '')}: {item.get('value', '')}"
-        rows.append(("tech_stack", text, str(item.get("path", ""))))
-    for group in context.get("features") or []:
-        place = f"features: {group.get('group', '')}"
-        for item in group.get("items") or []:
-            rows.append((place, str(item.get("text", "")), str(item.get("path", ""))))
-    for level, items in (context.get("data_sensitivity") or {}).items():
-        place = f"data_sensitivity: {level}"
-        for item in items or []:
-            rows.append((place, str(item.get("text", "")), str(item.get("path", ""))))
-    return rows
+def _files(count: int) -> str:
+    return f"{count:,} file" if count == 1 else f"{count:,} files"
 
 
 def numbers_text(stage: str, numbers: dict) -> str:
     """Return the numbers of a stage as a short text. Empty: none yet."""
     try:
         if stage == "scan" and "files" in numbers:
-            return f"{numbers['files']} files, {numbers['parts']} parts"
-        if stage == "write" and numbers.get("attempt"):
-            return f"attempt {numbers['attempt']}"
+            return _files(int(numbers["files"]))
+        if stage == "write" and int(numbers.get("attempt") or 0) >= 2:
+            return f"try {int(numbers['attempt'])} of {context_job.TRIES}"
         if stage == "check" and "kept" in numbers:
-            return f"{numbers['kept']} kept, {numbers['dropped']} removed"
-    except KeyError:
+            kept = int(numbers["kept"])
+            return f"{kept:,} of {kept + int(numbers['dropped']):,} passed"
+    except (KeyError, TypeError, ValueError):
         return ""
     return ""
 
 
-def files_line(result: dict) -> str:
-    """Return the line about the scan of the codebase."""
+def notes_lines(result: dict) -> list[str]:
+    """Return the lines above the draft. Empty: nothing to say."""
     facts = result.get("facts") or {}
-    line = f"{facts.get('files_seen', 0)} files scanned."
+    lines: list[str] = []
     secret = int(facts.get("secret_files_skipped") or 0)
-    if secret:
-        line += f" {secret} secret files were not read."
-    return line
+    if secret == 1:
+        lines.append("1 file that can hold secrets is not read.")
+    elif secret:
+        lines.append(f"{secret:,} files that can hold secrets are not read.")
+    if facts.get("stopped_early"):
+        seen = int(facts.get("files_seen") or 0)
+        lines.append(STOPPED_EARLY.format(n=f"{seen:,}"))
+    return lines
+
+
+def grouped_lines(result: dict) -> list[tuple[str, list[dict]]]:
+    """Return the lines of a draft as (place, lines), in order of first use."""
+    try:
+        lines = context_lines(result)
+    except (KeyError, TypeError, AttributeError):
+        return []
+    groups: dict[str, list[dict]] = {}
+    for line in lines:
+        groups.setdefault(str(line.get("where", "")), []).append(line)
+    return list(groups.items())
+
+
+def save_error_text(exc: OSError) -> str:
+    """Return the line for a context file that cannot be saved."""
+    reason = exc.strerror or type(exc).__name__
+    folder = show_path(data_home() / "contexts")
+    return f"The system context cannot be saved: {reason}. Check the folder {folder}."
 
 
 def open_context_dialog(
@@ -78,7 +94,15 @@ def open_context_dialog(
 ) -> None:
     """Open the dialog. on_saved gets the short path of the saved file."""
     shown = {"token": None}
-    with ui.dialog() as dialog, ui.card().classes("w-[760px] max-w-full gap-3"):
+    # A new dialog starts empty. It shows a job only when that job is in
+    # progress now or starts after the dialog opened.
+    first = context_job.writer.state()
+    old = {"serial": None if first["state"] == "running" else first["serial"]}
+    pending = {"start": False}
+    with (
+        ui.dialog() as dialog,
+        ui.card().classes("w-[760px] max-w-full gap-3 overflow-y-auto"),
+    ):
         ui.label(TITLE).classes("sr-section-title")
         with ui.column().classes("gap-0"):
             ui.label(INTRO).classes("sr-small")
@@ -106,7 +130,7 @@ def open_context_dialog(
             for name in context_job.STAGES:
                 with ui.row().classes("items-baseline gap-3 no-wrap"):
                     ui.label(context_job.STAGE_NAMES[name]).classes("w-[170px]")
-                    state_label = ui.label().classes("sr-small w-[70px]")
+                    state_label = ui.label().classes("sr-small w-[90px]")
                     numbers_label = ui.label().classes("sr-small")
                 stage_rows[name] = (state_label, numbers_label)
         steps.set_visibility(False)
@@ -120,11 +144,15 @@ def open_context_dialog(
         folder_field.on_value_change(lambda _e: remember_folder())
 
         async def write() -> None:
+            if pending["start"]:
+                return
             text = (folder_field.value or "").strip()
             if not text:
                 error_line.set_text(NO_FOLDER)
                 return
             error_line.set_text("")
+            write_button.set_enabled(False)
+            pending["start"] = True
             name = (product_field.value or "").strip() or None
             model = load_settings().writer_model
             try:
@@ -133,7 +161,8 @@ def open_context_dialog(
                 )
             except RuntimeError as exc:
                 error_line.set_text(str(exc))
-                return
+            finally:
+                pending["start"] = False
             refresh()
 
         write_button.on_click(write)
@@ -141,22 +170,41 @@ def open_context_dialog(
         def show_result(result: dict) -> None:
             result_box.clear()
             with result_box:
-                ui.label(files_line(result)).mark("context-files")
+                for line in notes_lines(result):
+                    ui.label(line).mark("context-note")
                 ui.label(NOTICE).classes("sr-notice")
                 ui.label(LINES_TITLE).classes("sr-section-title")
-                with ui.column().classes("w-full gap-1 max-h-[220px] overflow-auto"):
-                    for place, text, path in source_rows(result.get("context") or {}):
-                        with ui.row().classes("w-full items-baseline gap-3 no-wrap"):
-                            ui.label(place).classes("sr-code w-[170px] shrink-0")
-                            ui.label(text).classes("grow break-words")
-                            ui.label(path).classes("sr-code w-[150px] break-all")
+                with ui.column().classes("w-full gap-1"):
+                    for place, lines in grouped_lines(result):
+                        ui.label(place).classes("sr-code mt-2")
+                        for line in lines:
+                            with ui.row().classes(
+                                "w-full items-baseline gap-3 no-wrap"
+                            ):
+                                ui.label(str(line.get("text", ""))).classes(
+                                    "grow break-words"
+                                )
+                                source = (
+                                    "sr-small"
+                                    if place == "security_profile"
+                                    else "sr-code"
+                                )
+                                ui.label(str(line.get("path", ""))).classes(
+                                    f"{source} w-[190px] shrink-0 break-all"
+                                )
                 dropped = result.get("dropped") or []
                 if dropped:
-                    with ui.expansion(f"Removed by the check ({len(dropped)})"):
+                    with ui.expansion(f"Not in the draft ({len(dropped)})"):
                         for item in dropped:
-                            what = str(item.get("what", ""))
-                            why = str(item.get("why", ""))
-                            ui.label(f"{what}: {why}").classes("sr-small")
+                            with ui.row().classes(
+                                "w-full items-baseline gap-3 no-wrap"
+                            ):
+                                ui.label(str(item.get("what", ""))).classes(
+                                    "sr-small shrink-0"
+                                )
+                                ui.label(str(item.get("why", ""))).classes(
+                                    "sr-small break-words"
+                                )
                 area = (
                     ui.textarea(value=str(result.get("yaml") or ""))
                     .props("outlined rows=16 input-class=sr-code")
@@ -191,7 +239,7 @@ def open_context_dialog(
             try:
                 path = await run.io_bound(storage.save_context, text, result, name)
             except OSError as exc:
-                yaml_error.set_text(f"The file cannot be saved: {exc}")
+                yaml_error.set_text(save_error_text(exc))
                 return
             on_saved(show_path(path))
             dialog.close()
@@ -201,24 +249,30 @@ def open_context_dialog(
             state = context_job.writer.state()
             another = jobs.manager.busy()
             working = state["state"] == "running"
+            mine = state["serial"] != old["serial"]
             busy_line.set_visibility(another)
-            write_button.set_enabled(not another and not working)
-            steps.set_visibility(state["state"] != "idle")
+            write_button.set_enabled(
+                not another and not working and not pending["start"]
+            )
+            steps.set_visibility(mine and state["state"] != "idle")
             for name, (state_label, numbers_label) in stage_rows.items():
                 item = state["stages"][name]
-                state_label.set_text(item["state"])
-                numbers_label.set_text(numbers_text(name, item["numbers"]))
-            if state["state"] == "failed":
+                state_label.set_text(item["state"] if mine else "")
+                numbers_label.set_text(
+                    numbers_text(name, item["numbers"]) if mine else ""
+                )
+            if mine and state["state"] == "failed":
                 error_line.set_text(state["message"])
-            token = f"{state['state']}:{state['serial']}"
+            elif mine and state["state"] in ("running", "done"):
+                error_line.set_text("")
+            token = f"{state['state']}:{state['serial']}" if mine else "old"
             if token != shown["token"]:
                 shown["token"] = token
                 result_box.clear()
-                if state["state"] == "done" and state["result"]:
+                if mine and state["state"] == "done" and state["result"]:
                     show_result(state["result"])
 
         timer = ui.timer(0.5, refresh)
         dialog.on("hide", timer.cancel)
         refresh()
     dialog.open()
-

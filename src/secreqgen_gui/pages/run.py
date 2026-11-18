@@ -373,8 +373,10 @@ def _steps_view(view: View, stored: dict | None) -> tuple | None:
 
 
 def _story_row(view: View, story) -> None:
-    with ui.column().classes("w-full gap-1 py-3").style(
-        "border-bottom:1px solid var(--sr-line)"
+    with (
+        ui.column()
+        .classes("w-full gap-1 py-3")
+        .style("border-bottom:1px solid var(--sr-line)")
     ):
         with ui.row().classes("w-full items-baseline no-wrap gap-4"):
             _plain(story.id, "font-semibold").style(ID_WIDTH)
@@ -459,8 +461,10 @@ def page(run_id: str) -> None:
     @ui.refreshable
     def stories_view() -> None:
         view = holder["view"]
-        with ui.column().classes("w-full gap-0 mt-6").style(
-            f"border-top:1px solid var(--sr-line);{READABLE}"
+        with (
+            ui.column()
+            .classes("w-full gap-0 mt-6")
+            .style(f"border-top:1px solid var(--sr-line);{READABLE}")
         ):
             for story in view.stories:
                 _story_row(view, story)
@@ -533,9 +537,7 @@ def page(run_id: str) -> None:
         body.clear()
         with body:
             if view is None:
-                empty_state(
-                    "This run does not exist.", "Open History", "/history"
-                )
+                empty_state("This run does not exist.", "Open History", "/history")
                 return
             holder["view"] = view
             holder["stored"] = (

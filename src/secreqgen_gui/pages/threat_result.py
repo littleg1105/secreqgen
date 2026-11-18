@@ -24,6 +24,7 @@ from secreqgen_gui import storage
 from secreqgen_gui.widgets import (
     empty_state,
     formats_tag,
+    has_mirror_names,
     marked_passage,
     page_title,
     tag,
@@ -191,6 +192,19 @@ def _load(run_id: str, story_id: str) -> dict:
     }
 
 
+def _with_real_names(model: dict) -> dict:
+    """Return a copy of the model with the real file names in the passages."""
+    copy = dict(model)
+    passages = []
+    for passage in model.get("passages") or []:
+        if isinstance(passage, dict):
+            name, divider, rest = str(passage.get("header", "")).partition(" > ")
+            passage = {**passage, "header": shown_name(name) + divider + rest}
+        passages.append(passage)
+    copy["passages"] = passages
+    return copy
+
+
 def _plural(count: int, word: str) -> str:
     return f"{count} {word}" if count == 1 else f"{count} {word}s"
 
@@ -207,9 +221,7 @@ def _steps_line(model: dict) -> str:
     if removed == 1:
         return line + " 1 failed the quote check and is not in the list."
     if removed:
-        return (
-            f"{line} {removed} failed the quote check and are not in the list."
-        )
+        return f"{line} {removed} failed the quote check and are not in the list."
     return line + " All passed the quote check." if written else line
 
 
@@ -272,8 +284,10 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
     passages = {
         p.get("ref"): split_passage(p) for p in model["passages"] if isinstance(p, dict)
     }
-    for part in passages.values():
-        part["page"] = shown_name(part["page"])
+    mirror = has_mirror_names(data["manifest"])
+    if mirror:
+        for part in passages.values():
+            part["page"] = shown_name(part["page"])
     flat = [item for group in grouped["groups"] for item in group["rows"]]
     order = [item["row"]["id"] for item in flat]
     by_id = {item["row"]["id"]: item for item in flat}
@@ -361,7 +375,8 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
         if "keep" not in state["verdicts"].values():
             ui.notify("Keep at least one threat before you export.", type="warning")
             return
-        body = export_kept(model, state["verdicts"], fmt=fmt)
+        source = _with_real_names(model) if mirror else model
+        body = export_kept(source, state["verdicts"], fmt=fmt)
         if fmt == "json":
             data = body.encode("utf-8")
             ui.download.content(data, "kept_threats.json", "application/json")
@@ -553,9 +568,7 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
         with ui.column().classes("sr-list-col gap-3"):
             with ui.row().classes("w-full items-start justify-between no-wrap"):
                 with ui.column().classes("gap-0 min-w-0"):
-                    page_title(
-                        f"Threat list: {story_id}", str(story.get("title", ""))
-                    )
+                    page_title(f"Threat list: {story_id}", str(story.get("title", "")))
                 with ui.row().classes("gap-1 no-wrap"):
                     for label, target in (
                         ("Previous story", previous_id),

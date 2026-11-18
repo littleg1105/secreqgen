@@ -286,9 +286,7 @@ def read_verdicts(run_id: str, story_id: str) -> dict[str, str]:
     return verdicts
 
 
-def write_verdict(
-    run_id: str, story_id: str, row_id: str, verdict: str | None
-) -> None:
+def write_verdict(run_id: str, story_id: str, row_id: str, verdict: str | None) -> None:
     """Set the verdict of one row. None clears it. The write is atomic."""
     if verdict is not None and verdict not in VERDICTS:
         raise ValueError("The verdict must be keep, delete or None.")

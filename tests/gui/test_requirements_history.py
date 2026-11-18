@@ -16,6 +16,36 @@ OLD = "20261116-100000-threats"
 EVIL = "<script>alert(1)</script> must not run"
 
 
+async def _table_ready(user) -> None:
+    """Wait until the History page has built its table.
+
+    The page shows its title first and reads the run list in a thread. The
+    table comes after. A test must wait for it, not for the title.
+    """
+    from nicegui import ui
+
+    await user.should_see(kind=ui.table)
+
+
+async def _row_ids(user, wanted: list[str]) -> list[str]:
+    """Return the ids of the table rows when they equal wanted, or at the end.
+
+    The page rebuilds the table a short time after a delete. This polls for
+    the new table up to 5 seconds.
+    """
+    from nicegui import ui
+
+    ids: list[str] = []
+    for _ in range(100):
+        found = user.find(kind=ui.table).elements
+        if found:
+            ids = [r["id"] for r in next(iter(found)).rows]
+            if ids == wanted:
+                break
+        await asyncio.sleep(0.05)
+    return ids
+
+
 def _req(number: int, description: str = "The system must log it.") -> dict:
     return {
         "id": f"SR-00{number}",
@@ -188,7 +218,7 @@ async def test_history_lists_runs_newest_first(user, athens_time):
     _write_threat_run()
     _write_requirements()
     await user.open("/history")
-    await user.should_see("History")
+    await _table_ready(user)
     await user.should_not_see("All runs in the data folder.")
     table = user.find(kind=ui.table).elements.pop()
     assert [r["id"] for r in table.rows] == [RUN, OLD]
@@ -207,6 +237,7 @@ async def test_row_click_opens_the_run(user):
 
     _write_threat_run()
     await user.open("/history")
+    await _table_ready(user)
     user.find(kind=ui.table).trigger("rowClick", args=[{}, {"id": OLD}, 0])
     await asyncio.sleep(0.3)
     assert user.back_history[-1] == f"/runs/{OLD}"
@@ -219,7 +250,7 @@ async def test_delete_run_asks_then_removes(user):
     _write_threat_run()
     _write_requirements()
     await user.open("/history")
-    table = user.find(kind=ui.table).elements.pop()
+    await _table_ready(user)
     user.find(kind=ui.table).trigger("delete", args={"id": OLD, "busy": False})
     await user.should_see("Delete this run and its files?")
     assert storage.run_dir(OLD).exists()
@@ -227,9 +258,7 @@ async def test_delete_run_asks_then_removes(user):
     await user.should_see("Run deleted.")
     assert not storage.run_dir(OLD).exists()
     assert storage.run_dir(RUN).exists()
-    await asyncio.sleep(0.3)
-    table = user.find(kind=ui.table).elements.pop()
-    assert [r["id"] for r in table.rows] == [RUN]
+    assert await _row_ids(user, [RUN]) == [RUN]
 
 
 async def test_run_in_progress_cannot_be_deleted(user):
@@ -239,6 +268,7 @@ async def test_run_in_progress_cannot_be_deleted(user):
     storage.run_dir(OLD).mkdir(parents=True)
     storage.write_manifest(OLD, {"kind": "threats", "status": "running"})
     await user.open("/history")
+    await _table_ready(user)
     table = user.find(kind=ui.table).elements.pop()
     assert table.rows[0]["busy"] is True
     user.find(kind=ui.table).trigger("delete", args=table.rows[0])
@@ -259,6 +289,7 @@ async def test_a_flag_from_the_browser_does_not_unlock_a_run_in_progress(user):
     storage.run_dir(OLD).mkdir(parents=True)
     storage.write_manifest(OLD, {"kind": "threats", "status": "running"})
     await user.open("/history")
+    await _table_ready(user)
     user.find(kind=ui.table).trigger("delete", args={"id": OLD, "busy": False})
     await user.should_see("This run is in progress. Stop it first.")
     await user.should_not_see("Delete this run and its files?")

@@ -12,6 +12,7 @@ from secreqgen_gui.widgets import (
     context_tag,
     empty_state,
     formats_tag,
+    has_mirror_names,
     page_title,
     tag,
     text,
@@ -126,13 +127,18 @@ def _requirement(req: dict) -> None:
             text(str(req["implementation_notes"]))
 
 
-def _shown_header(header: str) -> str:
-    """Show the real file name in the header "file > section"."""
+def _shown_header(header: str, mirror: bool) -> str:
+    """Show the real file name in the header "file > section".
+
+    Only a run that is stored with mirror names needs this.
+    """
+    if not mirror:
+        return header
     name, divider, rest = header.partition(" > ")
     return shown_name(name) + divider + rest
 
 
-def _passages(result: dict) -> None:
+def _passages(result: dict, mirror: bool) -> None:
     passages = [_as_dict(p) for p in _as_list(result.get("passages"))]
     if not passages:
         return
@@ -140,26 +146,29 @@ def _passages(result: dict) -> None:
     with ui.expansion(label).classes("w-full").style(LINE):
         for passage in passages:
             with ui.column().classes("w-full gap-1 py-2"):
-                ui.label(_shown_header(str(passage.get("header", "")))).classes(
+                ui.label(_shown_header(str(passage.get("header", "")), mirror)).classes(
                     "sr-small break-words"
                 )
                 text(str(passage.get("text", "")), "sr-source")
 
 
-def _story(result: dict, opened: bool) -> None:
+def _story(result: dict, opened: bool, mirror: bool) -> None:
     story = _story_of(result)
     reqs = [_as_dict(r) for r in _as_list(result.get("requirements"))]
     head = f"{story.get('id', '')}  {story.get('title', '')}".strip()
     caption = _plural(len(reqs), "requirement")
-    with ui.expansion(head, caption=caption, value=opened).classes("w-full").props(
-        'header-class="font-semibold"'
-    ).style(LINE):
+    with (
+        ui.expansion(head, caption=caption, value=opened)
+        .classes("w-full")
+        .props('header-class="font-semibold"')
+        .style(LINE)
+    ):
         with ui.column().classes("w-full gap-0 pb-4"):
             if story.get("story"):
                 text(str(story["story"]), "sr-source pb-2")
             for req in reqs:
                 _requirement(req)
-            _passages(result)
+            _passages(result, mirror)
 
 
 def _failures(data: dict) -> None:
@@ -193,9 +202,7 @@ async def page(run_id: str) -> None:
         return
     if data is None:
         page_title("Requirements")
-        empty_state(
-            "This run has no requirements.", "Open the run", f"/runs/{run_id}"
-        )
+        empty_state("This run has no requirements.", "Open the run", f"/runs/{run_id}")
         return
     manifest = manifest or {}
     results = [_as_dict(r) for r in _as_list(data.get("results"))]
@@ -242,5 +249,5 @@ async def page(run_id: str) -> None:
     last = "border-bottom: 1px solid var(--sr-line)"
     with ui.column().classes("w-full gap-0").style(last):
         for number, result in enumerate(results):
-            _story(result, opened=number == 0)
+            _story(result, opened=number == 0, mirror=has_mirror_names(manifest))
     _failures(data)

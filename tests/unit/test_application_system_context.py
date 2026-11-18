@@ -238,3 +238,10 @@ def test_context_lines():
     assert lines[-1]["path"] == "Chosen by the model, not taken from a file."
     assert context_lines({}) == []
     assert context_lines({"context": "x"}) == []
+
+
+def test_the_number_of_tries_is_the_number_of_the_writer():
+    from secreqgen.application.system_context import CONTEXT_TRIES
+    from secreqgen.context.pipeline import MAX_JSON_ATTEMPTS
+
+    assert CONTEXT_TRIES == MAX_JSON_ATTEMPTS

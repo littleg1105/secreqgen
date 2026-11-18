@@ -14,14 +14,17 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from secreqgen.application.system_context import CONTEXT_TRIES
+
 from secreqgen_gui import jobs
 from secreqgen_gui.settings import load_settings, make_config
 
 BUSY = "Another run is in progress."
+TRIES = CONTEXT_TRIES  # the tries of the writer for one answer that can be read
 
 STAGES = ("scan", "write", "check")
 STAGE_NAMES = {
-    "scan": "Read the folder",
+    "scan": "Scan the folder",
     "write": "Write the context",
     "check": "Check each line",
 }
@@ -81,23 +84,24 @@ class ContextJob:
 
     def start(self, folder: Path, product: str | None, model: str) -> None:
         """Start the job. A run or another job in progress gives RuntimeError."""
-        with self._lock:
+        with jobs.START_LOCK:
             if self.busy() or jobs.manager.busy():
                 raise RuntimeError(BUSY)
-            self._serial += 1
-            self._state = _empty_state()
-            self._state["serial"] = self._serial
-            self._state["state"] = "running"
-            self._state["stage"] = "scan"
-            self._state["stages"]["scan"]["state"] = "running"
             settings = load_settings()
-            self._thread = threading.Thread(
-                target=self._work,
-                args=(Path(folder), product, model, settings),
-                daemon=True,
-                name="secreqgen-context",
-            )
-            self._thread.start()
+            with self._lock:
+                self._serial += 1
+                self._state = _empty_state()
+                self._state["serial"] = self._serial
+                self._state["state"] = "running"
+                self._state["stage"] = "scan"
+                self._state["stages"]["scan"]["state"] = "running"
+                self._thread = threading.Thread(
+                    target=self._work,
+                    args=(Path(folder), product, model, settings),
+                    daemon=True,
+                    name="secreqgen-context",
+                )
+                self._thread.start()
 
     def _work(self, folder: Path, product: str | None, model: str, settings) -> None:
         try:

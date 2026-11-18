@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from secreqgen.config import SecReqGenConfig
 
 CONTEXT_STEPS = ("scan", "write", "check")
+CONTEXT_TRIES = 3  # how often the writer asks the model at most (a test keeps it true)
 
 
 @dataclass

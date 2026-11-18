@@ -23,9 +23,15 @@ from typing import Any
 from secreqgen_gui import __version__, pipeline_boards, storage
 from secreqgen_gui.settings import expand_path, load_settings, make_config
 
+SHOWN_SKIPPED = 5  # the skipped files that the manifest names
 TESTED_THREAT_SET = "threats_v5b_labels"
 TESTED_REQUIREMENTS_SET = "s1_word_3000"
 _SET_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
+
+# One lock for the start check of a run and of a context job. It is always
+# taken first. The other locks are taken for a short time inside it, never
+# the other way round. So two starts never wait for each other.
+START_LOCK = threading.RLock()
 
 
 @dataclass
@@ -145,10 +151,7 @@ def _model_present(status: Any, name: str) -> bool:
 def server_problems(status: Any, names: list[str], base_url: str) -> list[str]:
     """Return plain sentences about Ollama. Empty: all is well."""
     if not status.reachable:
-        return [
-            f"Ollama is not running at {base_url}. "
-            "Start Ollama, then check again."
-        ]
+        return [f"Ollama is not running at {base_url}. Start Ollama, then check again."]
     problems = []
     for name in names:
         if not _model_present(status, name):
@@ -253,9 +256,14 @@ class JobManager:
     def _start(self, kind: str, spec: Any) -> str:
         from secreqgen_gui import context_job  # here: it imports this module
 
-        with self._lock:
+        with START_LOCK:
             if self.busy() or context_job.writer.busy():
                 raise RuntimeError("Another run is in progress.")
+            return self._begin(kind, spec)
+
+    def _begin(self, kind: str, spec: Any) -> str:
+        """Set the state and start the worker. START_LOCK is held."""
+        with self._lock:
             run_id = storage.new_run_id(kind)
             self._stop = threading.Event()
             self._settings = load_settings()
@@ -318,6 +326,8 @@ class JobManager:
             )
         else:
             manifest["model"] = spec.model
+        if spec.other_formats:
+            manifest["other_formats"] = True
         if not threats and storage.is_generated_context(spec.system_context):
             manifest["generated_context"] = True
         manifest.update(
@@ -413,11 +423,30 @@ class JobManager:
         if not stories:
             raise RunFailedError("The stories file has no story to run.")
         manifest["stories_total"] = len(stories)
+        self._expect_formats(manifest, spec)
+        self._save(run_id, manifest)  # before the bump: the page then sees the tag
         with self._lock:
             self._state.stories = [StoryState(s.id, s.title) for s in stories]
             self._bump()
-        self._save(run_id, manifest)
         return copy_path
+
+    @staticmethod
+    def _expect_formats(manifest: dict, spec: Any) -> None:
+        """Note the files that the run will convert, before the run starts.
+
+        The page then shows the tag during the run and after a run that was
+        cut off. The real report replaces this note at the end of the run.
+        """
+        if not spec.other_formats:
+            return
+        from secreqgen.application.documentation import count_documentation
+
+        counts = count_documentation(Path(spec.docs)).others
+        if sum(counts.values()) > 0:
+            manifest["docs_formats"] = {
+                "converted": {str(k): int(v) for k, v in counts.items()},
+                "skipped": 0,
+            }
 
     def _check_models(self, run_id: str, manifest: dict, names: list[str]) -> None:
         base_url = self._settings.base_url
@@ -502,9 +531,7 @@ class JobManager:
                         return
                     if run.progress is None:
                         story_id = str(getattr(event, "story_id", "") or "")
-                        run.progress = pipeline_boards.new_progress(
-                            run.kind, story_id
-                        )
+                        run.progress = pipeline_boards.new_progress(run.kind, story_id)
                     pipeline_boards.apply_event(run.progress, event)
                     self._bump_steps()
             except Exception:  # noqa: BLE001 - the run never depends on the view
@@ -542,14 +569,27 @@ class JobManager:
         converted = getattr(report, "converted", None)
         if report is None or not isinstance(converted, dict):
             return
+        skipped = list(getattr(report, "skipped", None) or [])
         manifest["docs_formats"] = {
             "converted": {str(k): int(v) for k, v in converted.items()},
-            "skipped": len(getattr(report, "skipped", None) or []),
+            "skipped": len(skipped),
         }
+        pairs = []
+        for item in skipped[:SHOWN_SKIPPED]:
+            try:
+                name, reason = item
+            except (TypeError, ValueError):
+                continue
+            pairs.append([str(name), str(reason)])
+        if pairs:
+            manifest["skipped_files"] = pairs
 
     def _end_of_loop(self, run_id: str, manifest: dict, result: Any) -> None:
         """Set the final state from the result of a run function."""
         self._docs_formats(manifest, result)
+        if getattr(result, "docs_report", None) is None:
+            # No file was converted. Drop the note from the start of the run.
+            manifest.pop("docs_formats", None)
         aborted = getattr(result, "aborted", None)
         stopped = bool(getattr(result, "stopped", False))
         manifest["skipped"] = [

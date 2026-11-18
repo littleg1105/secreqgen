@@ -38,9 +38,30 @@ FORMATS_HINT = (
 )
 
 
+def has_mirror_names(manifest: dict | None) -> bool:
+    """Say if a run is stored with the names of mirror files (x.rst.md)."""
+    return isinstance(manifest, dict) and isinstance(manifest.get("docs_formats"), dict)
+
+
+def converted_files(manifest: dict | None) -> int:
+    """Return the number of files that the run converted or will convert."""
+    if not has_mirror_names(manifest):
+        return 0
+    converted = manifest["docs_formats"].get("converted")
+    if not isinstance(converted, dict):
+        return 0
+    total = 0
+    for value in converted.values():
+        try:
+            total += int(value)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
 def formats_tag(manifest: dict | None) -> None:
     """Show the tag "untested file types" when the run converted files."""
-    if not manifest or not isinstance(manifest.get("docs_formats"), dict):
+    if not manifest or not converted_files(manifest):
         return
     with ui.element("span").mark("tag-file-types"):
         tag("untested file types", "caution")
@@ -139,9 +160,9 @@ def path_field(
         field = ui.input(label, value=value).props("outlined dense").classes("grow")
         if hint:
             field.props(f'hint="{hint}"')
-        ui.button(
-            "Browse", on_click=lambda: _browse(field, folder, start)
-        ).props("outline no-caps unelevated")
+        ui.button("Browse", on_click=lambda: _browse(field, folder, start)).props(
+            "outline no-caps unelevated"
+        )
     return field
 
 
