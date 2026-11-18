@@ -286,7 +286,6 @@ SECRET_FORMS = [
     ("https://x.example.com/cb?a=1&signature=SigVal2", "SigVal2"),
     ("https://x.example.com/cb?a=1&access_token=AccTok1", "AccTok1"),
     ("https://x.example.com/cb?api_key=QKey123", "QKey123"),
-    ("https://x.example.com/cb?code=Code123", "Code123"),
     ("whsec_aaaaaaaaaaaaaaaaaaaaaaaa", "aaaaaaaa"),
     ("GOCSPX-bbbbbbbbbbbbbbbbbbbbbbbb", "bbbbbbbb"),
     ("dop_v1_cccccccccccccccccccccccccccccccc", "cccccccc"),

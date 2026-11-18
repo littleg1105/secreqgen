@@ -283,11 +283,9 @@ USUAL = [
 ]
 
 # Cases that stay wrong, with the reason.
-STAYS_WRONG = {
-    # The README says "the flask of water": the name stands in the prose as a
-    # whole phrase, and nothing tells a bottle from the library.
-    ("prose", "Flask"): "the plain word is a name in prose",
-}
+# No case of the two lists stays wrong: "the flask of water" has no capital
+# letter, so it does not name Flask.
+STAYS_WRONG: dict[tuple[str, str], str] = {}
 
 
 def _facts(kind: str, text: str, path: str = "x.txt", **extra) -> CodebaseFacts:
@@ -412,13 +410,16 @@ def test_joined_name():
     ("value", "prose", "expected"),
     [
         ("Rust", "we trust the reviewers", False),
-        ("Rust", "the service is written in rust.", True),
+        ("Rust", "the service is written in rust.", False),
+        ("Rust", "The service is written in Rust.", True),
         ("Redis", "we redistribute the load", False),
-        ("Redis", "cache: redis, queue: kafka", True),
+        ("Redis", "cache: redis, queue: kafka", False),
+        ("Redis", "The cache is Redis, the queue is Kafka.", True),
         ("Go", "written in go", False),
         ("R", "an r script", False),
         ("Java 21", "javascript only", False),
-        ("Java 21", "needs java 21 or newer", True),
+        ("Java 21", "needs java 21 or newer", False),
+        ("Java 21", "It needs Java 21 or newer.", True),
         ("Next.js", "the next steps are in the roadmap", False),
         ("Next.js", "built with next.js", True),
         ("Docker", "the app is dockerized", False),
@@ -660,16 +661,26 @@ def test_t4_path_marks_hold_only_for_the_right_path():
 # name word in a manifest. A model must write the name first, so this is a
 # wrong keep only when the model guessed it. Each case is marked and explained.
 LIMITS = [
-    ("Swift", "A swift response is expected."),
     ("Express", "Express delivery"),
+    ("Kafka", "Franz Kafka wrote novels."),
+]
+# A plain word with no capital letter in the prose is no name.
+NO_NAMES = [
+    ("Swift", "A swift response is expected."),
     ("Helm", "The helm of the ship"),
     ("Vault", "A bank vault"),
+    ("Flask", "The flask of water; the flash message."),
 ]
+
+
+@pytest.mark.parametrize(("name", "text"), NO_NAMES)
+def test_a_plain_word_in_prose_is_no_name(name, text):
+    assert not _kept(_facts("readme", text), name)
 
 
 @pytest.mark.parametrize(("name", "text"), LIMITS)
 @pytest.mark.xfail(
-    strict=True, reason="rule B: a whole word in prose is enough (design limit)"
+    strict=True, reason="a capital word in prose counts as a name (design limit)"
 )
 def test_t5_common_word_in_prose_stays_a_known_limit(name, text):
     assert not _kept(_facts("readme", text), name)

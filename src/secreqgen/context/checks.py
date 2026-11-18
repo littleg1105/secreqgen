@@ -158,7 +158,7 @@ PATH_MARKS = (
 )
 # Kinds of part that hold settings and code, not a list of names.
 SETTING_KINDS = frozenset({"manifest", "container", "api"})
-_SENTENCE_RE = re.compile(r"[A-Za-z .,;']+")
+_SENTENCE_RE = re.compile(r"[A-Za-z .,;'!?]+")
 SENTENCE_WORDS = 4  # a line of this many plain words is a sentence
 # A plain line is a sentence only when it starts with a capital letter or holds
 # one of these words. A list of packages (apt install redis nginx) holds none.
@@ -301,12 +301,21 @@ def _alias_hit(alias: str, words: frozenset[str], suffixes: frozenset[str]) -> b
 
 
 def prose_names(parts: list[str], prose: str) -> bool:
-    """True when the name stands in the prose as a whole phrase."""
+    """True when the name stands in the prose as a whole phrase, as a name.
+
+    A name of one plain word must have a capital letter in the prose at least
+    one time (Swift, Redis): "a swift response" does not name Swift. A name
+    with more words, a digit or a sign (next.js, c++, ruby on rails) is no
+    normal word, so its letter case does not count.
+    """
     name = " ".join(parts)
     if len(re.sub(r"\s", "", name)) <= SHORT_NAME:
         return False
-    pattern = rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])"
-    return re.search(pattern, prose) is not None
+    pattern = rf"(?<![A-Za-z0-9]){re.escape(name)}(?![A-Za-z0-9])"
+    found = [m[0] for m in re.finditer(pattern, prose, re.IGNORECASE)]
+    if not name.isalpha():
+        return bool(found)
+    return any(any(ch.isupper() for ch in text) for text in found)
 
 
 class _Files:
@@ -322,8 +331,8 @@ class _Files:
         self.paths = [
             _Evidence(p.ref, p.path, "") for p in facts.parts if p.kind in PROSE_KINDS
         ]
-        self.prose = {
-            p.ref: " ".join(p.text[:MAX_EVIDENCE_CHARS].lower().split())
+        self.prose = {  # with its capital letters: a name has one
+            p.ref: " ".join(p.text[:MAX_EVIDENCE_CHARS].split())
             for p in facts.parts
             if p.kind in PROSE_KINDS
         }

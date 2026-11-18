@@ -303,16 +303,22 @@ _PLAIN_END_RE = re.compile(
     r"lifetime|type|algorithm|alg|path|file|dir|url|uri|endpoint|header|name|"
     r"provider|policy|ref|prefix|label|minutes|seconds|hours|days|hasher|"
     r"hashers|encoder|encoders|manager|store|storage|backend|source|engine|"
-    r"method|format|complexity|strategy|scheme|generator)$",
+    r"method|format|complexity|strategy|scheme|generator|placeholder|message|"
+    r"msg|error|title|hint|help|text|field|invalid|mismatch|required|"
+    r"supported|enabled|allowed|short|long|weak)$",
     re.IGNORECASE,
 )
+# The key of a text for a screen: msg_password_too_short, error.password.invalid.
+_TEXT_NAME_RE = re.compile(r"^(?:msg|message|error|err|label|forgot)[_.-]", re.I)
 # A name that points to a Kubernetes Secret object, not to a secret value.
 _PLAIN_START_RE = re.compile(r"^existing", re.IGNORECASE)
 _PLAIN_CAMEL_RE = re.compile(
     r"(?:Id|Ids|Length|Size|Count|Ttl|Timeout|Expiry|Expiration|Lifetime|Type|"
     r"Algorithm|Path|File|Dir|Url|Uri|Endpoint|Header|Name|Provider|Policy|"
     r"Ref|Prefix|Label|Hasher|Hashers|Encoder|Encoders|Manager|Store|Storage|"
-    r"Backend|Source|Engine|Method|Format|Complexity|Strategy|Scheme|Generator)$"
+    r"Backend|Source|Engine|Method|Format|Complexity|Strategy|Scheme|Generator|"
+    r"Placeholder|Message|Error|Title|Hint|Help|Text|Field|Required|Supported|"
+    r"Enabled|Allowed)$"
 )
 _PUBLIC_RE = re.compile(r"public[_-]?key", re.IGNORECASE)
 _WORD_VALUES = frozenset(
@@ -328,7 +334,7 @@ _TYPE_WORDS = frozenset(
 _REF_RE = re.compile(
     r"^(?:\$\{[^{}]*\}\S*|\$[A-Za-z_]\w*[,;)]*|%\w+%|\{\{.*|\{\w+\}|:\w+|"
     r"<[^<>]*>|process\.env\b|os\.environ\b|os\.getenv\b|System\.getenv\b|"
-    r"ENV\[|getenv\(|env\(|file:|vault:|ref\+|op://|ssm:)",
+    r"ENV\[|getenv\(|env\(|file:|vault:|ref\+|op://|ssm:|\$\(|ENC\[)",
     re.IGNORECASE,
 )
 _REDACTED_RE = re.compile(
@@ -399,9 +405,11 @@ _URL_USER_RE = re.compile(
 )
 # Example values of documentation: "?key=value".
 _DUMMY_VALUES = frozenset({"value", "val", "foo", "bar", "baz", "xxx", "abc", "123"})
+QUERY_VALUE_CHARS = 6  # a shorter value of "key" or "token" is no key
+_QUERY_ALWAYS = frozenset({"password", "pw", "pwd", "secret", "client_secret"})
 _QUERY_RE = re.compile(
     r"(?P<head>[?&;](?:sig|signature|token|access_token|refresh_token|id_token|"
-    r"client_secret|key|api_key|apikey|password|pw|pwd|secret|code)=)"
+    r"client_secret|key|api_key|apikey|password|pw|pwd|secret)=)"
     r"(?P<val>[^&;\s#'\"<>]+)",
     re.IGNORECASE,
 )
@@ -583,7 +591,7 @@ _INDEX_RE = re.compile(
     re.IGNORECASE,
 )
 _CALL_NAME_RE = re.compile(
-    r"(?<![\w.])(?P<name>[\w.]*+)[ \t]*\([ \t]*"
+    r"(?<![\w.])(?P<name>[\w.]++)[ \t]*\([ \t]*"
     r"(?P<val>(?:" + _QUOTED + r")(?:[ \t]*,[ \t]*(?:" + _QUOTED + r"))*)",
     re.IGNORECASE,
 )
@@ -602,7 +610,7 @@ _PAIR_RE = re.compile(
     re.IGNORECASE,
 )
 _GRADLE_RE = re.compile(
-    r"^(?P<head>[ \t]*(?P<key>[\w.]*+)[ \t]+)(?P<val>" + _QUOTED + r")",
+    r"^(?P<head>[ \t]*(?P<key>[\w.]++)[ \t]+)(?P<val>" + _QUOTED + r")",
     re.IGNORECASE | re.MULTILINE,
 )
 _TERRAFORM_RE = re.compile(
@@ -625,6 +633,13 @@ _LOGIN_RE = re.compile(
 )
 _COMMON_USERS = frozenset({"admin", "administrator", "root", "user", "test", "demo"})
 _SETTING_WORD_RE = re.compile(r"[A-Za-z][A-Za-z.]*")
+_VALUE_NEXT_RE = re.compile(r"[ \t]+value[ \t]*=", re.IGNORECASE)
+# The login of a registry in a config file: "auth": "dXNlcjpwYXNz...".
+_AUTH_BASE64_RE = re.compile(
+    r"(?P<head>(?<![\w.-])[\"']?_?auth[\"']?[ \t]*[:=][ \t]*)"
+    r"(?P<q>[\"'])(?P<val>[A-Za-z0-9+/]{12,}={0,2})(?P=q)",
+    re.IGNORECASE,
+)
 _XML_ELEMENT_RE = re.compile(
     r"<(?P<tag>[\w.:-]+)(?P<attrs>\s[^<>]{0,400})?>(?P<val>[^<>\n]{1,400})</(?P=tag)>"
 )
@@ -832,6 +847,7 @@ def _is_plain_name(name: str) -> bool:
     """True for a name that tells what the value is for (a file, a length)."""
     return bool(
         _COUNT_NAME_RE.search(name)
+        or _TEXT_NAME_RE.search(name)
         or _PLAIN_END_RE.search(name)
         or _PLAIN_START_RE.search(name)
         or _PLAIN_CAMEL_RE.search(name)
@@ -875,6 +891,8 @@ def _key_sub(m: re.Match[str]) -> str:
             val[1:-1], bool(m["q"]) and bool(m["colon"])
         ):
             return m[0]  # <add key="name" value="x"/>, { key: 'name' }
+        if low == "key" and _VALUE_NEXT_RE.match(m.string, m.end()):
+            return m[0]  # <add key="webpages:Version" value="3.0.0.0"/>
         return m[0] if _is_harmless(val[1:-1], True) else prefix + REMOVED
     core, tail = _trim(val)
     if _is_harmless(val) or _is_harmless(core):
@@ -911,6 +929,9 @@ def _query_sub(m: re.Match[str]) -> str:
     val = m["val"]
     if _is_harmless(val) or val.lower() in _DUMMY_VALUES:
         return m[0]
+    name = m["head"].strip("?&;=").lower()
+    if name not in _QUERY_ALWAYS and len(val) < QUERY_VALUE_CHARS:
+        return m[0]  # "?key=v1": too short for a key
     return m["head"] + REMOVED
 
 
@@ -921,6 +942,11 @@ def _header_sub(m: re.Match[str]) -> str:
     if head.endswith("cookie"):
         if "=" not in val or REMOVED in val:
             return m[0]
+        if head == "set-cookie":
+            # the value of the cookie goes; its attributes (HttpOnly) stay
+            pair, mark, rest = val.partition(";")
+            name = pair.partition("=")[0]
+            return m["head"] + m["sep"] + name + "=" + REMOVED + mark + rest
         return m["head"] + m["sep"] + REMOVED
     if scheme and scheme.strip().lower() != "digest":
         first, _, rest = val.partition(" ")
@@ -1231,6 +1257,8 @@ def remove_secrets(text: str) -> str:
     text = _CALL_NAME_RE.sub(_call_sub, text)
     text = _PAIR_RE.sub(_pair_sub, text)
     text = _GRADLE_RE.sub(_gradle_sub, text)
+    if "auth" in low:
+        text = _AUTH_BASE64_RE.sub(lambda m: m["head"] + REMOVED, text)
     text = _KEY_RE.sub(_key_sub, text)
     text = _AUTH_PAIR_RE.sub(_auth_pair_sub, text)
     if "|" in text:

@@ -192,6 +192,9 @@ SECRET_LINES = [
     ('keyring.set_password("system", "username", "Pw4theRing")', "Pw4theRing"),
     ('ds.setPassword("javaSetPw1");', "javaSetPw1"),
     ("upload with pypi-AgEIcHlwaS5vcmcCJGZha2V0b2tlbmZvcnRlc3Rz", "AgEIcHlwaS5vcmc"),
+    ("Set-Cookie: sessionid=abc123def; HttpOnly; Secure", "abc123def"),
+    ('{"auths": {"ghcr.io": {"auth": "dXNlcjpwYXNzd29yZDEyMw=="}}}', "dXNlcjpwYXNz"),
+    ("https://maps.example.com/api?key=Zx81kQw77LmP02", "Zx81kQw77LmP02"),
 ]
 HARMLESS_LINES = [
     "POSTGRES_HOST_AUTH_METHOD=trust",
@@ -215,6 +218,17 @@ HARMLESS_LINES = [
     "tokens = 512",
     "* Support relative URLs like ``'?key=value'`` (#100)",
     "https://tidelift.com/subscription/pkg/pypi-charset-normalizer?utm_source=pypi",
+    "export TOKEN=$(vault read -field=token secret/x)",
+    "password=$(cat /run/secrets/pw)",
+    "password: ENC[AES256_GCM,data:abc]",
+    "https://example.com/cb?code=authorization_code&state=xyz",
+    '<link rel="stylesheet" href="https://x.com/a.css?key=v1">',
+    "token_endpoint_auth_methods_supported: client_secret_post",
+    "error.password.invalid=Invalid password",
+    'msg_password_too_short = "Password too short"',
+    "passwordPlaceholder: 'Enter your password'",
+    '<add key="webpages:Version" value="3.0.0.0" />',
+    '"auth": "basic"',
 ]
 
 
@@ -228,6 +242,10 @@ class TestSecretRule:
     @pytest.mark.parametrize("line", HARMLESS_LINES)
     def test_harmless_text_stays(self, line):
         assert remove_secrets(line) == line
+
+    def test_a_cookie_keeps_its_attributes(self):
+        out = remove_secrets("Set-Cookie: sessionid=abc123def; HttpOnly; Secure")
+        assert out == "Set-Cookie: sessionid=<removed>; HttpOnly; Secure"
 
     def test_the_name_of_a_key_stays(self):
         assert remove_secrets("DB_PASS=hunter2") == "DB_PASS=<removed>"
@@ -247,6 +265,13 @@ class TestSecretRule:
             tokens.append(rng.randbytes(16).hex())
         missed = [t for t in tokens if not looks_random(t)]
         assert len(missed) <= len(tokens) // 100  # 1 of 100 at most
+
+    @pytest.mark.parametrize("unit", ["  ", "\t", " \t", "( ", "a (", "x  ", ". "])
+    def test_a_long_run_of_spaces_is_fast(self, unit):
+        """A name must have one character: an empty name made the rules slow."""
+        start = time.time()
+        remove_secrets(unit * 100_000)
+        assert time.time() - start < 3
 
     def test_a_very_long_line_is_fast(self, tmp_path):
         (tmp_path / "README.md").write_text(
@@ -609,6 +634,27 @@ class TestChecks:
         context, dropped = check_answer(answer, facts, None)
         assert [t["value"] for t in context["tech_stack"]] == ([value] if kept else [])
         assert bool(dropped) is not kept or dropped[0]["what"] == "security_profile"
+
+    @pytest.mark.parametrize(
+        ("value", "readme", "kept"),
+        [
+            ("Swift", "A swift response is expected.", False),
+            ("Swift", "The app is written in Swift.", True),
+            ("Helm", "The helm of the ship.", False),
+            ("Redis", "We use Redis for the cache.", True),
+            ("Redis", "we use redis for the cache", False),
+            ("gRPC", "The services talk over gRPC.", True),
+        ],
+    )
+    def test_a_readme_names_a_technology_with_a_capital_letter(
+        self, tmp_path, value, readme, kept
+    ):
+        (tmp_path / "README.md").write_text(f"# App\n{readme}\n", encoding="utf-8")
+        facts = scan_codebase(tmp_path)
+        ref = _refs(facts)["readme"]
+        answer = {"tech_stack": [{"kind": "x", "value": value, "source": ref}]}
+        context, _ = check_answer(answer, facts, None)
+        assert [t["value"] for t in context["tech_stack"]] == ([value] if kept else [])
 
     def test_source_is_corrected(self, codebase):
         facts = scan_codebase(codebase)
