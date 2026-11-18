@@ -79,7 +79,9 @@ secreqgen generate single --title "Session timeout" \
   words of the body text stay. Navigation, page headers and footers, metadata and the labels of notes are left
   out. PDF text is less exact: a PDF has no headings, and a word that the page splits at the end of a line stays
   split. Files that are not documentation are left out: files in dependency, build, test and template folders, and
-  files such as `LICENSE.txt` or `requirements.txt`. A file that cannot be read is skipped, and the note names it. The
+  files such as `LICENSE.txt` or `requirements.txt`. A file that cannot be read is skipped, and the note names it. A PDF or
+  Word file that someone made on purpose to be hard to read can make the conversion slow, so use documentation
+  from a source that you trust. The
   `.md` files are used as they are. The command prints one note with the number of converted files. This is
   outside the tested setup, because the final test read `.md` files only. A folder with `.md` files only
   gives the same run as without the option.
