@@ -12,7 +12,7 @@ import string
 import time
 
 import pytest
-from secreqgen.context.scan import (
+from secreqgen.context.secrets import (
     REMOVED,
     looks_random,
     remove_secrets,

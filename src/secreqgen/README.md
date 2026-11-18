@@ -37,8 +37,9 @@ src/secreqgen/
   threats/                   threat list: `actors.py`, `checks.py`, `pipeline.py`, `render.py`, `prompts/`
   documents/                 other file types to Markdown: `formats.py` (one converter for each type),
                              `mirror.py` (the copy of a folder that the search reads; `MIRROR_VERSION`)
-  context/                   system context of a codebase: `scan.py` (plain code reads the folder and
-                             replaces secrets), `checks.py`, `pipeline.py`, `render.py`, `prompts/`
+  context/                   system context of a codebase: `scan.py` (plain code reads the folder),
+                             `secrets.py` (the rules that replace secret values), `checks.py` (the
+                             answer of the model against the files), `pipeline.py`, `render.py`, `prompts/`
   ingestion/                 loader, chunker, embedder, metadata
   evaluation/                baseline, metrics, semantic matcher, `multi_run.py`, pipeline, report
   output/                    formatter and exporter

@@ -24,7 +24,8 @@ from secreqgen.context import (
     source_lines,
 )
 from secreqgen.context.checks import check_answer
-from secreqgen.context.scan import TOTAL_WORDS, looks_random, remove_secrets
+from secreqgen.context.scan import TOTAL_WORDS
+from secreqgen.context.secrets import looks_random, remove_secrets
 
 SECRET = "0123456789abcdef0123456789abcdef01234567"
 
