@@ -1,0 +1,6 @@
+exit=1
+Writing a paragraph about empty with gemma4:26b
+Error: The folder has no README, no manifest and no documentation overview.
+
+--- calls
+_ollama_client(model_name='gemma4:26b', tested_setup=True)

@@ -1,0 +1,6 @@
+exit=1
+Writing a paragraph about shop with gemma4:26b
+Error: The output file exists: out/about.txt. Give the name of a new file, or delete the file first.
+
+--- file out/about.txt
+MY HAND EDITED PARAGRAPH

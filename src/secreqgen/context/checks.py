@@ -440,6 +440,8 @@ def check_answer(
 
     name = _text(answer.get("name")) or _text(product) or facts.name
     description = _cut(_text(answer.get("description")), MAX_DESCRIPTION_WORDS)
+    source = _text(answer.get("description_source"))
+    description_path = paths.get(source, "") if description else ""
     tech: list[dict] = []
     for raw in _list(answer.get("tech_stack")):
         item = _dict(raw)
@@ -513,6 +515,7 @@ def check_answer(
     context = {
         "name": name,
         "description": description,
+        "description_path": description_path,
         "tech_stack": tech,
         "security_profile": profile,
         "features": features,

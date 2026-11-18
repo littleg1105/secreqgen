@@ -1,0 +1,15 @@
+exit=0
+Writing a paragraph about shop with gemma4:26b
+2 files scanned. 3 parts read.
+Each line and its source:
+- description: A web shop for small stores.  <- The model named no source file.
+- features: Orders: Orders  <- README.md
+
+Shop: A web shop for small stores. Main parts: Orders. Features: Orders.
+
+DRAFT for a person to check. A model wrote the facts of this paragraph from the files of the product. Check each line against its source before you use it.
+
+--- calls
+_ollama_client(model_name='gemma4:26b', tested_setup=True)
+--- prompts
+[1] stand-in generate

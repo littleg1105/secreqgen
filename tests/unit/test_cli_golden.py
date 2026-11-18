@@ -428,6 +428,7 @@ def test_command_order():
             "single",
             "threats",
             "context",
+            "about",
         ],
         "evaluate": ["run", "compare-runs", "compare", "report"],
     }

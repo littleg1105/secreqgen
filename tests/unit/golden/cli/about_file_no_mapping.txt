@@ -1,0 +1,2 @@
+exit=1
+Error: list.yaml is not a system context file (YAML).

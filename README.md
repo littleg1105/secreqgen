@@ -110,6 +110,28 @@ secreqgen generate context path/to/codebase --output system_context.yaml
 - `--model NAME` changes the writer. `--product NAME` gives the name of the product.
 - A run that uses a context of this kind is outside the tested setup.
 
+### A paragraph about the product
+
+`secreqgen generate about SOURCE` writes a draft paragraph for the option `--about-file` of
+`generate threats`. The source is a codebase folder or a system context file (YAML). For a folder,
+the writer model writes a system context as in `generate context`, and plain code checks it. For a
+file, no model runs. Then plain code makes the paragraph from the checked context with the rule of the
+test of 17 November 2026: name, description, main parts and features, about 80 words (120 at most). No
+model writes the sentences of the paragraph. The command prints each line that the paragraph uses with
+its source file, and the number of features that did not fit.
+
+```bash
+secreqgen generate about path/to/codebase --output about.txt
+secreqgen generate about system_context.yaml --output about.txt
+```
+
+- Without `--output` the paragraph goes to the console. With it, the file must be a new file: a file
+  that exists is never replaced.
+- `--model NAME` changes the writer (not for a file). `--product NAME` gives the name of the product.
+- The paragraph of a folder is a draft: a model chose the facts. A person checks each line against its
+  source. A run with such a paragraph is outside the tested setup, because the test used paragraphs
+  that were made from system context files that a person wrote.
+
 ### Draft threat list of a user story
 
 `secreqgen generate threats` writes a draft threat list for each user story. It uses the word search
@@ -157,6 +179,7 @@ secreqgen generate threats stories.json --docs path/to/product/docs --output thr
 | `generate single` | Writes requirements for one story. Options `--title`, `--story`, `--ac`, `--docs`, `--product`, `--context`, `--baseline`, `--format`. |
 | `generate threats INPUT_FILE` | Writes a draft threat list for each story. Needs `--docs`. Other options: `--product`, `--story-id`, `--labels`/`--no-labels`, `--model`, `--check`/`--no-check`, `--checker-model`, `--about-file`, `--other-formats`, `--output`. |
 | `generate context FOLDER` | Writes a draft system context file for a codebase. Options `--output`, `--model`, `--product`. |
+| `generate about SOURCE` | Writes a draft paragraph about the product, for `--about-file`. The source is a codebase folder or a system context file. Options `--output`, `--model`, `--product`. |
 | `evaluate run STORIES GROUND_TRUTH` | Runs the older RAG against zero-shot comparison. |
 | `evaluate compare-runs STORIES GROUND_TRUTH` | Repeats that comparison `--runs` times (default 20) and reports totals. Option `--pilot` runs 10. |
 | `evaluate compare GENERATED GROUND_TRUTH` | Matches a file of generated requirements against a ground truth file. |

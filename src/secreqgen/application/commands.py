@@ -288,3 +288,29 @@ def context_command(
     if product is not None and product.strip():
         line.word("--product", product)
     return line.build([])
+
+
+def about_command(
+    *,
+    folder: Path,
+    product: str | None,
+    writer_model: str,
+    base_url: str,
+    home: Path | None = None,
+) -> Command:
+    """Build the command of `secreqgen generate about` for a codebase folder.
+
+    The rules are those of context_command. The paragraph goes to the console.
+    """
+    from secreqgen.threats import TESTED_WRITER
+
+    line = _Line(_home(home))
+    _add_address(line, base_url)
+    line.word("generate", "about")
+    line.path(Path(folder))
+    writer = (writer_model or "").strip()
+    if writer and writer != TESTED_WRITER:
+        line.word("--model", writer_model)
+    if product is not None and product.strip():
+        line.word("--product", product)
+    return line.build([])

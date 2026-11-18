@@ -1,0 +1,10 @@
+exit=1
+Writing a paragraph about shop with gemma4:26b
+Error: The model gave no answer that can be read.
+
+--- calls
+_ollama_client(model_name='gemma4:26b', tested_setup=True)
+--- prompts
+[1] stand-in generate
+[2] stand-in generate
+[3] stand-in generate

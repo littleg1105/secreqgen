@@ -1,0 +1,208 @@
+{
+ "note": "The paragraphs of the test of 17 November 2026 (threat lists, 12 stories with a paragraph). A fixed rule made each paragraph from the system context file of the product (real_test_cases/<product>/system_context.yaml in the thesis folder): name, description, main parts, features. The budget of the rule was 90: each word costs 1 and each feature costs 1 more. The file of Keycloak has no feature list (it has the keys system and architecture); its paragraph was written with another rule and is not a case here.",
+ "budget": 90,
+ "cases": [
+  {
+   "product": "bitwarden",
+   "file_data": {
+    "project": {
+     "name": "Bitwarden Server",
+     "description": "Open-source password manager with zero-knowledge architecture, providing secure credential storage, sync, and sharing across devices"
+    },
+    "features": {
+     "authentication": [
+      "Email/password authentication with master password",
+      "Two-factor authentication (TOTP, WebAuthn/FIDO2, Email, Duo)",
+      "Biometric unlock (fingerprint, face recognition)",
+      "Password hint recovery",
+      "Account recovery via emergency access"
+     ],
+     "encryption": [
+      "Zero-knowledge architecture - server never has plaintext access",
+      "AES-256-CBC for vault encryption",
+      "PBKDF2-SHA256 for key derivation (600,000 iterations)",
+      "RSA-2048 for asymmetric operations",
+      "Encrypted key exchange for sharing"
+     ],
+     "vault_management": [
+      "Password/credential storage with encryption",
+      "Secure notes with full encryption",
+      "File attachments with per-file encryption",
+      "Folder organization",
+      "Custom fields support"
+     ],
+     "organization_features": [
+      "Team/organization vaults with shared items",
+      "Role-based access control (Owner, Admin, Manager, User)",
+      "Collection-based item grouping",
+      "Policy enforcement (password requirements, 2FA mandate)",
+      "Event logging and audit trails"
+     ],
+     "sync_and_access": [
+      "Real-time sync across browser extensions, desktop, mobile",
+      "API access with OAuth2 tokens",
+      "CLI tool with session tokens",
+      "Emergency access delegation",
+      "Account takeover protection"
+     ]
+    }
+   },
+   "paragraph": "Bitwarden Server: Open-source password manager with zero-knowledge architecture, providing secure credential storage, sync, and sharing across devices. Main parts: authentication, encryption, vault management, organization features, sync and access. Features: Email/password authentication with master password; Two-factor authentication (TOTP, WebAuthn/FIDO2, Email, Duo); Biometric unlock (fingerprint, face recognition); Password hint recovery; Account recovery via emergency access; Zero-knowledge architecture - server never has plaintext access; AES-256-CBC for vault encryption; PBKDF2-SHA256 for key derivation (600,000 iterations); RSA-2048 for asymmetric operations; Encrypted key exchange for sharing."
+  },
+  {
+   "product": "gitlab",
+   "file_data": {
+    "project": {
+     "name": "GitLab",
+     "description": "Complete DevOps platform providing Git repository management, CI/CD pipelines, issue tracking, and project management"
+    },
+    "features": {
+     "repository_management": [
+      "Git repository hosting",
+      "Branch protection rules",
+      "Merge request workflows",
+      "Code review and approvals",
+      "Repository mirroring"
+     ],
+     "ci_cd": [
+      "Pipeline execution with YAML configuration",
+      "Runner management (shared, specific)",
+      "Environment variables and secrets",
+      "Deployment to environments",
+      "Artifact storage"
+     ],
+     "access_control": [
+      "Role-based access (Owner, Maintainer, Developer, Reporter, Guest)",
+      "Group and project level permissions",
+      "Protected branches and tags",
+      "Deploy tokens and keys",
+      "API token management"
+     ],
+     "collaboration": [
+      "Issue tracking and boards",
+      "Merge request discussions",
+      "Wiki pages",
+      "Snippets (code sharing)",
+      "User mentions and notifications"
+     ],
+     "security_features": [
+      "Vulnerability scanning",
+      "Secret detection",
+      "License compliance",
+      "Container scanning",
+      "Dependency scanning"
+     ]
+    }
+   },
+   "paragraph": "GitLab: Complete DevOps platform providing Git repository management, CI/CD pipelines, issue tracking, and project management. Main parts: repository management, ci cd, access control, collaboration, security features. Features: Git repository hosting; Branch protection rules; Merge request workflows; Code review and approvals; Repository mirroring; Pipeline execution with YAML configuration; Runner management (shared, specific); Environment variables and secrets; Deployment to environments; Artifact storage; Role-based access (Owner, Maintainer, Developer, Reporter, Guest); Group and project level permissions; Protected branches and tags."
+  },
+  {
+   "product": "mastodon",
+   "file_data": {
+    "project": {
+     "name": "Mastodon",
+     "description": "Decentralized social network based on ActivityPub federation protocol"
+    },
+    "features": {
+     "social_features": [
+      "Status/post creation (toots)",
+      "Follow/unfollow users",
+      "Direct messages",
+      "Reblogs and favorites",
+      "Lists and hashtags"
+     ],
+     "media_handling": [
+      "Image upload with processing",
+      "Video upload with transcoding",
+      "Audio attachment support",
+      "Custom emoji upload",
+      "Media descriptions (alt text)"
+     ],
+     "federation": [
+      "ActivityPub protocol support",
+      "Remote user follows",
+      "Federated timeline",
+      "Instance blocklist/allowlist",
+      "Signature verification"
+     ],
+     "privacy_controls": [
+      "Post visibility (public, unlisted, followers-only, direct)",
+      "Account privacy settings",
+      "Block and mute functionality",
+      "Content warnings",
+      "Domain blocking"
+     ],
+     "moderation": [
+      "Report system",
+      "User suspension",
+      "Content removal",
+      "Appeal process",
+      "Instance-level moderation"
+     ]
+    }
+   },
+   "paragraph": "Mastodon: Decentralized social network based on ActivityPub federation protocol. Main parts: social features, media handling, federation, privacy controls, moderation. Features: Status/post creation (toots); Follow/unfollow users; Direct messages; Reblogs and favorites; Lists and hashtags; Image upload with processing; Video upload with transcoding; Audio attachment support; Custom emoji upload; Media descriptions (alt text); ActivityPub protocol support; Remote user follows; Federated timeline; Instance blocklist/allowlist; Signature verification; Post visibility (public, unlisted, followers-only, direct); Account privacy settings."
+  },
+  {
+   "product": "mattermost",
+   "file_data": {
+    "project": {
+     "name": "Mattermost",
+     "description": "Open-source team collaboration platform for secure messaging, file sharing, and integrations"
+    },
+    "features": {
+     "messaging": [
+      "Direct messages",
+      "Public and private channels",
+      "Threaded conversations",
+      "Message editing and deletion",
+      "Emoji reactions"
+     ],
+     "team_management": [
+      "Team creation and membership",
+      "Channel organization",
+      "Role-based permissions",
+      "Guest accounts",
+      "System admin controls"
+     ],
+     "file_sharing": [
+      "File upload in messages",
+      "Image preview generation",
+      "File search",
+      "Export functionality"
+     ],
+     "integrations": [
+      "Webhook support",
+      "Slash commands",
+      "Bot accounts",
+      "OAuth apps",
+      "Plugin system"
+     ],
+     "authentication": [
+      "Local authentication",
+      "OAuth/OIDC providers",
+      "LDAP/SAML integration",
+      "Multi-factor authentication",
+      "SSO support"
+     ]
+    }
+   },
+   "paragraph": "Mattermost: Open-source team collaboration platform for secure messaging, file sharing, and integrations. Main parts: messaging, team management, file sharing, integrations, authentication. Features: Direct messages; Public and private channels; Threaded conversations; Message editing and deletion; Emoji reactions; Team creation and membership; Channel organization; Role-based permissions; Guest accounts; System admin controls; File upload in messages; Image preview generation; File search; Export functionality; Webhook support; Slash commands; Bot accounts; OAuth apps; Plugin system."
+  }
+ ],
+ "no_feature_list": {
+  "system": {
+   "name": "Keycloak",
+   "description": "Open-source Identity and Access Management (IAM) solution for modern applications and services",
+   "version": "23.0.x",
+   "type": "identity_provider"
+  },
+  "architecture_keys": [
+   "cloud_provider",
+   "components",
+   "deployment",
+   "protocols",
+   "type"
+  ]
+ }
+}

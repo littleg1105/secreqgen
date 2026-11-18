@@ -1,0 +1,6 @@
+exit=0
+Wrote about.txt
+SecReqGen made this paragraph from the system context file. No model was used.
+
+--- file about.txt
+Shop Two: A web shop for small stores. Main parts: orders, admin tools. Features: Orders and payments; Refunds; Stock lists.

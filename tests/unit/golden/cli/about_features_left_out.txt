@@ -1,0 +1,24 @@
+exit=0
+Writing a paragraph about shop with other-model
+2 files scanned. 3 parts read.
+Each line and its source:
+- description: A web shop for small stores.  <- README.md
+- features: Group 0: Feature 0.0 with a few more words  <- README.md
+- features: Group 0: Feature 0.1 with a few more words  <- README.md
+- features: Group 0: Feature 0.2 with a few more words  <- README.md
+- features: Group 0: Feature 0.3 with a few more words  <- README.md
+- features: Group 0: Feature 0.4 with a few more words  <- README.md
+- features: Group 0: Feature 0.5 with a few more words  <- README.md
+- features: Group 1: Feature 1.0 with a few more words  <- README.md
+- features: Group 1: Feature 1.1 with a few more words  <- README.md
+- features: Group 1: Feature 1.2 with a few more words  <- README.md
+15 features left out for length.
+
+Shop: A web shop for small stores. Main parts: Group 0, Group 1, Group 2, Group 3. Features: Feature 0.0 with a few more words; Feature 0.1 with a few more words; Feature 0.2 with a few more words; Feature 0.3 with a few more words; Feature 0.4 with a few more words; Feature 0.5 with a few more words; Feature 1.0 with a few more words; Feature 1.1 with a few more words; Feature 1.2 with a few more words.
+
+DRAFT for a person to check. A model wrote the facts of this paragraph from the files of the product. Check each line against its source before you use it.
+
+--- calls
+_ollama_client(model_name='other-model', tested_setup=True)
+--- prompts
+[1] stand-in generate

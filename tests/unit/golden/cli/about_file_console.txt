@@ -1,0 +1,3 @@
+exit=0
+Shop: A web shop for small stores. Main parts: orders, admin tools. Features: Orders and payments; Refunds; Stock lists.
+SecReqGen made this paragraph from the system context file. No model was used.

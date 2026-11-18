@@ -898,3 +898,147 @@ def generate_context(
         # soft_wrap: a long line stays one line, so that a copy is valid YAML
         console.print(result["yaml"], markup=False, highlight=False, soft_wrap=True)
     console.print(f"\n[bold]{DRAFT_NOTICE}[/bold]")
+
+
+@generate_app.command(
+    "about",
+    help=(
+        "Write a draft paragraph about the product, for --about-file. "
+        "A person must check it before use."
+    ),
+)
+def generate_about(
+    source: Annotated[
+        Path,
+        typer.Argument(
+            help=(
+                "The folder of the codebase (a model writes the facts), or a "
+                "system context file in YAML (no model runs)"
+            )
+        ),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help=(
+                "Write the paragraph to this new file (a file that exists is "
+                "never replaced). Without it the text goes to the console."
+            ),
+        ),
+    ] = None,
+    writer_model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help=(
+                "The model that writes (default: the tested writer). "
+                "It has no use with a system context file."
+            ),
+        ),
+    ] = None,
+    product: Annotated[
+        str | None,
+        typer.Option(
+            "--product",
+            "-p",
+            help="The name of the product, if the files do not say it.",
+        ),
+    ] = None,
+) -> None:
+    """Write a draft paragraph about the product."""
+    from rich.markup import escape
+
+    from secreqgen.application.about import AboutOptions, run_about
+    from secreqgen.application.errors import InputError, ModelServerError
+    from secreqgen.application.system_context import resolve_context_model
+    from secreqgen.context import (
+        ABOUT_DRAFT_NOTICE,
+        ABOUT_FILE_NOTICE,
+        ContextError,
+    )
+    from secreqgen.exceptions import LLMConnectionError
+
+    def count(number: int, one: str, many: str) -> str:
+        return f"{number} {one if number == 1 else many}"
+
+    cfg = get_config()
+    writer_name = ""
+    if source.is_dir():
+        try:
+            writer_name = resolve_context_model(cfg, writer_model)
+        except InputError as e:
+            console.print(f"[red]Error:[/red] {escape(str(e))}")
+            raise typer.Exit(1)
+        console.print(
+            f"Writing a paragraph about {escape(source.name or str(source))} "
+            f"with {escape(writer_name)}"
+        )
+    options = AboutOptions(
+        source=source, product=product, writer_model=writer_model, output=output
+    )
+    try:
+        run = run_about(options, cfg=cfg, make_client=_client)
+    except InputError as e:
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+    except ModelServerError as e:
+        console.print(
+            f"[red]Error:[/red] {escape(str(e))}\n"
+            "Start Ollama: [cyan]ollama serve[/cyan]. Get the model: "
+            f"[cyan]ollama pull {escape(writer_name)}[/cyan]"
+        )
+        raise typer.Exit(1)
+    except LLMConnectionError as e:
+        console.print(f"[red]LLM Connection Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+    except ContextError as e:
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+    except OSError as e:
+        console.print(
+            f"[red]Error:[/red] Cannot write to {escape(str(output))}: "
+            f"{escape(str(e))}"
+        )
+        raise typer.Exit(1)
+
+    draft = run.draft
+    if run.result is not None:
+        facts = run.result["facts"]
+        scanned = (
+            f"{count(facts['files_seen'], 'file', 'files')} scanned. "
+            f"{count(len(facts['parts']), 'part', 'parts')} read."
+        )
+        secret = facts["secret_files_skipped"]
+        if secret:
+            one, many = "file that can hold secrets", "files that can hold secrets"
+            verb = "was" if secret == 1 else "were"
+            scanned += f" {count(secret, one, many)} {verb} skipped."
+        if facts.get("stopped_early"):
+            scanned += " The folder has more files: the scan stopped at this number."
+        console.print(scanned)
+        console.print("Each line and its source:")
+        for line in draft.lines:
+            path = line["path"] or "The model named no source file."
+            console.print(
+                f"- {line['where']}: {line['text']}  <- {path}",
+                markup=False,
+                highlight=False,
+                soft_wrap=True,
+            )
+        if draft.left_out:
+            console.print(
+                f"{count(len(draft.left_out), 'feature', 'features')} "
+                "left out for length."
+            )
+        console.print()
+    if run.output is not None:
+        console.print(f"Wrote {escape(str(run.output))}")
+    else:
+        console.print(draft.paragraph, markup=False, highlight=False, soft_wrap=True)
+    if run.result is not None:
+        console.print(f"\n[bold]{ABOUT_DRAFT_NOTICE}[/bold]")
+    else:
+        console.print(ABOUT_FILE_NOTICE)

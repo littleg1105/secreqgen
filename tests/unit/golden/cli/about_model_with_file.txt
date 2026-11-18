@@ -1,0 +1,2 @@
+exit=1
+Error: The option --model has no use with a system context file.

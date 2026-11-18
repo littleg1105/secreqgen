@@ -26,6 +26,7 @@ from secreqgen.application import commands as cmds
 from secreqgen.application.clients import build_ollama_client
 from secreqgen.application.commands import (
     Command,
+    about_command,
     context_command,
     requirements_command,
     threat_command,
@@ -100,6 +101,18 @@ def context(**changes) -> Command:
     )
     values.update(changes)
     return context_command(**values)
+
+
+def about(**changes) -> Command:
+    values = dict(
+        folder=Path("/data/code"),
+        product=None,
+        writer_model=TESTED_WRITER,
+        base_url=DEFAULT_URL,
+        home=HOME,
+    )
+    values.update(changes)
+    return about_command(**values)
 
 
 ROOT = typer.main.get_command(secreqgen.cli.app)
@@ -280,15 +293,42 @@ def test_context_command():
     assert "--model" not in context(writer_model="").argv
 
 
+def test_about_command():
+    command = about()
+    assert command.argv == ("secreqgen", "generate", "about", "/data/code")
+    assert command.text == "secreqgen generate about /data/code"
+    assert command.differences == ()
+    command = about(writer_model="m1", product="Shop")
+    assert command.argv[3:] == ("/data/code", "--model", "m1", "--product", "Shop")
+    assert "--product" not in about(product="  ").argv
+    assert "--model" not in about(writer_model="").argv
+    assert "--model" not in about(writer_model="  ").argv
+    assert about(folder=HOME / "code").text == "secreqgen generate about ~/code"
+
+
+def test_about_and_context_commands_differ_only_in_the_name():
+    for changes in (
+        {},
+        {"writer_model": "m1", "product": "Shop"},
+        {"base_url": "http://gpu:11434", "folder": Path("-x")},
+    ):
+        one, two = about(**changes), context(**changes)
+        assert one.env == two.env
+        assert one.argv[:2] == two.argv[:2] == ("secreqgen", "generate")
+        assert (one.argv[2], two.argv[2]) == ("about", "context")
+        assert one.argv[3:] == two.argv[3:]
+
+
 def test_the_address_of_ollama_is_a_variable_in_front():
     for command in (
         threat(base_url="http://gpu:11434"),
         requirements(base_url="http://gpu:11434"),
         context(base_url="http://gpu:11434"),
+        about(base_url="http://gpu:11434"),
     ):
         assert command.env == (("SECREQGEN_LLM_BASE_URL", "http://gpu:11434"),)
         assert command.text.startswith("SECREQGEN_LLM_BASE_URL=http://gpu:11434 ")
-    for command in (threat(), requirements(), context()):
+    for command in (threat(), requirements(), context(), about()):
         assert command.env == ()
 
 
@@ -543,6 +583,7 @@ def cases(make, seed: int):
 THREAT_CASES = cases(threat_case, 20261118)
 REQUIREMENTS_CASES = cases(requirements_case, 20261119)
 CONTEXT_CASES = cases(context_case, 20261120)
+ABOUT_CASES = cases(context_case, 20261121)
 
 
 def effective_llm(env: tuple[tuple[str, str], ...], monkeypatch) -> LLMConfig:
@@ -683,6 +724,36 @@ def test_context_commands_parse(monkeypatch):
         ), where
 
 
+def test_about_commands_parse(monkeypatch):
+    for number, case in enumerate(ABOUT_CASES):
+        command = about_command(**case)
+        parsed = parse(command)
+        where = f"case {number}: {case}\n{command.text}"
+        assert same_path(parsed["source"], case["folder"]), where
+        from secreqgen.application.system_context import resolve_context_model
+
+        llm = effective_llm(command.env, monkeypatch)
+        assert llm.base_url == case["base_url"], where
+        name = (
+            resolve_context_model(
+                type("Cfg", (), {"llm": llm})(), parsed["writer_model"]
+            )
+            if case["writer_model"].strip()
+            else resolve_context_model(type("Cfg", (), {"llm": llm})(), None)
+        )
+        assert name == (case["writer_model"].strip() or TESTED_WRITER), where
+        product = case["product"]
+        want = product if product is not None and product.strip() else None
+        assert parsed["product"] == want, where
+        assert parsed["output"] is None, where
+        assert command.differences == (), where
+        assert command.env == (
+            (("SECREQGEN_LLM_BASE_URL", case["base_url"]),)
+            if case["base_url"] != DEFAULT_URL
+            else ()
+        ), where
+
+
 # ---------------------------------------------------------------------------
 # 3. The text is the argv
 # ---------------------------------------------------------------------------
@@ -713,6 +784,7 @@ def expand_by_hand(tokens: list[str], argv: tuple[str, ...], home: Path) -> list
         (THREAT_CASES, threat_command, "threats"),
         (REQUIREMENTS_CASES, requirements_command, "requirements"),
         (CONTEXT_CASES, context_command, "context"),
+        (ABOUT_CASES, about_command, "about"),
     ],
 )
 def test_the_text_is_the_argv(make, build, name):
@@ -747,6 +819,7 @@ secreqgen() {
         (THREAT_CASES, threat_command),
         (REQUIREMENTS_CASES, requirements_command),
         (CONTEXT_CASES, context_command),
+        (ABOUT_CASES, about_command),
     ],
 )
 def test_a_real_shell_reads_the_text_as_the_argv(make, build, tmp_path):
@@ -787,6 +860,7 @@ EQUALS_COMMANDS = [
     lambda: requirements(system_context=Path("=c.yaml")),
     lambda: requirements(base_url="=u"),
     lambda: context(folder=Path("=code"), product="=p", writer_model="=m"),
+    lambda: about(folder=Path("=code"), product="=p", writer_model="=m"),
 ]
 
 
@@ -840,6 +914,7 @@ def test_zsh_reads_a_value_that_starts_with_an_equals_sign(tmp_path):
         (THREAT_CASES, threat_command),
         (REQUIREMENTS_CASES, requirements_command),
         (CONTEXT_CASES, context_command),
+        (ABOUT_CASES, about_command),
     ],
 )
 def test_zsh_reads_the_text_as_the_argv(make, build, tmp_path):

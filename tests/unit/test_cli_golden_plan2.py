@@ -48,6 +48,28 @@ class ContextStandIn:
         features = [
             {"group": "Orders", "items": [{"text": "Orders", "source": readme}]}
         ]
+        description_source = None
+        if self.mode == "about_long":
+            features = [
+                {
+                    "group": f"Group {g}",
+                    "items": [
+                        {
+                            "text": f"Feature {g}.{n} with a few more words",
+                            "source": readme,
+                        }
+                        for n in range(6)
+                    ],
+                }
+                for g in range(4)
+            ]
+            description_source = readme
+        if self.mode == "about_one":
+            features = [
+                {"group": "Orders", "items": [{"text": "Orders", "source": readme}]},
+                {"group": "Cart", "items": [{"text": "A cart", "source": package}]},
+            ]
+            description_source = package
         if self.mode == "dropped":
             tech.append(
                 {"kind": "orchestrator", "value": "Kubernetes", "source": package}
@@ -58,6 +80,7 @@ class ContextStandIn:
                 {
                     "name": "Shop",
                     "description": "A web shop for small stores.",
+                    "description_source": description_source,
                     "tech_stack": tech,
                     "security_profile": "Medium - holds orders",
                     "features": features,
@@ -239,3 +262,158 @@ def test_requirements_other_formats_no_docs(monkeypatch):
         "requirements_other_formats_no_docs",
         ["generate", "requirements", "stories.json", "--other-formats"],
     )
+
+
+# the paragraph "About the product" ---------------------------------------------
+
+ABOUT = ["generate", "about"]
+CONTEXT_FILE = (
+    "project:\n  name: Shop\n  description: A web shop for small stores.\n"
+    "features:\n  orders:\n    - Orders and payments\n    - Refunds.\n"
+    "  admin_tools:\n    - Stock lists\n"
+)
+
+
+def context_file() -> str:
+    return g.write("shop.yaml", CONTEXT_FILE)
+
+
+def test_about_ok_console(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    folder = small_codebase()
+    g.run_case("about_ok_console", [*ABOUT, folder])
+
+
+def test_about_ok_output(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn(mode="about_one"))
+    folder = small_codebase()
+    g.run_case(
+        "about_ok_output",
+        [*ABOUT, folder, "--output", "out/about.txt", "--product", "Shop Plus"],
+        files=("out/about.txt",),
+    )
+
+
+def test_about_features_left_out(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn(mode="about_long"))
+    folder = small_codebase()
+    g.run_case("about_features_left_out", [*ABOUT, folder, "-m", "other-model"])
+
+
+def test_about_dropped_lines_are_not_in_the_paragraph(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn(mode="dropped"))
+    folder = small_codebase()
+    g.run_case("about_dropped", [*ABOUT, folder])
+
+
+def test_about_file_console(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    g.run_case("about_file_console", [*ABOUT, context_file()])
+    assert not g.CALLS  # no model client was made
+
+
+def test_about_file_output(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    g.run_case(
+        "about_file_output",
+        [*ABOUT, context_file(), "-o", "about.txt", "--product", "Shop Two"],
+        files=("about.txt",),
+    )
+
+
+def test_about_file_with_no_features(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    g.write("keycloak.yaml", "system:\n  name: Keycloak\n  description: An IAM tool.\n")
+    g.run_case("about_file_no_features", [*ABOUT, "keycloak.yaml"])
+
+
+def test_about_file_with_no_name(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    g.write("noname.yaml", "features:\n  a:\n    - Orders\n")
+    g.run_case("about_file_no_name", [*ABOUT, "noname.yaml"])
+
+
+def test_about_file_is_no_yaml_mapping(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    g.write("list.yaml", "- a\n- b\n")
+    g.run_case("about_file_no_mapping", [*ABOUT, "list.yaml"])
+
+
+def test_about_model_with_a_file(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    g.run_case("about_model_with_file", [*ABOUT, context_file(), "--model", "m:1"])
+
+
+def test_about_output_exists(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    folder = small_codebase()
+    Path("out").mkdir()
+    g.write("out/about.txt", "MY HAND EDITED PARAGRAPH\n")
+    g.run_case(
+        "about_output_exists",
+        [*ABOUT, folder, "--output", "out/about.txt"],
+        files=("out/about.txt",),
+    )
+
+
+class LateStandIn(ContextStandIn):
+    """It makes the output file while the model works."""
+
+    def generate(self, prompt, system_prompt=None, format=None):
+        Path("late.txt").write_text("MY OWN FILE\n", encoding="utf-8")
+        return super().generate(prompt, system_prompt, format)
+
+
+def test_about_output_file_that_appears_during_the_run_is_kept(monkeypatch):
+    use_context_client(monkeypatch, LateStandIn())
+    folder = small_codebase()
+    lines = g.describe([*ABOUT, folder, "--output", "late.txt"])
+    assert lines[0] == "exit=1"
+    assert "Error: The output file exists: " in "\n".join(lines)
+    assert Path("late.txt").read_text(encoding="utf-8") == "MY OWN FILE\n"
+
+
+def test_about_source_not_there(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    g.run_case("about_no_source", [*ABOUT, "nofolder"])
+
+
+def test_about_no_server(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn(healthy=False))
+    folder = small_codebase()
+    g.run_case("about_no_server", [*ABOUT, folder])
+
+
+def test_about_nothing_useful(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn())
+    Path("empty").mkdir()
+    g.write("empty/notes.bin", "x")
+    g.run_case("about_nothing_useful", [*ABOUT, "empty"])
+
+
+def test_about_bad_answers(monkeypatch):
+    use_context_client(monkeypatch, ContextStandIn(script="not json at all"))
+    folder = small_codebase()
+    g.run_case("about_bad_answers", [*ABOUT, folder])
+
+
+def test_the_paragraph_that_the_command_writes_goes_into_generate_threats(
+    monkeypatch,
+):
+    use_context_client(monkeypatch, ContextStandIn(mode="about_long"))
+    folder = small_codebase()
+    lines = g.describe([*ABOUT, folder, "--output", "about.txt"])
+    assert lines[0] == "exit=0"
+    written = Path("about.txt").read_text(encoding="utf-8")
+    assert written.endswith(".\n") and len(written.split()) <= 120
+    g.use_threat_clients(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    g.CALLS.clear()
+    g.PROMPTS.clear()
+    lines = g.describe(
+        g.threat_args("--no-check", "--about-file", "about.txt", "--output", "out")
+    )
+    assert lines[0] == "exit=0", lines
+    saved = json.loads(Path("out/US-1/threats.json").read_text(encoding="utf-8"))
+    assert saved["about"] == " ".join(written.split())
