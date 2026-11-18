@@ -184,6 +184,14 @@ SECRET_LINES = [
     ("JWT_SECRET=a1,b2", "b2"),
     ('password = "my secret pass phrase"', "pass phrase"),
     ("PASSWORD='p@ss w0rd'", "w0rd"),
+    (
+        "docker run -e MYSQL_USER=app -e MYSQL_PASSWORD=dbsecretword -p 3306:3306 db",
+        "dbsecretword",
+    ),
+    ("run with DB_PASS=wordonly and then restart the service", "wordonly"),
+    ('keyring.set_password("system", "username", "Pw4theRing")', "Pw4theRing"),
+    ('ds.setPassword("javaSetPw1");', "javaSetPw1"),
+    ("upload with pypi-AgEIcHlwaS5vcmcCJGZha2V0b2tlbmZvcnRlc3Rz", "AgEIcHlwaS5vcmc"),
 ]
 HARMLESS_LINES = [
     "POSTGRES_HOST_AUTH_METHOD=trust",
@@ -199,6 +207,14 @@ HARMLESS_LINES = [
     "password:\n  secretKeyRef:\n    name: db",
     "=" * 48,
     "-" * 48,
+    'keyring.get_password("system", "username")',
+    '> fuzz.token_sort_ratio("fuzzy wuzzy was a bear", "wuzzy fuzzy was a bear")',
+    'enc = SimpleBytePairEncoding.from_tiktoken("cl100k_base")',
+    "special_tokens={",
+    "response = pipeline(chat, max_new_tokens=512)",
+    "tokens = 512",
+    "* Support relative URLs like ``'?key=value'`` (#100)",
+    "https://tidelift.com/subscription/pkg/pypi-charset-normalizer?utm_source=pypi",
 ]
 
 
@@ -567,7 +583,11 @@ class TestChecks:
             ("Apache Kafka", "image: apache/kafka:3.7", True),
             ("Amazon SQS", '<PackageReference Include="AWSSDK.SQS" />', True),
             ("Azure Service Bus", "Azure.Messaging.ServiceBus", True),
-            ("SQL Server", "Microsoft.Data.SqlClient for a server", True),
+            (
+                "SQL Server",
+                '<PackageReference Include="Microsoft.Data.SqlClient" />',
+                True,
+            ),
             ("Google Cloud Storage", "google analytics in the cloud", False),
             ("Go", "google and mongo are going", False),
             ("Go", "module x\n\ngo 1.22", True),
@@ -580,9 +600,11 @@ class TestChecks:
         ],
     )
     def test_technology_must_be_named(self, tmp_path, value, files, kept):
-        (tmp_path / "README.md").write_text(files + "\n", encoding="utf-8")
+        """A manifest names the technology. A README must hold its whole name."""
+        (tmp_path / "README.md").write_text("# App\nA product.\n", encoding="utf-8")
+        (tmp_path / "requirements.txt").write_text(files + "\n", encoding="utf-8")
         facts = scan_codebase(tmp_path)
-        readme = _refs(facts)["readme"]
+        readme = _refs(facts)["manifest"]
         answer = {"tech_stack": [{"kind": "x", "value": value, "source": readme}]}
         context, dropped = check_answer(answer, facts, None)
         assert [t["value"] for t in context["tech_stack"]] == ([value] if kept else [])
@@ -618,6 +640,13 @@ class TestChecks:
         assert context["security_profile"] == ""
         whys = {d["why"] for d in dropped}
         assert {"too long", "two times", "over the limit"} <= whys
+
+    def test_a_source_name_in_the_rating_is_removed(self, codebase):
+        facts = scan_codebase(codebase)
+        answer = _good_answer()
+        answer["security_profile"] = "high - keeps orders and passwords [F2]."
+        context, _ = check_answer(answer, facts, None)
+        assert context["security_profile"] == "High - keeps orders and passwords."
 
     def test_strange_answer(self, codebase):
         facts = scan_codebase(codebase)
