@@ -38,7 +38,7 @@ async def test_the_diagram_draws_only_when_the_board_changed(user: User) -> None
     with user.client.content:
         assert diagram.show(boards.live_board(progress), story_id=STORY)
         assert "4 passages" in diagram.picture.content
-    await user.should_see("Write threats")
+    await user.should_see("Writer model. Reads the story and one group of passages.")
     await user.should_see("Group 1 of 1.")
     # The button and the hint of the full screen are parts of the diagram.
     await user.should_see("Full screen")

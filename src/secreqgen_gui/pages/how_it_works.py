@@ -179,12 +179,12 @@ def _source_line(kind: str, data: dict) -> None:
         if data["status"] == "story":
             manifest = data["manifest"]
             text = (
-                f"Replay of {data['story_id']} from the run of "
+                f"Replay: {data['story_id']}, run of "
                 f"{format_date({**manifest, 'id': data['run_id']})}."
             )
             seconds = _seconds_text(data["trace"])
             if seconds:
-                text += f" The real run took {seconds}."
+                text += f" Run time: {seconds}."
             ui.label(text).classes("sr-small")
             if kind == "threats":
                 target = (

@@ -147,16 +147,21 @@ def _tested_row(info: PromptSetInfo) -> None:
 
 
 def _user_row(info: PromptSetInfo, refresh) -> None:
-    with ui.row().classes("w-full items-center gap-3 py-3 border-b border-[#D8DEE4]"):
-        text(info.name, "font-semibold")
-        tag("untested", "caution")
-        ui.space()
-        ui.button(
-            "Edit", on_click=lambda: ui.navigate.to(f"/prompts/{info.kind}/{info.name}")
-        ).props("flat no-caps color=primary").mark(f"edit-{info.kind}-{info.name}")
-        ui.button(
-            "Delete", on_click=lambda: _ask_delete(info.kind, info.name, refresh)
-        ).props("flat no-caps color=negative").mark(f"delete-{info.kind}-{info.name}")
+    with ui.column().classes("w-full gap-2 py-3 border-b border-[#D8DEE4]"):
+        with ui.row().classes("w-full items-center gap-3"):
+            text(info.name, "font-semibold")
+            tag("untested", "caution")
+            ui.space()
+            ui.button(
+                "Edit",
+                on_click=lambda: ui.navigate.to(f"/prompts/{info.kind}/{info.name}"),
+            ).props("flat no-caps color=primary").mark(f"edit-{info.kind}-{info.name}")
+            ui.button(
+                "Delete", on_click=lambda: _ask_delete(info.kind, info.name, refresh)
+            ).props("flat no-caps color=negative").mark(
+                f"delete-{info.kind}-{info.name}"
+            )
+        _file_rows(info)
 
 
 def page() -> None:

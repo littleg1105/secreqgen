@@ -625,7 +625,7 @@ async def _export(user, run_id, marker):
     await user.open(f"/runs/{run_id}/stories/MM-US-007")
     await user.should_see("1 threat")
     user.find(marker="row-keep-T1").click()
-    await user.should_see("Kept 1, deleted 0")
+    await user.should_see("Kept 1, deleted 0.")
     user.find("Export kept threats").click()
     user.find(marker=marker).click()
     return (await user.download.next()).text

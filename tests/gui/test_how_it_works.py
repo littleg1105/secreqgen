@@ -105,9 +105,9 @@ async def test_a_stored_story_is_replayed_with_its_numbers(user):
     _store()
     frames = _frames()
     await user.open("/how-it-works")
-    await user.should_see(f"Replay of {STORY} from the run of")
+    await user.should_see(f"Replay: {STORY}, run of")
     await user.should_see("17 November 2026")
-    await user.should_see("The real run took 42 seconds.")
+    await user.should_see("Run time: 42 seconds.")
     await user.should_see("Open the result")
     await user.should_see(f"Step 1 of {len(frames)}")
     await user.should_see("Story and documentation")
@@ -118,7 +118,7 @@ async def test_a_stored_story_is_replayed_with_its_numbers(user):
     await user.should_see("In total 2 passed and 1 failed.")
     user.find("Previous").click()
     await user.should_see(f"Step {index} of {len(frames)}")
-    await user.should_see("Write threats")
+    await user.should_see("Writer model. Reads the story and one group of passages.")
 
 
 async def test_frame_parameter_opens_a_frame(user):
@@ -137,8 +137,8 @@ async def test_requirements_kind_has_five_steps(user):
     for _ in range(3):
         user.find("Next").click()
     await user.should_see("Step 4 of 5")
-    await user.should_see("Parse")
-    await user.should_not_see("checks each quote")
+    await user.should_see("Plain code, no AI. Stores each requirement")
+    await user.should_not_see("Quote check")
 
 
 async def test_story_without_a_result_says_so(user):
@@ -215,4 +215,4 @@ async def test_a_requirements_replay_takes_its_time_from_the_manifest(user):
         },
     )
     await user.open("/how-it-works?kind=requirements")
-    await user.should_see("The real run took 37 seconds.")
+    await user.should_see("Run time: 37 seconds.")

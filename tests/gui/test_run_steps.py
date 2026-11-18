@@ -191,7 +191,7 @@ async def test_the_run_page_shows_the_story_in_work(user, monkeypatch):
     await user.open(f"/runs/{state.id}")
     await user.should_see("Steps")
     await user.should_see("Story 2 of 3: S-2 Second story")
-    await user.should_see("Write threats")
+    await user.should_see("Writer model. Reads the story and one group of passages.")
     await user.should_see("Group 2 of 3.")
     # Only the row of the finished story has a Replay link, not the steps line.
     replays = [e for e in user.find(kind=ui.link).elements if e.text == "Replay"]

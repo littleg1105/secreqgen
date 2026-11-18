@@ -161,7 +161,7 @@ def test_a_missing_model_gives_the_pull_command(spec):
     manager.join(10)
     state = manager.get(run_id)
     assert state.state == "failed"
-    assert f"{CHECKER} is not installed. Run: ollama pull {CHECKER}" in (
+    assert f"Not in Ollama: {CHECKER}. Run: ollama pull {CHECKER}" in (
         state.message
     )
 

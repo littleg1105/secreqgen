@@ -78,7 +78,7 @@ def show_server_result(status, roles: list[tuple[str, str]], address: str) -> No
             names = ", ".join(m.name for m in status.models) or "none"
             with ui.row().classes("items-baseline gap-3"):
                 ui.label("Ollama OK").classes("sr-ok")
-                ui.label(f"Models: {names}").classes("sr-small")
+                ui.label(f"Models: {names}").style("color: var(--sr-slate)")
             for name, role_text in _missing_lines(status, roles):
                 ui.label(
                     f"Not in Ollama: {name} ({role_text}). Run: ollama pull {name}"

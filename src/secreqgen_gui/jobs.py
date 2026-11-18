@@ -156,7 +156,7 @@ def server_problems(status: Any, names: list[str], base_url: str) -> list[str]:
     problems = []
     for name in names:
         if not _model_present(status, name):
-            problems.append(f"{name} is not installed. Run: ollama pull {name}")
+            problems.append(f"Not in Ollama: {name}. Run: ollama pull {name}")
     return problems
 
 

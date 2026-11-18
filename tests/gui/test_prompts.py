@@ -77,12 +77,14 @@ async def test_each_tested_file_row_shows_its_description(user):
 
 
 async def test_file_row_of_a_set_of_the_person_shows_its_description(user):
+    # The tested row shows each description once. A set of the person must
+    # add a second row, so each description must show twice.
     _make("threats", "my_set")
     _make("requirements", "r_set")
     await user.open("/prompts")
     for words in (THREAT_WORDS, REQUIREMENT_WORDS):
         for description in words.values():
-            await user.should_see(description)
+            assert len(user.find(content=description).elements) == 2, description
 
 
 def test_a_file_with_another_name_has_no_description():
