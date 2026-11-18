@@ -8,7 +8,7 @@ ui.markdown, ui.code or raw HTML.
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from nicegui import ui
@@ -84,6 +84,71 @@ def context_tag(manifest: dict | None) -> None:
     with ui.element("span").mark("tag-generated-context"):
         tag("generated context", "caution")
         ui.tooltip(CONTEXT_HINT)
+
+
+COMMAND_LABEL = "Command"
+COMMAND_HINT = "This command starts the same run in a terminal."
+COPY_LABEL = "Copy"
+COPIED = "Copied."
+
+
+class CommandBlock:
+    """Show the command of a run, a link that copies it and its differences.
+
+    The command and the lines are plain text elements. Call show() each time
+    the command can change. With titled False the block has no label: the
+    caller shows the title, for example as the head of an expansion.
+    """
+
+    def __init__(self, *, titled: bool = True, mark: str = "command-block") -> None:
+        self.text = ""
+        self._lines: tuple[str, ...] = ()
+        self.box = ui.column().classes("w-full gap-1 min-w-0").mark(mark)
+        with self.box:
+            with ui.row().classes("items-baseline gap-3"):
+                if titled:
+                    with ui.label(COMMAND_LABEL).classes("sr-small"):
+                        ui.tooltip(COMMAND_HINT)
+                ui.button(COPY_LABEL, on_click=self.copy).props(
+                    "flat dense no-caps"
+                ).classes("sr-link-button").mark("command-copy")
+            self.code = (
+                ui.label()
+                # A line breaks at a space. Only a word that is longer than the
+                # line breaks inside, so the page never gets wider.
+                .classes("sr-code whitespace-pre-wrap w-full")
+                .style("overflow-wrap:anywhere;min-width:0")
+                .mark("command-text")
+            )
+            self.notes = ui.column().classes("w-full gap-0")
+        self.box.set_visibility(False)
+
+    def copy(self) -> None:
+        """Copy the text of the command and say so."""
+        if self.text:
+            ui.clipboard.write(self.text)
+            ui.notify(COPIED)
+
+    def show(self, command, lines: Sequence[str] = ()) -> None:
+        """Show a command with its lines. None hides the block."""
+        if command is None:
+            self.text = ""
+            self.box.set_visibility(False)
+            return
+        text = str(command.text)
+        if text != self.text:
+            self.text = text
+            self.code.set_text(text)
+        shown = tuple(lines)
+        if shown != self._lines:
+            self._lines = shown
+            self.notes.clear()
+            with self.notes:
+                for line in shown:
+                    ui.label(line).classes("sr-small").style(
+                        "color: var(--sr-caution)"
+                    ).mark("command-note")
+        self.box.set_visibility(True)
 
 
 def text(value: str, classes: str = "") -> None:

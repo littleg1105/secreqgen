@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -55,6 +56,70 @@ def contexts_dir() -> Path:
     return _sub_dir("contexts")
 
 
+ABOUT_FILE = "about.txt"  # the paragraph of a run, in the folder of the run
+ABOUT_FOLDER = "about"  # the paragraphs of the open forms, in the data folder
+_ABOUT_LOCK = threading.Lock()
+_ABOUT_USERS: dict[Path, int] = {}  # how many open forms use each file
+
+
+def about_path(text: str) -> Path:
+    """Return the file of a paragraph about the product, in the data folder.
+
+    The name comes from the text. So a file never changes what it holds: two
+    pages with different paragraphs have two files, and a command that names
+    a file stays true while the file is there.
+    """
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:10]
+    return data_home() / ABOUT_FOLDER / f"about-{digest}.txt"
+
+
+def swap_about(text: str | None, old: Path | None = None) -> Path | None:
+    """Write the file of a paragraph and let go of the file used before.
+
+    Return the new file, or None for an empty text. A file is removed when no
+    open form uses it. A form that is closed keeps its file until the next
+    start of the GUI (see clear_about).
+    """
+    path = about_path(text) if text else None
+    with _ABOUT_LOCK:
+        if path is not None:
+            _write_text(path, text + "\n")
+            _ABOUT_USERS[path] = _ABOUT_USERS.get(path, 0) + 1
+        if old is not None:
+            left = _ABOUT_USERS.get(old, 1) - 1
+            if left > 0:
+                _ABOUT_USERS[old] = left
+            else:
+                _ABOUT_USERS.pop(old, None)
+                old.unlink(missing_ok=True)
+    return path
+
+
+def clear_about() -> None:
+    """Remove the paragraph files of the forms. Call this when the GUI starts.
+
+    No form is open then, so no command on a screen names one of the files.
+    """
+    folder = data_home() / ABOUT_FOLDER
+    with _ABOUT_LOCK:
+        _ABOUT_USERS.clear()
+        if folder.is_dir() and not folder.is_symlink():
+            for path in folder.glob("about-*.txt"):
+                path.unlink(missing_ok=True)
+
+
+def run_about_path(run_id: str) -> Path:
+    """Return the file of the paragraph in the folder of a run."""
+    return run_dir(run_id) / ABOUT_FILE
+
+
+def write_run_about(run_id: str, text: str) -> Path:
+    """Write the paragraph of a run into its folder. Return the file."""
+    path = run_about_path(run_id)
+    _write_text(path, text.strip() + "\n")
+    return path
+
+
 def _check_run_id(run_id: str) -> str:
     if not isinstance(run_id, str) or not _RUN_ID.match(run_id):
         raise ValueError("The run id is not valid.")
@@ -85,6 +150,14 @@ def new_run_id(kind: str) -> str:
             number += 1
             continue
         return run_id
+
+
+def _write_text(path: Path, text: str) -> None:
+    """Write text to a temp file in the same folder, then rename it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(text, encoding="utf-8")
+    os.replace(temp, path)
 
 
 def _write_json(path: Path, data: object) -> None:

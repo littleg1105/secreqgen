@@ -96,6 +96,19 @@ def load_settings() -> GuiSettings:
     return settings
 
 
+_SAVES = [0]  # how many times this process saved the settings
+
+
+def saves() -> int:
+    """Return how many times the settings were saved since the GUI started.
+
+    A page that shows a value of the settings keeps this number. When the
+    number changes, the page reads the settings again. This costs no file
+    read.
+    """
+    return _SAVES[0]
+
+
 def save_settings(settings: GuiSettings) -> None:
     """Write the settings. The write is atomic."""
     target = _settings_file()
@@ -105,6 +118,7 @@ def save_settings(settings: GuiSettings) -> None:
         encoding="utf-8",
     )
     os.replace(temp, target)
+    _SAVES[0] += 1
 
 
 def make_config(settings: GuiSettings | None = None):

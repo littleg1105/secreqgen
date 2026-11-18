@@ -173,7 +173,8 @@ body {{
 .sr-step-text {{ color: var(--sr-slate); max-width: 84ch; margin-top: 2px; }}
 .sr-steps-hint {{ display: none; }}
 .sr-step-more {{ margin-top: 4px; max-width: 84ch; }}
-.sr-step-more .q-item {{
+.sr-step-more .q-item,
+.sr-command-more .q-item {{
   display: inline-flex;
   padding: 0;
   min-height: 24px;
@@ -181,10 +182,18 @@ body {{
   font-size: var(--sr-size-small);
   background: none;
 }}
-.sr-step-more .q-focus-helper {{ display: none; }}
-.sr-step-more .q-item__section--main {{ flex: 0 0 auto; }}
-.sr-step-more .q-item__section--side {{ padding-left: 2px; min-width: 0; }}
+.sr-step-more .q-focus-helper,
+.sr-command-more .q-focus-helper {{ display: none; }}
+.sr-step-more .q-item__section--main,
+.sr-command-more .q-item__section--main {{ flex: 0 0 auto; }}
+.sr-step-more .q-item__section--side,
+.sr-command-more .q-item__section--side {{ padding-left: 2px; min-width: 0; }}
 .sr-step-more .q-expansion-item__content {{ padding: 2px 0 0 0; }}
+.sr-command-more .q-expansion-item__content {{ padding: 4px 0 0 0; }}
+.sr-command-more .q-item:focus-visible {{
+  outline: 2px solid var(--sr-blue);
+  outline-offset: 2px;
+}}
 """
 
 # The step diagram in the full screen of the browser, for a projector. Each

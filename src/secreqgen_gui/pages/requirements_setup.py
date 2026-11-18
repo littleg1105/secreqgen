@@ -127,18 +127,15 @@ def page(
             chosen = prompt_set_value(prompt.value)
             set_message(untested, UNTESTED_PROMPTS if chosen else "", "caution")
             foot.update()
+            foot.show_command()
 
-        async def start() -> None:
+        def make_spec() -> jobs.RequirementsRunSpec | None:
+            """Return what a click on Start gives to the run."""
             if not stories_part.path or not docs_part.path:
-                return
-            await check_context()
-            if not context_state["ok"]:
-                return
-            if not await docs_part.still_there():
-                return
+                return None
             context_text = (context.value or "").strip()
             context_path = str(expand_path(context_text)) if context_text else None
-            spec = jobs.RequirementsRunSpec(
+            return jobs.RequirementsRunSpec(
                 stories_file=stories_part.path,
                 docs=docs_part.path,
                 product=(docs_part.product.value or "").strip() or None,
@@ -148,6 +145,35 @@ def page(
                 prompt_set=prompt_set_value(prompt.value),
                 other_formats=docs_part.other_formats,
             )
+
+        def command() -> tuple | None:
+            """Return the command of the form and its lines."""
+            spec = make_spec()
+            if spec is None:
+                return None
+            total = len(stories_part.checks)
+            found = jobs.command_for_requirements(
+                spec,
+                total_stories=total,
+                default_product=stories_part.requirements_default,
+                base_url=load_settings().base_url,
+            )
+            lines = jobs.command_lines(
+                found, picked=len(stories_part.selected), total=total
+            )
+            return found, lines
+
+        async def start() -> None:
+            if not stories_part.path or not docs_part.path:
+                return
+            await check_context()
+            if not context_state["ok"]:
+                return
+            if not await docs_part.still_there():
+                return
+            spec = make_spec()
+            if spec is None:
+                return
             try:
                 run_id = await run.io_bound(jobs.manager.start_requirements, spec)
             except RuntimeError as exc:
@@ -161,6 +187,7 @@ def page(
             ready,
             lambda: about_summary(len(stories_part.selected)),
             start,
+            command,
         )
         prompt.on_value_change(lambda _e: refresh())
         model.on_value_change(lambda _e: refresh())

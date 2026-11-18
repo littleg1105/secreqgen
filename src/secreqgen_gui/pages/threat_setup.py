@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from nicegui import run, ui
 from secreqgen.application.errors import InputError
 from secreqgen.application.inputs import check_about
 
-from secreqgen_gui import form_memory, jobs
+from secreqgen_gui import form_memory, jobs, storage
 from secreqgen_gui.form_memory import COMMON, THREATS
 from secreqgen_gui.pages._setup_parts import (
     UNTESTED_PROMPTS,
@@ -27,6 +29,7 @@ from secreqgen_gui.settings import load_settings
 from secreqgen_gui.widgets import page_title
 
 ABOUT_LIMIT = 120
+ABOUT_PAUSE = 0.3  # seconds with no change before the paragraph goes to its file
 SAME_MODEL = "The checker must be a different model from the writer."
 ABOUT_HINT = "What the product does and who uses it. The writer reads this."
 
@@ -103,10 +106,24 @@ def page(
             return len((about.value or "").split())
 
         def same_model() -> bool:
-            return bool(
-                check.value
-                and (writer.value or "").strip() == (checker.value or "").strip()
-            )
+            """True when the tool counts the checker as the writer.
+
+            The tool ignores the letter case and a missing tag, so "gemma4"
+            and "gemma4:26b" are one model.
+            """
+            from secreqgen.threats import ThreatListError, choose_models
+
+            if not check.value:
+                return False
+            named_writer = (writer.value or "").strip()
+            named_checker = (checker.value or "").strip()
+            if not named_writer or not named_checker:
+                return False
+            try:
+                choose_models(named_writer, None, named_checker, True)
+            except ThreatListError:
+                return True
+            return False
 
         def ready() -> bool:
             if not (stories_part.path and stories_part.selected and docs_part.ok):
@@ -130,18 +147,13 @@ def page(
             chosen = prompt_set_value(prompt.value)
             set_message(untested, UNTESTED_PROMPTS if chosen else "", "caution")
             foot.update()
+            foot.show_command()
 
-        async def start() -> None:
-            try:
-                about_text = check_about(about.value)
-            except InputError as exc:
-                ui.notify(str(exc), type="negative")
-                return
+        def make_spec(about_text: str | None) -> jobs.ThreatRunSpec | None:
+            """Return what a click on Start gives to the run."""
             if not stories_part.path or not docs_part.path:
-                return
-            if not await docs_part.still_there():
-                return
-            spec = jobs.ThreatRunSpec(
+                return None
+            return jobs.ThreatRunSpec(
                 stories_file=stories_part.path,
                 docs=docs_part.path,
                 product=(docs_part.product.value or "").strip() or None,
@@ -154,6 +166,79 @@ def page(
                 prompt_set=prompt_set_value(prompt.value),
                 other_formats=docs_part.other_formats,
             )
+
+        def command() -> tuple | None:
+            """Return the command of the form and its lines."""
+            try:
+                about_text = check_about(about.value)
+            except InputError:
+                return None
+            if about_text and on_disk["text"] != about_text:
+                # The file of this paragraph is not written yet (or cannot be
+                # written). A command that names it would not be true.
+                return None
+            spec = make_spec(about_text)
+            if spec is None:
+                return None
+            total = len(stories_part.checks)
+            found = jobs.command_for_threats(
+                spec,
+                total_stories=total,
+                default_product=stories_part.project,
+                about_file=on_disk["path"] if about_text else None,
+                base_url=load_settings().base_url,
+            )
+            lines = jobs.command_lines(
+                found, picked=len(stories_part.selected), total=total
+            )
+            return found, lines
+
+        # The command needs the paragraph as a file. Each text has its own
+        # file (the name comes from the text). on_disk holds the text whose
+        # file this page wrote last.
+        paragraph = {"token": 0}
+        on_disk: dict = {"text": None, "path": None}
+
+        async def write_about() -> None:
+            """Put the paragraph into its file, a moment after the last change."""
+            paragraph["token"] += 1
+            token = paragraph["token"]
+            await asyncio.sleep(ABOUT_PAUSE)
+            if token != paragraph["token"]:
+                return  # a newer change waits already
+            try:
+                text = check_about(about.value)
+            except InputError:
+                text = None  # too long: the form is not complete
+            if text == on_disk["text"]:
+                return
+            old = on_disk["path"]
+            on_disk.update(text=None, path=None)
+            try:
+                path = await run.io_bound(storage.swap_about, text, old)
+            except (OSError, ValueError):
+                return  # no file: the block shows no command for this text
+            if token == paragraph["token"]:
+                on_disk.update(text=text, path=path)
+                foot.show_command()
+            elif path is not None:
+                # A newer change came while the file was written. Let go of
+                # this file. The newer change writes its own.
+                await run.io_bound(storage.swap_about, None, path)
+
+        async def start() -> None:
+            try:
+                about_text = check_about(about.value)
+            except InputError as exc:
+                ui.notify(str(exc), type="negative")
+                return
+            if not stories_part.path or not docs_part.path:
+                return
+            if not await docs_part.still_there():
+                return
+            spec = make_spec(about_text)
+            if spec is None:
+                return
             try:
                 run_id = await run.io_bound(jobs.manager.start_threats, spec)
             except RuntimeError as exc:
@@ -167,7 +252,11 @@ def page(
             ready,
             lambda: about_summary(len(stories_part.selected)),
             start,
+            command,
         )
+        about.on_value_change(lambda _e: write_about())
+        if (about.value or "").strip():
+            ui.timer(0.05, write_about, once=True)
         for element in (check, labels, prompt):
             element.on_value_change(lambda _e: refresh())
         for element in (writer, checker, about):

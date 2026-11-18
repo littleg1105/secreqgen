@@ -11,12 +11,19 @@ from pathlib import Path
 
 import yaml
 from nicegui import run, ui
+from secreqgen.application.commands import context_command
 from secreqgen.application.system_context import context_lines
 
 from secreqgen_gui import context_job, form_memory, jobs, storage
 from secreqgen_gui.form_memory import REQUIREMENTS
-from secreqgen_gui.settings import data_home, expand_path, load_settings, show_path
-from secreqgen_gui.widgets import path_field
+from secreqgen_gui.settings import (
+    data_home,
+    expand_path,
+    load_settings,
+    saves,
+    show_path,
+)
+from secreqgen_gui.widgets import CommandBlock, path_field
 
 BUTTON = "Write one with the model"
 TITLE = "Write a system context"
@@ -123,6 +130,7 @@ def open_context_dialog(
                 .mark("context-write")
             )
             busy_line = ui.label(BUSY).classes("sr-small").style(CAUTION)
+        block = CommandBlock(mark="context-command")
         error_line = ui.label().classes("text-negative").mark("context-error")
         stage_rows: dict[str, tuple[ui.label, ui.label]] = {}
         steps = ui.column().classes("w-full gap-1")
@@ -141,7 +149,35 @@ def open_context_dialog(
                 REQUIREMENTS, "context_folder", (folder_field.value or "").strip()
             )
 
+        def show_command() -> None:
+            """Show the command for the folder and the product in the fields."""
+            text = (folder_field.value or "").strip()
+            if not text:
+                block.show(None)
+                return
+            settings = load_settings()
+            block.show(
+                context_command(
+                    folder=jobs.absolute(expand_path(text)),
+                    product=(product_field.value or "").strip() or None,
+                    writer_model=settings.writer_model,
+                    base_url=settings.base_url,
+                )
+            )
+
         folder_field.on_value_change(lambda _e: remember_folder())
+        folder_field.on_value_change(lambda _e: show_command())
+        product_field.on_value_change(lambda _e: show_command())
+        show_command()
+        seen = {"saves": saves()}
+
+        def follow_settings() -> None:
+            """Build the command again when the settings changed elsewhere."""
+            if saves() != seen["saves"]:
+                seen["saves"] = saves()
+                show_command()
+
+        ui.timer(0.5, follow_settings)
 
         async def write() -> None:
             if pending["start"]:

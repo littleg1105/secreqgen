@@ -19,7 +19,16 @@ from secreqgen.application.steps import requirements_trace, threat_trace
 
 from secreqgen_gui import jobs, pipeline_boards, storage
 from secreqgen_gui.step_widget import StepDiagram
-from secreqgen_gui.widgets import context_tag, empty_state, formats_tag, page_title, tag
+from secreqgen_gui.widgets import (
+    COMMAND_HINT,
+    COMMAND_LABEL,
+    CommandBlock,
+    context_tag,
+    empty_state,
+    formats_tag,
+    page_title,
+    tag,
+)
 
 POLL_SECONDS = 0.5
 ACTIVE = ("checking", "running")
@@ -412,6 +421,7 @@ def page(run_id: str) -> None:
         "elapsed": None,
         "stored": None,
         "line": None,
+        "command_done": False,
     }
 
     @ui.refreshable
@@ -499,6 +509,23 @@ def page(run_id: str) -> None:
                         "color:var(--sr-blue)"
                     )
 
+    async def show_command(view: View) -> None:
+        """Fill the part "Command" once, when the manifest of the run is there.
+
+        It reads files, so it runs off the event loop. A problem with an old
+        run leaves the part hidden. It never fails the page.
+        """
+        if holder["command_done"] or view.manifest is None:
+            return
+        holder["command_done"] = True
+        try:
+            found = await run.io_bound(jobs.stored_run_command, view.id, view.manifest)
+        except Exception:  # noqa: BLE001 - the page must not fail for a command
+            found = None
+        holder["command_part"].set_visibility(found is not None)
+        if found is not None:
+            holder["command_block"].show(*found)
+
     async def tick() -> None:
         view = holder["view"]
         if view is None:
@@ -513,6 +540,7 @@ def page(run_id: str) -> None:
             manifest = await run.io_bound(storage.read_manifest, run_id)
             new = _from_state(state, manifest)
             holder["view"] = new
+            await show_command(new)
             if state.story_version == view.story_version and new.live:
                 # Only the steps changed. Keep the head and the story list.
                 show_steps(new)
@@ -546,6 +574,27 @@ def page(run_id: str) -> None:
             )
             with ui.column().classes("w-full gap-0").style(READABLE):
                 head_view()
+            with ui.column().classes("w-full gap-0 mt-4").style(READABLE) as part:
+                # The part looks like "Details" of the step diagram: a small
+                # link at the left edge, and no grey band (see theme.py).
+                with (
+                    ui.expansion()
+                    .props("dense")
+                    .classes("w-full sr-command-more") as more
+                ):
+                    with more.add_slot("header"):
+                        with ui.label(COMMAND_LABEL):
+                            # At the right side, so that it does not cover
+                            # the link "Copy" under the title.
+                            ui.tooltip(COMMAND_HINT).props(
+                                'anchor="center right" self="center left"'
+                            )
+                    holder["command_block"] = CommandBlock(
+                        titled=False, mark="run-command"
+                    )
+            part.set_visibility(False)
+            holder["command_part"] = part
+            await show_command(view)
             with ui.column().classes("w-full gap-2 mt-6") as section:
                 ui.label("Steps").classes("sr-section-title")
                 holder["line_row"] = ui.row().classes("items-baseline gap-4")

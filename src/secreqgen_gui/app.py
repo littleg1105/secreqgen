@@ -160,6 +160,7 @@ def start_run_from_file(path: Path) -> str | None:
 
 def _on_startup() -> None:
     storage.mark_interrupted_runs()
+    storage.clear_about()
     storage.ensure_examples()
     value = os.environ.get(START_RUN_ENV, "").strip()
     if value:

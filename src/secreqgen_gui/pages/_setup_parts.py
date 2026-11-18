@@ -22,8 +22,8 @@ from secreqgen.application.prompt_sets import list_user_prompt_sets
 
 from secreqgen_gui import context_job, form_memory, jobs, storage
 from secreqgen_gui.form_memory import COMMON
-from secreqgen_gui.settings import expand_path, show_path
-from secreqgen_gui.widgets import path_field
+from secreqgen_gui.settings import expand_path, saves, show_path
+from secreqgen_gui.widgets import CommandBlock, path_field
 
 TESTED_SET = "__tested__"
 FOLDER_MISSING = "Folder not found. Check the path or click Browse."
@@ -172,6 +172,7 @@ class StoriesPart:
         self.on_change = on_change
         self.stories: list = []
         self.project: str | None = None
+        self.project_is_text = True  # False: the raw key project is not text
         self.checks: dict[str, ui.checkbox] = {}
         self._token = 0
         self.loaded: Path | None = None
@@ -383,10 +384,15 @@ class StoriesPart:
             self._clear("")
             return
         path = expand_path(value)
+        if self.loaded is not None and path != self.loaded:
+            # A new file is being read: the old file must not stay the choice.
+            self.loaded = None
+            self.on_change()
         try:
             if not await run.io_bound(path.is_file):
                 raise FileNotFoundError(FILE_MISSING)
             result = await run.io_bound(read_story_file, path)
+            text_key = await run.io_bound(jobs.project_key_is_text, path)
         except Exception as exc:  # the text of the error is the message
             if token == self._token:
                 missing = isinstance(exc, FileNotFoundError)
@@ -406,6 +412,7 @@ class StoriesPart:
             return
         self.stories = list(result.stories)
         self.project = result.project
+        self.project_is_text = text_key
         self.named_pick = pick if result.project else None
         self.loaded = path
         set_message(self.problem, "")
@@ -428,6 +435,7 @@ class StoriesPart:
     def _clear(self, problem: str) -> None:
         self.stories = []
         self.project = None
+        self.project_is_text = True
         self.loaded = None
         self.checks = {}
         self.named_pick = None
@@ -491,6 +499,15 @@ class StoriesPart:
     @property
     def path(self) -> Path | None:
         return self.loaded
+
+    @property
+    def requirements_default(self) -> str | None:
+        """Return the product name that the command for requirements takes.
+
+        It is None when the raw key project is not text: the command then
+        gets the name with --product.
+        """
+        return self.project if self.project_is_text else None
 
 
 class DocsPart:
@@ -688,7 +705,11 @@ class DocsPart:
 
 
 class Foot:
-    """The foot of a form: a summary, the start button and the busy line."""
+    """The foot of a form: a summary, the start button and the busy line.
+
+    Under the button the block shows the command of the run. The function
+    command gives (command, lines) for a form that is complete, or None.
+    """
 
     def __init__(
         self,
@@ -696,9 +717,11 @@ class Foot:
         ready: Callable[[], bool],
         summary: Callable[[], str],
         start: Callable[[], Awaitable[None]],
+        command: Callable[[], tuple | None] | None = None,
     ) -> None:
         self.ready = ready
         self.summary = summary
+        self.command = command
         with ui.column().classes("w-full gap-2 pt-5 border-t border-[#D8DEE4]"):
             self.summary_label = ui.label().classes("sr-small")
             with ui.row().classes("items-center gap-4"):
@@ -715,9 +738,22 @@ class Foot:
                         .style("color: var(--sr-caution)")
                     )
                     self.link_slot = ui.element("span")
+            self.block = CommandBlock()
         self._link_id: str | None = None
+        self._saves = saves()
         ui.timer(0.5, self.update)
         self.update()
+        self.show_command()
+
+    def show_command(self) -> None:
+        """Show the command of the form, or hide the block when it is not complete."""
+        if self.command is None:
+            return
+        shown = self.command() if self.ready() else None
+        if shown is None:
+            self.block.show(None)
+        else:
+            self.block.show(*shown)
 
     def update(self) -> None:
         """Show the summary and switch the button on or off."""
@@ -735,6 +771,11 @@ class Foot:
             with self.link_slot:
                 ui.link("Open the run", f"/runs/{run_id}" if run_id else "/history")
         self.button.set_enabled(self.ready() and not current)
+        if saves() != self._saves:
+            # The settings changed on another page (the address of Ollama).
+            # A click on Start reads them again, so the command must too.
+            self._saves = saves()
+            self.show_command()
 
 
 def about_summary(count: int) -> str:
