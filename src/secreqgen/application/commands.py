@@ -6,9 +6,9 @@ gives the same run. These builders make that command from the values that the
 GUI gives to the run.
 
 The first rule: the command must be true. An option is left out only when the
-default of the command line gives the same value. Where the command line
-cannot do what the GUI does, the code of the difference is in
-Command.differences. No file is read or written here.
+default of the command line gives the same value. The models are always in
+the command. The address of Ollama is in front of the command when it is not
+the default of the tool. No file is read or written here.
 """
 
 from __future__ import annotations
@@ -21,13 +21,8 @@ from pathlib import Path
 
 PROGRAM = "secreqgen"
 
-# The codes of Command.differences.
-STORIES_SUBSET = "stories_subset"  # the command cannot pick these stories
-PROMPT_SET = "prompt_set"  # the command has no option for a prompt set
-
-# The variables that the tool reads (the prefix of the LLM settings).
+# The variable that the tool reads for the address of Ollama.
 BASE_URL_VARIABLE = "SECREQGEN_LLM_BASE_URL"
-MODEL_VARIABLE = "SECREQGEN_LLM_MODEL_NAME"
 
 # The rest of a path below the home folder may be written with a ~ when it
 # has only these characters.
@@ -41,13 +36,11 @@ class Command:
     env: the variables in front of the command, in order.
     argv: the program and its arguments, as real values (no quotes, no ~).
     text: one line for a shell.
-    differences: what the command cannot do.
     """
 
     env: tuple[tuple[str, str], ...]
     argv: tuple[str, ...]
     text: str
-    differences: tuple[str, ...]
 
 
 def _quote(value: str) -> str:
@@ -115,13 +108,12 @@ class _Line:
     def variable(self, name: str, value: str) -> None:
         self.env.append((name, value))
 
-    def build(self, differences: Sequence[str]) -> Command:
+    def build(self) -> Command:
         front = [f"{name}={_quote(value)}" for name, value in self.env]
         return Command(
             env=tuple(self.env),
             argv=tuple(self.argv),
             text=" ".join(front + self._shown),
-            differences=tuple(differences),
         )
 
 
@@ -137,29 +129,37 @@ def _settings_default(name: str) -> str:
 
 
 def _add_address(line: _Line, base_url: str) -> None:
-    """Put the address of Ollama in front, when it is not the default.
+    """Put the address of Ollama in front when it is not the default.
 
-    The tool builds its client with the address of its settings, so the
-    variable SECREQGEN_LLM_BASE_URL wins over OLLAMA_HOST.
+    The tool reads its address from the variable SECREQGEN_LLM_BASE_URL. With
+    no variable it uses its default, and then the command needs none. A
+    terminal that sets this variable keeps its own address for a command that
+    has none: the README of the GUI states this.
     """
     if base_url != _settings_default("base_url"):
         line.variable(BASE_URL_VARIABLE, base_url)
 
 
-def _story_option(
-    story_ids: Sequence[str] | None, total_stories: int, *, one_id_option: bool
-) -> tuple[str | None, list[str]]:
-    """Return the id for --story-id (or None) and the codes of the differences.
+def _add_stories(
+    line: _Line, story_ids: Sequence[str] | None, total_stories: int
+) -> None:
+    """Add one --story-id for each picked story.
 
-    No ids, or all ids: no option. One id: --story-id (threats only). Any
-    other choice cannot be said on the command line.
+    No ids, or all ids: no option, because the command runs all stories. An
+    id that stands two times counts one time. The ids keep the order given.
     """
     ids = list(dict.fromkeys(story_ids or ()))
     if not ids or len(ids) >= total_stories:
-        return None, []
-    if len(ids) == 1 and one_id_option:
-        return ids[0], []
-    return None, [STORIES_SUBSET]
+        return
+    for story_id in ids:
+        line.word("--story-id", story_id)
+
+
+def _add_prompts(line: _Line, prompts_dir: Path | None) -> None:
+    """Add --prompts-dir for a prompt folder of the person."""
+    if prompts_dir is not None:
+        line.word("--prompts-dir")
+        line.path(Path(prompts_dir))
 
 
 def threat_command(
@@ -175,13 +175,20 @@ def threat_command(
     checker_model: str | None,
     labels: bool,
     about_file: Path | None,
-    prompt_set: str | None,
+    prompts_dir: Path | None,
     other_formats: bool,
     base_url: str,
     home: Path | None = None,
 ) -> Command:
-    """Build the command of `secreqgen generate threats`."""
-    from secreqgen.threats import TESTED_WRITER, ThreatListError, choose_models
+    """Build the command of `secreqgen generate threats`.
+
+    The writer is always in the command. With the check on, the checker is
+    always in it too: a blank name gives the checker that the tool takes for
+    that writer. With the check off the command has --no-check and no checker.
+    The builder never raises: a form with the same model in both places gives a
+    command that the tool refuses, as the run does.
+    """
+    from secreqgen.threats import TESTED_WRITER, choose_models
 
     line = _Line(_home(home))
     _add_address(line, base_url)
@@ -191,31 +198,25 @@ def threat_command(
     line.path(Path(docs))
     if product is not None and product != default_product:
         line.word("--product", product)
-    story_id, differences = _story_option(story_ids, total_stories, one_id_option=True)
-    if story_id is not None:
-        line.word("--story-id", story_id)
-    writer = (writer_model or "").strip()
-    if writer and writer != TESTED_WRITER:
-        line.word("--model", writer_model)
+    _add_stories(line, story_ids, total_stories)
+    writer = (writer_model or "").strip() or TESTED_WRITER
+    line.word("--model", writer)
     if not check:
         line.word("--no-check")
-    elif checker_model and checker_model.strip():
-        try:
-            _, default_checker = choose_models(writer or None, None, None, True)
-        except ThreatListError:
-            default_checker = None
-        if checker_model != default_checker:
-            line.word("--checker-model", checker_model)
+    else:
+        checker = (checker_model or "").strip()
+        if not checker:
+            _, checker = choose_models(writer, None, None, True)
+        line.word("--checker-model", checker)
     if not labels:
         line.word("--no-labels")
     if about_file is not None:
         line.word("--about-file")
         line.path(Path(about_file))
+    _add_prompts(line, prompts_dir)
     if other_formats:
         line.word("--other-formats")
-    if prompt_set is not None:
-        differences.append(PROMPT_SET)
-    return line.build(differences)
+    return line.build()
 
 
 def requirements_command(
@@ -228,15 +229,14 @@ def requirements_command(
     story_ids: Sequence[str] | None,
     model: str,
     system_context: Path | None,
-    prompt_set: str | None,
+    prompts_dir: Path | None,
     other_formats: bool,
     base_url: str,
     home: Path | None = None,
 ) -> Command:
     """Build the command of `secreqgen generate requirements`.
 
-    The command has no option for the model. It reads the setting
-    SECREQGEN_LLM_MODEL_NAME, so the variable stands in front of it.
+    The model is always in the command, as --model.
 
     default_product is what the command takes with no --product: the key
     project of the file, as the command reads it. When that key is not text
@@ -245,23 +245,21 @@ def requirements_command(
     """
     line = _Line(_home(home))
     _add_address(line, base_url)
-    if model != _settings_default("model_name"):
-        line.variable(MODEL_VARIABLE, model)
     line.word("generate", "requirements")
     line.path(Path(stories_file))
     line.word("--docs")
     line.path(Path(docs))
     if product is not None and product != default_product:
         line.word("--product", product)
+    _add_stories(line, story_ids, total_stories)
+    line.word("--model", (model or "").strip())
     if system_context is not None:
         line.word("--context")
         line.path(Path(system_context))
+    _add_prompts(line, prompts_dir)
     if other_formats:
         line.word("--other-formats")
-    _, differences = _story_option(story_ids, total_stories, one_id_option=False)
-    if prompt_set is not None:
-        differences.append(PROMPT_SET)
-    return line.build(differences)
+    return line.build()
 
 
 def context_command(
@@ -282,12 +280,10 @@ def context_command(
     _add_address(line, base_url)
     line.word("generate", "context")
     line.path(Path(folder))
-    writer = (writer_model or "").strip()
-    if writer and writer != TESTED_WRITER:
-        line.word("--model", writer_model)
+    line.word("--model", (writer_model or "").strip() or TESTED_WRITER)
     if product is not None and product.strip():
         line.word("--product", product)
-    return line.build([])
+    return line.build()
 
 
 def about_command(
@@ -308,9 +304,7 @@ def about_command(
     _add_address(line, base_url)
     line.word("generate", "about")
     line.path(Path(folder))
-    writer = (writer_model or "").strip()
-    if writer and writer != TESTED_WRITER:
-        line.word("--model", writer_model)
+    line.word("--model", (writer_model or "").strip() or TESTED_WRITER)
     if product is not None and product.strip():
         line.word("--product", product)
-    return line.build([])
+    return line.build()

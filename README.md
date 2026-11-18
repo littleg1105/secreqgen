@@ -85,6 +85,14 @@ secreqgen generate single --title "Session timeout" \
   `.md` files are used as they are. The command prints one note with the number of converted files. This is
   outside the tested setup, because the final test read `.md` files only. A folder with `.md` files only
   gives the same run as without the option.
+- `--story-id ID` (on `generate requirements` and `generate threats`) writes the result of the stories that you
+  name only. Give the option one time for each story. The stories run in the order of the file. An id that
+  is not in the file stops the command before any model call. The same id two times counts one time.
+- `generate requirements --model NAME` (or `-m`) chooses the model that writes the requirements. Without it,
+  the setting `SECREQGEN_LLM_MODEL_NAME` applies, as before. A name with no text is an error.
+- `--prompts-dir FOLDER` (on `generate requirements` and `generate threats`) uses your own prompt files in place
+  of the tested prompts. The folder needs all the files of the tested set, with the same names. The tool checks
+  the folder before any model call. A run with this option is outside the tested setup.
 
 ### A system context for a new codebase
 
@@ -156,6 +164,9 @@ secreqgen generate threats stories.json --docs path/to/product/docs --output thr
   at most) as background. It is not a source: each row still needs a quote from a passage. The second
   model does not get it. In the test the paragraph did not lower the number of wrong rows, so it is an
   option only.
+- `--story-id ID` writes the list of the stories that you name only. Give the option one time for each story.
+  `--prompts-dir FOLDER` uses your own prompt files in place of the tested prompts. The files of the run say
+  which prompts it used. A run with `--prompts-dir` is outside the tested setup.
 - `--no-labels` leaves out the call that names the threat actor and the STRIDE category. The two
   labels are the model's choice from the threat sentence. They have no source in the documentation.
 - Measured on 17 November 2026 (16 stories of 5 products; 4 of them fully new, 12 used before to choose
@@ -175,9 +186,9 @@ secreqgen generate threats stories.json --docs path/to/product/docs --output thr
 | `ingest stats` | Shows statistics of the vector store. |
 | `ingest clear` | Removes all data from the vector store. |
 | `generate check-ollama` | Checks that Ollama runs and has the model. |
-| `generate requirements INPUT_FILE` | Writes requirements for the user stories of a file. Options `--docs`, `--other-formats`, `--product`, `--context`, `--baseline`, `--format`, `--output`. |
+| `generate requirements INPUT_FILE` | Writes requirements for the user stories of a file. Options `--docs`, `--other-formats`, `--product`, `--context`, `--story-id`, `--model`, `--prompts-dir`, `--baseline`, `--format`, `--output`. |
 | `generate single` | Writes requirements for one story. Options `--title`, `--story`, `--ac`, `--docs`, `--product`, `--context`, `--baseline`, `--format`. |
-| `generate threats INPUT_FILE` | Writes a draft threat list for each story. Needs `--docs`. Other options: `--product`, `--story-id`, `--labels`/`--no-labels`, `--model`, `--check`/`--no-check`, `--checker-model`, `--about-file`, `--other-formats`, `--output`. |
+| `generate threats INPUT_FILE` | Writes a draft threat list for each story. Needs `--docs`. Other options: `--product`, `--story-id`, `--labels`/`--no-labels`, `--model`, `--check`/`--no-check`, `--checker-model`, `--about-file`, `--prompts-dir`, `--other-formats`, `--output`. |
 | `generate context FOLDER` | Writes a draft system context file for a codebase. Options `--output`, `--model`, `--product`. |
 | `generate about SOURCE` | Writes a draft paragraph about the product, for `--about-file`. The source is a codebase folder or a system context file. Options `--output`, `--model`, `--product`. |
 | `evaluate run STORIES GROUND_TRUTH` | Runs the older RAG against zero-shot comparison. |

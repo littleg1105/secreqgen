@@ -1,0 +1,2 @@
+exit=1
+Error: The prompt set has problems. labels_prompt.txt: the file is missing.

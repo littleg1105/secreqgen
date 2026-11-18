@@ -9,7 +9,7 @@ given. It has no default folder.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -220,8 +220,12 @@ def _require_healthy(client, model_name: str, what: str) -> None:
         )
 
 
-def _select_story_ids(stories: list, story_ids: tuple[str, ...]) -> list:
-    """Return the stories with these ids, in file order. An unknown id is an error."""
+def select_story_ids(stories: list, story_ids: Sequence[str]) -> list:
+    """Return the stories with these ids, in file order. An unknown id is an error.
+
+    An id that stands two times counts one time. The command line and the
+    GUI both call this function.
+    """
     known = {story.id for story in stories}
     for story_id in story_ids:
         if story_id not in known:
@@ -243,10 +247,14 @@ def _check_output_folder(folder: Path) -> None:
         ) from e
 
 
-def _build_generator(options, llm_client, checker, product, about, strict, docs=None):
+def build_threat_generator(
+    options, llm_client, checker, product, about, strict, docs=None
+):
     """Build the threat list generator. A user prompt folder gives a subclass.
 
-    docs is the documentation folder to search. None means options.docs.
+    docs is the documentation folder to search. None means options.docs. The
+    command line and run_threat_lists both call this function. It reads
+    options.docs, .labels and .prompts_dir.
     """
     from secreqgen.retrieval.word_search import SearchError
     from secreqgen.threats import ThreatListError, ThreatListGenerator
@@ -337,7 +345,7 @@ def run_threat_lists(
         if not stories:
             raise InputError(f"Story not found in the input file: {options.story_id}")
     if options.story_ids is not None:
-        stories = _select_story_ids(stories, options.story_ids)
+        stories = select_story_ids(stories, options.story_ids)
     if not stories:
         raise NothingToDoError("No user stories found in input file.")
 
@@ -384,7 +392,7 @@ def run_threat_lists(
             checker = None
             if checker_name:
                 checker = make_client(cfg, tested_setup=True, model_name=checker_name)
-            generator = _build_generator(
+            generator = build_threat_generator(
                 options, llm_client, checker, product, about, strict, docs
             )
             _require_healthy(llm_client, writer, "model")
@@ -397,7 +405,7 @@ def run_threat_lists(
                 checker = _checked_client(
                     make_client, cfg, checker_name, "checker model"
                 )
-            generator = _build_generator(
+            generator = build_threat_generator(
                 options, llm_client, checker, product, about, strict, docs
             )
 

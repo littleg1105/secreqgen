@@ -526,7 +526,7 @@ def page(run_id: str) -> None:
             found = None
         holder["command_part"].set_visibility(found is not None)
         if found is not None:
-            holder["command_block"].show(*found)
+            holder["command_block"].show(found)
 
     async def tick() -> None:
         view = holder["view"]

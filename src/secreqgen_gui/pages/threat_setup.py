@@ -208,8 +208,8 @@ def page(
                 other_formats=docs_part.other_formats,
             )
 
-        def command() -> tuple | None:
-            """Return the command of the form and its lines."""
+        def command():
+            """Return the command of the form."""
             try:
                 about_text = check_about(about.value)
             except InputError:
@@ -221,18 +221,13 @@ def page(
             spec = make_spec(about_text)
             if spec is None:
                 return None
-            total = len(stories_part.checks)
-            found = jobs.command_for_threats(
+            return jobs.command_for_threats(
                 spec,
-                total_stories=total,
+                total_stories=len(stories_part.checks),
                 default_product=stories_part.project,
                 about_file=on_disk["path"] if about_text else None,
                 base_url=load_settings().base_url,
             )
-            lines = jobs.command_lines(
-                found, picked=len(stories_part.selected), total=total
-            )
-            return found, lines
 
         # The command needs the paragraph as a file. Each text has its own
         # file (the name comes from the text). on_disk holds the text whose

@@ -1,0 +1,11 @@
+exit=1
+╭────────────────────────────────────────────────────────────────────────────────── Generating Security Requirements ──────────────────────────────────────────────────────────────────────────────────╮
+│ Input: stories.json                                                                                                                                                                                  │
+│ Mode: RAG-enhanced                                                                                                                                                                                   │
+│ Search: word search over docs                                                                                                                                                                        │
+│ Format: markdown                                                                                                                                                                                     │
+│ Output: stdout                                                                                                                                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+* Loading user stories...
+✓ Loaded 3 user stories
+Error: Story not found in the input file: NOPE

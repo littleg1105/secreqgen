@@ -21,6 +21,7 @@ from secreqgen.application.inputs import (
     check_input_file,
     read_story_data,
 )
+from secreqgen.application.threats import select_story_ids
 
 if TYPE_CHECKING:
     from secreqgen.application.steps import StepCallback
@@ -81,6 +82,29 @@ def requirements_prompt_builder(docs: Path | None):
 
         prompts_dir = TESTED_PROMPT_SET
     return SecurityRequirementsPromptBuilder(prompts_dir=prompts_dir)
+
+
+def choose_requirements_prompts(
+    docs: Path | None, prompts_dir: Path | None
+) -> tuple[Any, str, bool]:
+    """Return the prompt builder, the name of the prompt set and its tested flag.
+
+    No prompt folder: the tested set with a documentation folder, else the
+    default builder. A prompt folder of the person gives its own builder.
+    The command line and run_requirements both call this function.
+    """
+    if prompts_dir is None:
+        prompt_set = ""
+        if docs is not None:
+            from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
+
+            prompt_set = Path(TESTED_PROMPT_SET).name
+        return requirements_prompt_builder(docs), prompt_set, True
+    from secreqgen.application.prompt_sets import is_tested
+    from secreqgen.generation import SecurityRequirementsPromptBuilder
+
+    builder = SecurityRequirementsPromptBuilder(prompts_dir=prompts_dir)
+    return builder, f"user:{prompts_dir.name}", is_tested("requirements", prompts_dir)
 
 
 def build_requirements_generator(llm_client, retriever, prompt_builder):
@@ -288,12 +312,7 @@ def run_requirements(
         raise NothingToDoError("No user stories found in input file.")
     stories, skipped = build_user_stories(stories_data)
     if options.story_ids is not None:
-        known = {story.id for story in stories}
-        for story_id in options.story_ids:
-            if story_id not in known:
-                raise InputError(f"Story not found in the input file: {story_id}")
-        wanted = set(options.story_ids)
-        stories = [story for story in stories if story.id in wanted]
+        stories = select_story_ids(stories, options.story_ids)
         if not stories:
             raise NothingToDoError("No user stories found in input file.")
     if options.model is not None and not options.model.strip():
@@ -357,23 +376,9 @@ def run_requirements(
                 cfg, mode, docs=docs, product=product
             )
 
-        prompt_set = ""
-        tested_prompts = True
-        if options.prompts_dir is None:
-            prompt_builder = requirements_prompt_builder(options.docs)
-            if options.docs is not None:
-                from secreqgen.generation.prompt_sets import TESTED_PROMPT_SET
-
-                prompt_set = Path(TESTED_PROMPT_SET).name
-        else:
-            from secreqgen.application.prompt_sets import is_tested
-            from secreqgen.generation import SecurityRequirementsPromptBuilder
-
-            prompt_builder = SecurityRequirementsPromptBuilder(
-                prompts_dir=options.prompts_dir
-            )
-            prompt_set = f"user:{options.prompts_dir.name}"
-            tested_prompts = is_tested("requirements", options.prompts_dir)
+        prompt_builder, prompt_set, tested_prompts = choose_requirements_prompts(
+            options.docs, options.prompts_dir
+        )
         generator = build_requirements_generator(llm_client, retriever, prompt_builder)
         if on_step is not None:
             from secreqgen.application.steps import watch_requirements_generator

@@ -534,11 +534,14 @@ async def test_the_dialog_shows_the_command_for_its_fields(user, tmp_path, job):
     product = _field(user, "about-product")
     product.set_value("")
     await asyncio.sleep(0.3)
-    assert _command_texts(user) == [f"secreqgen generate about {code}"]
+    # The model is always in the command, also the tested one.
+    assert _command_texts(user) == [
+        f"secreqgen generate about {code} --model gemma4:26b"
+    ]
     product.set_value("Acme Chat")
     await asyncio.sleep(0.3)
     assert _command_texts(user) == [
-        f"secreqgen generate about {code} --product 'Acme Chat'"
+        f"secreqgen generate about {code} --model gemma4:26b --product 'Acme Chat'"
     ]
     _field(user, "about-folder").set_value("")
     await asyncio.sleep(0.3)
@@ -554,7 +557,8 @@ async def test_the_command_follows_the_settings(user, tmp_path, job):
     job()
     code = await _open_dialog(user, tmp_path)
     await asyncio.sleep(0.3)
-    assert "SECREQGEN_LLM_BASE_URL" not in _command_texts(user)[0]
+    # The default address: no variable in front.
+    assert _command_texts(user)[0].startswith("secreqgen generate about ")
     save_settings(
         dataclasses.replace(jobs.load_settings(), base_url="http://10.1.1.1:11434")
     )

@@ -185,27 +185,6 @@ def _threat_summary(outcome: Any, checked: bool) -> str:
     return ", ".join(parts)
 
 
-SUBSET_LINE = "The command runs all {total} stories, not your {picked}."
-PROMPT_LINE = "The command uses the tested prompts, not your set."
-RUN_PROMPT_LINE = "The command uses the tested prompts, not the set of this run."
-
-
-def _plain(value: Any) -> Any:
-    """Return the value with only what JSON can write.
-
-    A YAML file can hold dates and other values that JSON cannot write. The
-    command line reads such a file as it is, so the copy must keep it
-    readable. A key becomes text. A date or any other value becomes text.
-    """
-    if isinstance(value, dict):
-        return {str(key): _plain(item) for key, item in value.items()}
-    if isinstance(value, list | tuple | set | frozenset):
-        return [_plain(item) for item in value]
-    if value is None or isinstance(value, str | int | float | bool):
-        return value
-    return str(value)
-
-
 def absolute(path: str | Path) -> Path:
     """Return the path made absolute against the folder of the GUI.
 
@@ -233,6 +212,24 @@ def project_key_is_text(path: Path) -> bool:
     return data.get("project") is None or isinstance(data.get("project"), str)
 
 
+def prompt_set_folder(kind: str, name: str | None) -> Path | None:
+    """Return the folder of a prompt set of the person. None: the tested prompts.
+
+    A run and the command of a run both get their folder from here. It raises
+    RunFailedError when the name is not allowed or the folder is not there.
+    """
+    if name is None:
+        return None
+    if not _SET_NAME.match(name):
+        raise RunFailedError(
+            "Name not allowed. Use lowercase letters, digits, hyphens, underscores."
+        )
+    folder = storage.prompt_sets_dir() / kind / name
+    if not folder.is_dir():
+        raise RunFailedError(f"The prompt set {name} does not exist.")
+    return absolute(folder)
+
+
 def command_for_threats(
     spec: ThreatRunSpec,
     *,
@@ -243,10 +240,15 @@ def command_for_threats(
 ):
     """Return the command that gives the run of a threat list spec.
 
-    The values come from the spec, the same values that a run gets.
+    The values come from the spec, the same values that a run gets. It returns
+    None when the prompt set of the spec is not there: the run would fail.
     """
     from secreqgen.application.commands import threat_command
 
+    try:
+        prompts_dir = prompt_set_folder("threats", spec.prompt_set)
+    except RunFailedError:
+        return None
     return threat_command(
         stories_file=absolute(spec.stories_file),
         docs=absolute(spec.docs),
@@ -259,7 +261,7 @@ def command_for_threats(
         checker_model=spec.checker_model if spec.check else None,
         labels=spec.labels,
         about_file=about_file,
-        prompt_set=spec.prompt_set,
+        prompts_dir=prompts_dir,
         other_formats=spec.other_formats,
         base_url=base_url,
     )
@@ -276,10 +278,15 @@ def command_for_requirements(
 
     default_product is the product name of the stories file. Give None when
     the key project of the file is not text (see project_key_is_text), so
-    that the command names the product.
+    that the command names the product. It returns None when the prompt set
+    of the spec is not there: the run would fail.
     """
     from secreqgen.application.commands import requirements_command
 
+    try:
+        prompts_dir = prompt_set_folder("requirements", spec.prompt_set)
+    except RunFailedError:
+        return None
     return requirements_command(
         stories_file=absolute(spec.stories_file),
         docs=absolute(spec.docs),
@@ -289,31 +296,23 @@ def command_for_requirements(
         story_ids=spec.story_ids,
         model=spec.model,
         system_context=(absolute(spec.system_context) if spec.system_context else None),
-        prompt_set=spec.prompt_set,
+        prompts_dir=prompts_dir,
         other_formats=spec.other_formats,
         base_url=base_url,
     )
 
 
-def command_lines(command: Any, *, picked: int, total: int) -> list[str]:
-    """Return the lines under a command of a form: what it cannot do."""
-    lines = []
-    if "stories_subset" in command.differences:
-        lines.append(SUBSET_LINE.format(picked=picked, total=total))
-    if "prompt_set" in command.differences:
-        lines.append(PROMPT_LINE)
-    return lines
-
-
 def stored_run_command(run_id: str, manifest: dict | None):
-    """Return (command, lines) for a stored run, or None when it is not known.
+    """Return the command of a stored run, or None when it is not known.
 
-    The command reads the copy of the story file in the folder of the run. It
-    reads files, so a page calls it off the event loop. A run that the command
-    cannot give gets no command, because a command that does something else
-    is not shown. That is the case for a run of some stories that kept the
-    whole file, for an old run whose paragraph or context file is not known,
-    and for a run with a relative path.
+    The command reads the copy of the story file in the folder of the run. The
+    copy is the whole file, so a run of some stories names them with
+    --story-id. A run of today that kept only its stories needs no option.
+    It reads files, so a page calls it off the event loop. A run that the
+    command cannot give gets no command, because a command that does
+    something else is not shown. That is the case for a run whose prompt set
+    is gone, for an old run whose paragraph or context file is not known, and
+    for a run with a relative path.
     """
     from secreqgen.application.commands import (
         requirements_command,
@@ -335,19 +334,33 @@ def stored_run_command(run_id: str, manifest: dict | None):
         stories = folder / "stories.json"
     if not stories.is_file():
         return None
+    ids = [str(i) for i in manifest.get("story_ids") or []]
+    have: set[str] | None = None
     try:
         found = read_story_file(stories)
         default_product, total = found.project, len(found.stories)
+        have = {story.id for story in found.stories}
     except Exception:  # noqa: BLE001 - an old file: build what is known
+        if ids:
+            return None  # the stories of the file are not known
         default_product, total = None, int(manifest.get("stories_total") or 0)
     if not threats and not project_key_is_text(stories):
         default_product = None  # the command must name the product
-    ids = [str(i) for i in manifest.get("story_ids") or []]
-    # An old run kept the whole file. A new run keeps only its stories.
-    chosen = tuple(ids) if ids and total > len(ids) else None
+    chosen = None
+    if ids and total > len(set(ids)):
+        # The copy holds more stories than the run: the command names them.
+        if have is None or not set(ids) <= have:
+            return None  # an id that the file lacks: the command would fail
+        chosen = tuple(ids)
     prompt = manifest.get("prompt_set")
-    own = isinstance(prompt, dict) and not prompt.get("tested", True)
-    set_name = str(prompt.get("name") or "set") if own else None
+    prompts_dir = None
+    if isinstance(prompt, dict) and not prompt.get("tested", True):
+        try:
+            prompts_dir = prompt_set_folder(
+                manifest["kind"], str(prompt.get("name") or "")
+            )
+        except RunFailedError:
+            return None  # the set is gone: the command could not give this run
     base_url = str(manifest.get("server") or "").strip() or load_settings().base_url
     common = {
         "stories_file": stories,
@@ -356,7 +369,7 @@ def stored_run_command(run_id: str, manifest: dict | None):
         "default_product": default_product,
         "total_stories": total,
         "story_ids": chosen,
-        "prompt_set": set_name,
+        "prompts_dir": prompts_dir,
         "other_formats": bool(manifest.get("other_formats")),
         "base_url": base_url,
     }
@@ -377,7 +390,7 @@ def stored_run_command(run_id: str, manifest: dict | None):
                 storage.write_run_about(run_id, text)
         checker = str(manifest.get("checker") or "")
         check = bool(manifest.get("check", True)) and bool(checker)
-        command = threat_command(
+        return threat_command(
             **common,
             writer_model=writer,
             check=check,
@@ -385,25 +398,20 @@ def stored_run_command(run_id: str, manifest: dict | None):
             labels=bool(manifest.get("labels", True)),
             about_file=about_file,
         )
-    else:
-        model = str(manifest.get("model") or "")
-        if not model:
-            return None
-        if "system_context" not in manifest:
-            return None  # an old run: it does not say if it had a context file
-        context = manifest.get("system_context")
-        context = context if isinstance(context, str) and context.strip() else None
-        if context and not Path(context).is_absolute():
-            return None  # the folder that the run started in is not known
-        command = requirements_command(
-            **common,
-            model=model,
-            system_context=Path(context) if context else None,
-        )
-    if "stories_subset" in command.differences:
+    model = str(manifest.get("model") or "")
+    if not model:
         return None
-    lines = [RUN_PROMPT_LINE] if "prompt_set" in command.differences else []
-    return command, lines
+    if "system_context" not in manifest:
+        return None  # an old run: it does not say if it had a context file
+    context = manifest.get("system_context")
+    context = context if isinstance(context, str) and context.strip() else None
+    if context and not Path(context).is_absolute():
+        return None  # the folder that the run started in is not known
+    return requirements_command(
+        **common,
+        model=model,
+        system_context=Path(context) if context else None,
+    )
 
 
 class JobManager:
@@ -647,31 +655,10 @@ class JobManager:
         items = data.get("user_stories") if isinstance(data, dict) else None
         if not isinstance(items, list):
             raise RunFailedError("The stories file needs a list named user_stories.")
-        stories, skipped = build_user_stories(items)
+        stories, _skipped = build_user_stories(items)
         if spec.story_ids:
             wanted = set(spec.story_ids)
-            everything = len(stories)
             stories = [s for s in stories if s.id in wanted]
-            if stories and len(stories) < everything:
-                # The copy holds only the stories of the run. So the command
-                # of the run page, with this file, gives the same run. A copy
-                # that cannot be made must not stop the run: the whole file
-                # stays, and the run page then shows no command for the run.
-                try:
-                    copy_path = self._chosen_copy(
-                        folder, copy_path, data, items, wanted
-                    )
-                except Exception:  # noqa: BLE001 - the copy serves only the command
-                    pass
-                else:
-                    # The run reads the copy, which has no entry that is not
-                    # valid. The record of the run still names the entries
-                    # of the file that were skipped (see _end_of_loop).
-                    manifest["skipped"] = [
-                        {"position": position, "message": str(error)}
-                        for position, error in skipped
-                    ]
-                manifest["stories_file"] = copy_path.name
         if not stories:
             raise RunFailedError("The stories file has no story to run.")
         about = getattr(spec, "about", None)
@@ -684,48 +671,6 @@ class JobManager:
             self._state.stories = [StoryState(s.id, s.title) for s in stories]
             self._bump()
         return copy_path
-
-    @staticmethod
-    def _chosen_copy(
-        folder: Path, copy_path: Path, data: dict, items: list, wanted: set
-    ) -> Path:
-        """Replace the copy of the story file by one with the chosen stories.
-
-        The new file is JSON and keeps the other keys of the file. An entry
-        with no id keeps the id that the run gave it. It raises when the copy
-        cannot be made with the same product name. The caller then keeps the
-        whole file.
-        """
-        from secreqgen.application.inputs import build_user_stories
-
-        project = data.get("project")
-        if _plain(project) != project or type(_plain(project)) is not type(project):
-            # JSON would change the product name of the file (a YAML date
-            # becomes text). The run must read what the file holds.
-            raise ValueError("the key project cannot be written as JSON")
-        kept = []
-        for position, item in enumerate(items, start=1):
-            built, _skipped = build_user_stories([item])
-            if not built:
-                continue
-            story_id = built[0].id if "id" in item else f"US-{position:03d}"
-            if story_id in wanted:
-                kept.append({**item, "id": story_id})
-        target = folder / "stories.json"
-        text = json.dumps(
-            _plain({**data, "user_stories": kept}), indent=2, ensure_ascii=False
-        )
-        # The new file takes the place of the copy in one step, so a write
-        # that fails leaves the copy as it was.
-        temp = folder / "stories.json.tmp"
-        try:
-            temp.write_text(text + "\n", encoding="utf-8")
-            temp.replace(target)
-        finally:
-            temp.unlink(missing_ok=True)
-        if target != copy_path:
-            copy_path.unlink(missing_ok=True)
-        return target
 
     @staticmethod
     def _expect_formats(manifest: dict, spec: Any) -> None:
@@ -753,17 +698,7 @@ class JobManager:
             raise RunFailedError(" ".join(problems))
 
     def _prompts_dir(self, kind: str, spec: Any) -> Path | None:
-        if spec.prompt_set is None:
-            return None
-        if not _SET_NAME.match(spec.prompt_set):
-            raise RunFailedError(
-                "Name not allowed. "
-                "Use lowercase letters, digits, hyphens, underscores."
-            )
-        folder = storage.prompt_sets_dir() / kind / spec.prompt_set
-        if not folder.is_dir():
-            raise RunFailedError(f"The prompt set {spec.prompt_set} does not exist.")
-        return folder
+        return prompt_set_folder(kind, spec.prompt_set)
 
     def _hooks(self, run_id: str, manifest: dict, checked: bool):
         """Return the four callbacks of a run function."""
@@ -889,14 +824,10 @@ class JobManager:
             manifest.pop("docs_formats", None)
         aborted = getattr(result, "aborted", None)
         stopped = bool(getattr(result, "stopped", False))
-        found = [
+        manifest["skipped"] = [
             {"position": position, "message": str(exc)}
             for position, exc in getattr(result, "skipped", None) or []
         ]
-        if found or not manifest.get("skipped"):
-            # A run of some stories noted the skipped entries of the file at
-            # its start (see _prepare). Its copy has none, so keep the note.
-            manifest["skipped"] = found
         if aborted is not None:
             self._finish(
                 run_id,

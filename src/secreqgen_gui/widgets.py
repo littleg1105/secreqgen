@@ -8,7 +8,7 @@ ui.markdown, ui.code or raw HTML.
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from pathlib import Path
 
 from nicegui import ui
@@ -99,16 +99,15 @@ COPIED = "Copied."
 
 
 class CommandBlock:
-    """Show the command of a run, a link that copies it and its differences.
+    """Show the command of a run and a link that copies it.
 
-    The command and the lines are plain text elements. Call show() each time
-    the command can change. With titled False the block has no label: the
-    caller shows the title, for example as the head of an expansion.
+    The command is a plain text element. Call show() each time the command
+    can change. With titled False the block has no label: the caller shows
+    the title, for example as the head of an expansion.
     """
 
     def __init__(self, *, titled: bool = True, mark: str = "command-block") -> None:
         self.text = ""
-        self._lines: tuple[str, ...] = ()
         self.box = ui.column().classes("w-full gap-1 min-w-0").mark(mark)
         with self.box:
             with ui.row().classes("items-baseline gap-3"):
@@ -126,7 +125,6 @@ class CommandBlock:
                 .style("overflow-wrap:anywhere;min-width:0")
                 .mark("command-text")
             )
-            self.notes = ui.column().classes("w-full gap-0")
         self.box.set_visibility(False)
 
     def copy(self) -> None:
@@ -135,8 +133,8 @@ class CommandBlock:
             ui.clipboard.write(self.text)
             ui.notify(COPIED)
 
-    def show(self, command, lines: Sequence[str] = ()) -> None:
-        """Show a command with its lines. None hides the block."""
+    def show(self, command) -> None:
+        """Show a command. None hides the block."""
         if command is None:
             self.text = ""
             self.box.set_visibility(False)
@@ -145,15 +143,6 @@ class CommandBlock:
         if text != self.text:
             self.text = text
             self.code.set_text(text)
-        shown = tuple(lines)
-        if shown != self._lines:
-            self._lines = shown
-            self.notes.clear()
-            with self.notes:
-                for line in shown:
-                    ui.label(line).classes("sr-small").style(
-                        "color: var(--sr-caution)"
-                    ).mark("command-note")
         self.box.set_visibility(True)
 
 

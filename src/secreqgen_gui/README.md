@@ -46,20 +46,15 @@ Under the Start button of each form, the block "Command" shows the command of `s
 
 The GUI does not run this command. The GUI and the command call the same code. A test compares the two: the models get the same prompts from the command and from the GUI.
 
-The command line cannot do two things that the GUI can do. Then the block says so in one line.
-
-| In the GUI | In the command |
-|---|---|
-| You pick some of the stories | `generate threats` takes one story (`--story-id`) or all stories. `generate requirements` takes all stories. |
-| You use a prompt set of your own | The command uses the tested prompts. |
+The command is exact. The stories that you pick are one `--story-id` each. The models are `--model` and `--checker-model`. A prompt set of your own is `--prompts-dir` with the folder of that set. A command with `--prompts-dir` is outside the tested setup, as the run is.
 
 More facts:
 
-- An option shows only when it differs from the default of the command line. A run with the tested models and all stories gives a short command.
-- `generate requirements` has no option for the model. The model is the variable `SECREQGEN_LLM_MODEL_NAME` in front of the command. An Ollama address that is not the default is the variable `SECREQGEN_LLM_BASE_URL`.
+- The models are always in the command, as options. So the variable `SECREQGEN_LLM_MODEL_NAME` in your terminal cannot change them. The address of Ollama shows only when it is not the default (`http://localhost:11434`): then it is the variable `SECREQGEN_LLM_BASE_URL` in front of the command. A terminal that sets `SECREQGEN_LLM_BASE_URL` keeps its own address for a command that has none. The options `--product`, `--no-labels`, `--other-formats`, `--context` and `--about-file` show only when they differ from the default of the command line. The GUI sets nothing else of the model settings (for example `SECREQGEN_LLM_NUM_CTX` or `SECREQGEN_LLM_TIMEOUT`). The command and the GUI read those from the variables of their own process, so keep them the same in both.
 - The paragraph "About the product" goes to the command as a file (`--about-file`). The GUI writes the paragraph of an open form into the folder `about` of the data folder, a moment after you stop typing. Each text has its own file, so a command stays true when you change the paragraph later. The GUI removes these files at its next start. The paragraph of a run is in the folder of the run (`about.txt`).
-- A run of some stories keeps a copy of only those stories in its folder. So the command on the page of the run starts exactly that run.
-- The page of a run shows no command when the GUI cannot know it. Examples: a requirements run of an older version of the GUI (it did not store if the run had a system context file), and a run of several stories of an older version.
+- A run keeps the whole stories file in its folder. The command on the page of a run names the stories of the run with `--story-id`. A run of an older version of the GUI that kept only its stories needs no story option.
+- A run with a prompt set of your own shows `--prompts-dir` with the folder of that set. When the folder is gone, the page shows no command.
+- The page of a run shows no command when the GUI cannot know it. Examples: a requirements run of an older version of the GUI (it did not store if the run had a system context file), and a run of a prompt set that you deleted.
 - The command writes its result where the command line writes it by default: `generate threats` into the folder `threat_lists` in the current folder, `generate requirements` and `generate context` to the screen. Add `--output` to change that.
 - The command starts with `secreqgen`. When this name is not on your path, use `.venv/bin/python -m secreqgen` in its place (see the README of the tool).
 

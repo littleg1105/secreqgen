@@ -119,6 +119,37 @@ def generate_requirements(
             ),
         ),
     ] = False,
+    story_id: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--story-id",
+            help=(
+                "Write the requirements of these stories only. Give the option "
+                "one time for each story"
+            ),
+        ),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help=(
+                "The model that writes the requirements. Default: the setting "
+                "SECREQGEN_LLM_MODEL_NAME"
+            ),
+        ),
+    ] = None,
+    prompts_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--prompts-dir",
+            help=(
+                "Folder with your own prompt files, in place of the tested "
+                "prompts. Outside the tested setup"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Generate security requirements from user stories.
 
@@ -138,14 +169,16 @@ def generate_requirements(
         check_input_file,
         read_story_data,
     )
+    from secreqgen.application.prompt_sets import check_prompt_folder
     from secreqgen.application.requirements import (
         build_requirements_generator,
         build_requirements_retriever,
+        choose_requirements_prompts,
         format_requirements,
         generate_for_stories,
         requirements_format,
-        requirements_prompt_builder,
     )
+    from secreqgen.application.threats import select_story_ids
     from secreqgen.exceptions import LLMConnectionError
     from secreqgen.generation import GenerationMode
     from secreqgen.retrieval.word_search import SearchError
@@ -215,6 +248,18 @@ def generate_requirements(
 
     console.print(f"[green]✓[/green] Loaded {len(user_stories)} user stories")
 
+    # The same checks, in the same order, as run_requirements.
+    try:
+        if story_id:
+            user_stories = select_story_ids(user_stories, story_id)
+        if model is not None and not model.strip():
+            raise InputError("The model name is empty.")
+        if prompts_dir is not None:
+            check_prompt_folder("requirements", prompts_dir)
+    except InputError as e:
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(1)
+
     # Load optional system context from file
     system_context = None
     if context:
@@ -259,7 +304,12 @@ def generate_requirements(
                 progress.add_task("Initializing components...", total=None)
 
                 # Initialize LLM client
-                llm_client = _client(cfg, tested_setup=docs is not None)
+                if model is None:
+                    llm_client = _client(cfg, tested_setup=docs is not None)
+                else:
+                    llm_client = _client(
+                        cfg, tested_setup=docs is not None, model_name=model.strip()
+                    )
 
                 # Check Ollama connection
                 if not llm_client.check_health():
@@ -281,7 +331,10 @@ def generate_requirements(
                 )
 
                 # Initialize generator. With --docs the prompt is the tested prompt set.
-                prompt_builder = requirements_prompt_builder(docs)
+                # With --prompts-dir it is the set of the person.
+                prompt_builder, _prompt_set, _tested = choose_requirements_prompts(
+                    docs, prompts_dir
+                )
                 generator = build_requirements_generator(
                     llm_client, retriever, prompt_builder
                 )
@@ -508,8 +561,14 @@ def generate_threats(
         typer.Option("--product", help="Name of the product (default: key 'project')"),
     ] = None,
     story_id: Annotated[
-        Optional[str],
-        typer.Option("--story-id", help="Write the threat list of this story only"),
+        list[str] | None,
+        typer.Option(
+            "--story-id",
+            help=(
+                "Write the threat list of these stories only. Give the option "
+                "one time for each story"
+            ),
+        ),
     ] = None,
     labels: Annotated[
         bool,
@@ -571,6 +630,16 @@ def generate_threats(
             ),
         ),
     ] = False,
+    prompts_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--prompts-dir",
+            help=(
+                "Folder with your own prompt files, in place of the tested "
+                "prompts. Outside the tested setup"
+            ),
+        ),
+    ] = None,
     output: Annotated[
         Path,
         typer.Option("--output", "-o", help="Output folder"),
@@ -591,10 +660,13 @@ def generate_threats(
         check_input_file,
         read_story_data,
     )
+    from secreqgen.application.prompt_sets import check_prompt_folder
     from secreqgen.application.threats import (
+        ThreatOptions,
+        build_threat_generator,
         real_file_names,
         resolve_threat_models,
-        select_stories,
+        select_story_ids,
         summarise_threat_list,
         threat_folder_name,
         threat_product_name,
@@ -602,7 +674,7 @@ def generate_threats(
     )
     from secreqgen.exceptions import GenerationError, LLMConnectionError
     from secreqgen.retrieval.word_search import SearchError
-    from secreqgen.threats import ThreatListError, ThreatListGenerator
+    from secreqgen.threats import ThreatListError
     from secreqgen.threats.pipeline import DRAFT_NOTICE
 
     try:
@@ -620,10 +692,11 @@ def generate_threats(
     user_stories, skipped = build_user_stories(data.get("user_stories", []) or [])
     for number, e in skipped:
         console.print(f"[yellow]Warning: Skipping invalid story {number}: {e}[/yellow]")
-    if story_id is not None:
-        user_stories = select_stories(user_stories, story_id)
-        if not user_stories:
-            console.print(f"[red]Error:[/red] Story not found in the input file: {story_id}")
+    if story_id:
+        try:
+            user_stories = select_story_ids(user_stories, story_id)
+        except InputError as e:
+            console.print(f"[red]Error:[/red] {escape(str(e))}")
             raise typer.Exit(1)
     if not user_stories:
         console.print("[yellow]No user stories found in input file.[/yellow]")
@@ -631,6 +704,12 @@ def generate_threats(
 
     product_name = threat_product_name(product, data)
     cfg = get_config()
+    if prompts_dir is not None:
+        try:
+            check_prompt_folder("threats", prompts_dir)
+        except InputError as e:
+            console.print(f"[red]Error:[/red] {escape(str(e))}")
+            raise typer.Exit(1)
     try:
         writer_name, checker_name = resolve_threat_models(
             cfg, writer_model, checker_model, check
@@ -699,18 +778,24 @@ def generate_threats(
                         f"[red]Error:[/red] The file has no text: {about_name}"
                     )
                     raise typer.Exit(1)
-            generator = ThreatListGenerator(
+            generator = build_threat_generator(
+                ThreatOptions(
+                    input_file=input_file,
+                    docs=docs,
+                    labels=labels,
+                    prompts_dir=prompts_dir,
+                ),
                 llm_client,
+                checker,
+                product_name,
+                about,
+                False,
                 search_docs,
-                product=product_name,
-                name_labels=labels,
-                checker=checker,
-                about=about,
             )
         except LLMConnectionError as e:
             console.print(f"[red]LLM Connection Error:[/red] {e}")
             raise typer.Exit(1)
-        except (SearchError, ThreatListError) as e:
+        except (SearchError, ThreatListError, InputError) as e:
             console.print(f"[red]Error:[/red] {escape(str(e))}")
             raise typer.Exit(1)
 

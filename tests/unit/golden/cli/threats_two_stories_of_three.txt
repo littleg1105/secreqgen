@@ -1,0 +1,381 @@
+exit=0
+Writer: gemma4:26b. Checker: none (--no-check).
+✓ US-1: 2 rows (1 attacks, 1 rules), 2 with no weak sign, 0 removed by the script, 1 calls, <N> s
+✓ US-3: 2 rows (1 attacks, 1 rules), 2 with no weak sign, 0 removed by the script, 1 calls, <N> s
+
+DRAFT for a person to check. Each row comes from one sentence of the product documentation. The list holds only what the documentation states. It is not a complete threat model.
+
+--- file out/US-1/threats.json
+{
+  "draft_notice": "DRAFT for a person to check. Each row comes from one sentence of the product documentation. The list holds only what the documentation states. It is not a complete threat model.",
+  "prompt_set": "threats_v5b_labels",
+  "product": "demo",
+  "model": "gemma4:26b",
+  "story": {
+    "id": "US-1",
+    "title": "Session timeout",
+    "story": "As an operator, I want sessions to end after idle time.",
+    "acceptance_criteria": [
+      "The session ends after a time with no activity."
+    ]
+  },
+  "seconds": <N>,
+  "calls": [
+    {
+      "group": 1,
+      "passages": 2,
+      "attempts": 1,
+      "ok": true,
+      "seconds": <N>
+    }
+  ],
+  "label_step": true,
+  "about": null,
+  "checker": null,
+  "extra_passages": 0,
+  "passages": [
+    {
+      "ref": "P1",
+      "header": "sessions.md > Sessions > Idle timeout",
+      "text": "### [1] sessions.md > Sessions > Idle timeout (Relevance: 0.50)\nSection: Sessions > Idle timeout\n\nSet `session-idle-timeout` to end a session after a time with no activity.\n\nAn attacker who steals the session cookie can use the session until the idle timeout ends it.",
+      "group": 1
+    },
+    {
+      "ref": "P2",
+      "header": "sessions.md > Sessions > Cookies",
+      "text": "### [2] sessions.md > Sessions > Cookies (Relevance: 0.50)\nSection: Sessions > Cookies\n\nThe session cookie must have the Secure flag.",
+      "group": 1
+    }
+  ],
+  "rows": [
+    {
+      "id": "T1",
+      "type": "attack",
+      "threat": "An attacker who steals the session cookie can use it.",
+      "harm": "access with no permission",
+      "story_part": "The session ends after a time with no activity.",
+      "source": "P1",
+      "quote": "An attacker who steals the session cookie can use the session until the idle timeout ends it.",
+      "requirement": "Set `session-idle-timeout`.",
+      "from_extra_group": false,
+      "actor": "external_individual",
+      "stride": "E",
+      "weak_signs": [],
+      "second_model": ""
+    },
+    {
+      "id": "T2",
+      "type": "rule",
+      "threat": "The session cookie is sent with no Secure flag.",
+      "harm": "",
+      "story_part": "",
+      "source": "P2",
+      "quote": "The session cookie must have the Secure flag.",
+      "requirement": "Keep the Secure flag on the session cookie.",
+      "from_extra_group": false,
+      "actor": "privileged_insider",
+      "stride": "I",
+      "weak_signs": [],
+      "second_model": ""
+    }
+  ],
+  "dropped": []
+}
+--- file out/US-3/threats.json
+{
+  "draft_notice": "DRAFT for a person to check. Each row comes from one sentence of the product documentation. The list holds only what the documentation states. It is not a complete threat model.",
+  "prompt_set": "threats_v5b_labels",
+  "product": "demo",
+  "model": "gemma4:26b",
+  "story": {
+    "id": "US-3",
+    "title": "Session timeout",
+    "story": "As an operator, I want sessions to end after idle time.",
+    "acceptance_criteria": [
+      "The session ends after a time with no activity."
+    ]
+  },
+  "seconds": <N>,
+  "calls": [
+    {
+      "group": 1,
+      "passages": 2,
+      "attempts": 1,
+      "ok": true,
+      "seconds": <N>
+    }
+  ],
+  "label_step": true,
+  "about": null,
+  "checker": null,
+  "extra_passages": 0,
+  "passages": [
+    {
+      "ref": "P1",
+      "header": "sessions.md > Sessions > Idle timeout",
+      "text": "### [1] sessions.md > Sessions > Idle timeout (Relevance: 0.50)\nSection: Sessions > Idle timeout\n\nSet `session-idle-timeout` to end a session after a time with no activity.\n\nAn attacker who steals the session cookie can use the session until the idle timeout ends it.",
+      "group": 1
+    },
+    {
+      "ref": "P2",
+      "header": "sessions.md > Sessions > Cookies",
+      "text": "### [2] sessions.md > Sessions > Cookies (Relevance: 0.50)\nSection: Sessions > Cookies\n\nThe session cookie must have the Secure flag.",
+      "group": 1
+    }
+  ],
+  "rows": [
+    {
+      "id": "T1",
+      "type": "attack",
+      "threat": "An attacker who steals the session cookie can use it.",
+      "harm": "access with no permission",
+      "story_part": "The session ends after a time with no activity.",
+      "source": "P1",
+      "quote": "An attacker who steals the session cookie can use the session until the idle timeout ends it.",
+      "requirement": "Set `session-idle-timeout`.",
+      "from_extra_group": false,
+      "actor": "external_individual",
+      "stride": "E",
+      "weak_signs": [],
+      "second_model": ""
+    },
+    {
+      "id": "T2",
+      "type": "rule",
+      "threat": "The session cookie is sent with no Secure flag.",
+      "harm": "",
+      "story_part": "",
+      "source": "P2",
+      "quote": "The session cookie must have the Secure flag.",
+      "requirement": "Keep the Secure flag on the session cookie.",
+      "from_extra_group": false,
+      "actor": "privileged_insider",
+      "stride": "I",
+      "weak_signs": [],
+      "second_model": ""
+    }
+  ],
+  "dropped": []
+}
+--- calls
+_ollama_client(model_name='gemma4:26b', tested_setup=True)
+--- prompts
+[1] gemma4:26b generate(format='json')
+system_prompt:
+You are a security engineer. You write a short list of threats for one user story of a software product. A person will check each row against its source.
+
+The documentation passages and the user story in the prompt are your only sources of facts about this product. Do not use what you remember about the product: your memory can be wrong, or it can describe a different version. A wrong statement about the product is worse than no statement, because the person loses time when they follow it.
+
+Rules for the passages:
+- A quote is a copy of words from one passage, character for character. Do not change a word in a quote.
+- A name that a passage shows with no description (a heading or a list entry) proves only that the name exists.
+- Template markup (for example text in braces or in tags) is not a part of the product.
+
+Always respond with valid JSON in the given form.
+
+prompt:
+## Documentation passages
+The passages below come from the documentation of the product. The name in square brackets in the header of a passage is its source name, for example P3.
+
+### [P1] sessions.md > Sessions > Idle timeout
+Section: Sessions > Idle timeout
+
+Set `session-idle-timeout` to end a session after a time with no activity.
+
+An attacker who steals the session cookie can use the session until the idle timeout ends it.
+
+---
+
+### [P2] sessions.md > Sessions > Cookies
+Section: Sessions > Cookies
+
+The session cookie must have the Secure flag.
+
+---
+
+## User story
+**Title:** Session timeout
+
+**Story:** As an operator, I want sessions to end after idle time.
+
+**Acceptance criteria:**
+- The session ends after a time with no activity.
+
+## Task
+Step 1. For each passage write:
+- fits_story: "yes", "partly" or "no".
+- statements: the security statements of the passage that are about the setup and the feature of this user story. Copy each one as an exact quote, 30 words at most. Most passages have none: then write [].
+
+A security statement is one of these two:
+- attack: the passage says what an attacker can do, or what goes wrong for security.
+- rule: the passage says what must be done, or what must not be done, to stay secure.
+These are not security statements: a sentence that only says how a feature works, what a field holds or which option exists; an example of a command; a statement about a mode, an option or a part that this user story does not use.
+
+Step 2. For each statement of step 1 write one row:
+- type: "attack" or "rule".
+- threat: one sentence. For an attack: who can do what, in the words of the passage. For a rule: the breach of the rule, which means who does what the rule forbids, or who does not do what the rule demands. Add the result only if the passage states it.
+- harm: what is lost. One of: "disclosure of data", "change of data", "false identity", "access with no permission", "loss of service", "no record of actions", "not stated". Write "not stated" when the passage does not show it.
+- story_part: the words of the user story or of its acceptance criteria that this row is about, as an exact copy, 15 words at most.
+- requirement: one sentence that stops the threat, for the part that this user story builds or sets up. Use only names and values that the passage gives.
+Do not add a result, a parameter, a role or a step that the passage does not state.
+
+When step 1 finds no security statement, "rows" is an empty list. That is a correct answer.
+
+## Answer form
+{
+ "passages": [
+  {"source": "<source name>", "fits_story": "<yes, partly or no>", "statements": ["<exact words of the passage>"]}
+ ],
+ "rows": [
+  {"source": "<source name>", "quote": "<one statement of step 1, exact words>", "type": "<attack or rule>", "threat": "<one sentence>", "harm": "<one value of the list>", "story_part": "<exact words of the user story>", "requirement": "<one sentence>"}
+ ]
+}
+
+Respond only with the JSON object. Do not include any text before or after it.
+
+
+[2] gemma4:26b generate()
+system_prompt:
+(none)
+prompt:
+Task: choose a threat actor and a STRIDE category for each threat.
+
+User story: Session timeout. As an operator, I want sessions to end after idle time.
+
+Threats (each has a number):
+1. An attacker who steals the session cookie can use it.
+2. The session cookie is sent with no Secure flag.
+
+For each threat choose two values.
+
+The threat actor: who would most likely cause the threat. One value of this list:
+- external_individual: one person outside the organisation that runs the system
+- external_group: persons outside the organisation who work together, for example a criminal group
+- external_organization: a different organisation with a connection to the system, for example a partner, a supplier or a competitor
+- nation_state: a government or an agency of a state
+- trusted_insider: a person with ordinary access, for example an employee or a member
+- privileged_insider: a person with administrator or operator rights
+- accidental_actor: a user or an administrator who causes harm by mistake
+- other: none of these fits
+
+The STRIDE category: what the threat does to security. One letter of this list:
+- S (spoofing): somebody uses a false identity
+- T (tampering): data or code is changed with no permission
+- R (repudiation): somebody can deny an action, because there is no record of it
+- I (information disclosure): data is shown to somebody who must not see it
+- D (denial of service): the service stops or becomes too slow
+- E (elevation of privilege): somebody gets rights or access that they must not have
+- none: the sentence is no security threat, for example a feature that does not work or a plain fact about the product
+
+Answer with one line for each threat and nothing else: the number, a colon, the actor, a comma and the STRIDE value. Example: 1: external_individual, S
+
+
+[3] gemma4:26b generate(format='json')
+system_prompt:
+You are a security engineer. You write a short list of threats for one user story of a software product. A person will check each row against its source.
+
+The documentation passages and the user story in the prompt are your only sources of facts about this product. Do not use what you remember about the product: your memory can be wrong, or it can describe a different version. A wrong statement about the product is worse than no statement, because the person loses time when they follow it.
+
+Rules for the passages:
+- A quote is a copy of words from one passage, character for character. Do not change a word in a quote.
+- A name that a passage shows with no description (a heading or a list entry) proves only that the name exists.
+- Template markup (for example text in braces or in tags) is not a part of the product.
+
+Always respond with valid JSON in the given form.
+
+prompt:
+## Documentation passages
+The passages below come from the documentation of the product. The name in square brackets in the header of a passage is its source name, for example P3.
+
+### [P1] sessions.md > Sessions > Idle timeout
+Section: Sessions > Idle timeout
+
+Set `session-idle-timeout` to end a session after a time with no activity.
+
+An attacker who steals the session cookie can use the session until the idle timeout ends it.
+
+---
+
+### [P2] sessions.md > Sessions > Cookies
+Section: Sessions > Cookies
+
+The session cookie must have the Secure flag.
+
+---
+
+## User story
+**Title:** Session timeout
+
+**Story:** As an operator, I want sessions to end after idle time.
+
+**Acceptance criteria:**
+- The session ends after a time with no activity.
+
+## Task
+Step 1. For each passage write:
+- fits_story: "yes", "partly" or "no".
+- statements: the security statements of the passage that are about the setup and the feature of this user story. Copy each one as an exact quote, 30 words at most. Most passages have none: then write [].
+
+A security statement is one of these two:
+- attack: the passage says what an attacker can do, or what goes wrong for security.
+- rule: the passage says what must be done, or what must not be done, to stay secure.
+These are not security statements: a sentence that only says how a feature works, what a field holds or which option exists; an example of a command; a statement about a mode, an option or a part that this user story does not use.
+
+Step 2. For each statement of step 1 write one row:
+- type: "attack" or "rule".
+- threat: one sentence. For an attack: who can do what, in the words of the passage. For a rule: the breach of the rule, which means who does what the rule forbids, or who does not do what the rule demands. Add the result only if the passage states it.
+- harm: what is lost. One of: "disclosure of data", "change of data", "false identity", "access with no permission", "loss of service", "no record of actions", "not stated". Write "not stated" when the passage does not show it.
+- story_part: the words of the user story or of its acceptance criteria that this row is about, as an exact copy, 15 words at most.
+- requirement: one sentence that stops the threat, for the part that this user story builds or sets up. Use only names and values that the passage gives.
+Do not add a result, a parameter, a role or a step that the passage does not state.
+
+When step 1 finds no security statement, "rows" is an empty list. That is a correct answer.
+
+## Answer form
+{
+ "passages": [
+  {"source": "<source name>", "fits_story": "<yes, partly or no>", "statements": ["<exact words of the passage>"]}
+ ],
+ "rows": [
+  {"source": "<source name>", "quote": "<one statement of step 1, exact words>", "type": "<attack or rule>", "threat": "<one sentence>", "harm": "<one value of the list>", "story_part": "<exact words of the user story>", "requirement": "<one sentence>"}
+ ]
+}
+
+Respond only with the JSON object. Do not include any text before or after it.
+
+
+[4] gemma4:26b generate()
+system_prompt:
+(none)
+prompt:
+Task: choose a threat actor and a STRIDE category for each threat.
+
+User story: Session timeout. As an operator, I want sessions to end after idle time.
+
+Threats (each has a number):
+1. An attacker who steals the session cookie can use it.
+2. The session cookie is sent with no Secure flag.
+
+For each threat choose two values.
+
+The threat actor: who would most likely cause the threat. One value of this list:
+- external_individual: one person outside the organisation that runs the system
+- external_group: persons outside the organisation who work together, for example a criminal group
+- external_organization: a different organisation with a connection to the system, for example a partner, a supplier or a competitor
+- nation_state: a government or an agency of a state
+- trusted_insider: a person with ordinary access, for example an employee or a member
+- privileged_insider: a person with administrator or operator rights
+- accidental_actor: a user or an administrator who causes harm by mistake
+- other: none of these fits
+
+The STRIDE category: what the threat does to security. One letter of this list:
+- S (spoofing): somebody uses a false identity
+- T (tampering): data or code is changed with no permission
+- R (repudiation): somebody can deny an action, because there is no record of it
+- I (information disclosure): data is shown to somebody who must not see it
+- D (denial of service): the service stops or becomes too slow
+- E (elevation of privilege): somebody gets rights or access that they must not have
+- none: the sentence is no security threat, for example a feature that does not work or a plain fact about the product
+
+Answer with one line for each threat and nothing else: the number, a colon, the actor, a comma and the STRIDE value. Example: 1: external_individual, S
+

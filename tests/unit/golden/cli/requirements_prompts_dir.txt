@@ -1,0 +1,155 @@
+exit=0
+╭────────────────────────────────────────────────────────────────────────────────── Generating Security Requirements ──────────────────────────────────────────────────────────────────────────────────╮
+│ Input: stories.json                                                                                                                                                                                  │
+│ Mode: RAG-enhanced                                                                                                                                                                                   │
+│ Search: word search over docs                                                                                                                                                                        │
+│ Format: markdown                                                                                                                                                                                     │
+│ Output: stdout                                                                                                                                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+* Loading user stories...
+✓ Loaded 1 user stories
+Note: no system context file (--context). The tested runs had one.
+* Initializing components...
+✓ Components initialized
+  Generating requirements... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+✓ Generated 1 requirements from 1 stories
+
+# Security Requirements: Session timeout
+
+## Generation Metadata
+
+- **Generated**: <TIME>
+- **Model**: llama3:8b
+- **RAG Enabled**: True
+
+## User Story
+
+**ID**: US-1
+
+> As an operator, I want sessions to end after idle time.
+
+**Acceptance Criteria**:
+
+- The session ends after a time with no activity.
+
+## Security Requirements
+
+### SR-001: Idle timeout
+
+**Priority**: HIGH
+**ASVS Category**: V3: Session Management
+
+**Description**:
+
+Set session-idle-timeout.
+
+**Rationale**:
+
+Passage 1 states the setting.
+
+**Acceptance Criteria**:
+
+- [ ] The session ends.
+
+
+
+--- calls
+_ollama_client(model_name=None, tested_setup=True)
+--- prompts
+[1] llama3:8b generate(format='json')
+system_prompt:
+You are a security requirements engineer. You write security requirements for one user story of a software product.
+
+The documentation, the system context and the user story in the prompt are your only sources of facts about this product. Do not use what you remember about the product: your memory can be wrong, or it can describe a different version. Where the documentation is silent, a general requirement is correct. A wrong statement about the product is worse than a general requirement, because developers lose time when they follow it.
+
+Rules for the passages:
+- A name that a passage shows with no description (a heading or a list entry) proves only that the name exists. Do not say what it does or what its default is.
+- A passage with source code shows what the shown lines do now. You can state that, with the name of the file, and nothing more.
+- Template markup (for example text in braces or in tags) is not a command and not a setting for the operator. Do not copy it into a requirement.
+
+Always respond with valid JSON matching the specified schema.
+MARKER-system_prompt
+
+prompt:
+## System Context
+No system context provided.
+
+## Project Documentation
+The passages below come from the documentation of the product. A passage that is marked as a code search hit shows lines of its source code.
+
+### [1] sessions.md > Sessions > Idle timeout (Relevance: 0.50)
+Section: Sessions > Idle timeout
+
+Set `session-idle-timeout` to end a session after a time with no activity.
+
+An attacker who steals the session cookie can use the session until the idle timeout ends it.
+
+---
+
+### [2] sessions.md > Sessions > Cookies (Relevance: 0.50)
+Section: Sessions > Cookies
+
+The session cookie must have the Secure flag.
+
+---
+
+## User Story
+**ID:** US-1
+**Title:** Session timeout
+
+**Story:** As an operator, I want sessions to end after idle time.
+
+**Acceptance Criteria:**
+- The session ends after a time with no activity.
+
+## Task
+Step 1. Read each passage and write one short note about it: which feature or part of the product it is about, and whether it fits this user story: "yes", "partly" or "no".
+
+Step 2. Write the security requirements that this user story needs.
+- Use only the passages with "yes" or "partly". From a passage with "partly", use only the part that is about this user story.
+- State only what a passage says, and only about the names that it describes.
+- When a requirement uses a passage that you marked "yes" or "partly", write in its rationale what that passage says about the product, as a fact, with the number of the passage, for example: "The documentation states that ... (passage 3)." Use the names and the values of the passage. Do not write this for something that comes from the user story or from your memory.
+- Where no passage fits a point, write the requirement in general words. That is a correct answer.
+
+Write as many requirements as the story needs, and not more.
+
+## Output Format
+Respond with a JSON object with two keys, in this order: "passage_notes" and then "requirements".
+- passage_notes: array of objects, one for each passage, each with "passage" (its number), "about" (12 words at most) and "fits_story" ("yes", "partly" or "no")
+- requirements: array of objects. Each requirement must have:
+
+- id: string (format: "SR-XXX" where XXX is a 3-digit number)
+- user_story_id: string (must match the input user story ID)
+- title: string (concise title, max 100 characters)
+- description: string (detailed requirement description)
+- rationale: string (why this requirement is necessary)
+- acceptance_criteria: array of strings (testable verification criteria)
+- asvs_category: string (one of the OWASP ASVS v4.0 categories)
+- priority: string (one of: "critical", "high", "medium", "low")
+- implementation_notes: string or null (specific implementation guidance)
+- source_references: array of strings (references to standards or documentation)
+
+Valid ASVS categories:
+- "V1: Architecture, Design and Threat Modeling"
+- "V2: Authentication"
+- "V3: Session Management"
+- "V4: Access Control"
+- "V5: Validation, Sanitization and Encoding"
+- "V6: Stored Cryptography"
+- "V7: Error Handling and Logging"
+- "V8: Data Protection"
+- "V9: Communication"
+- "V10: Malicious Code"
+- "V11: Business Logic"
+- "V12: Files and Resources"
+- "V13: API and Web Service"
+- "V14: Configuration"
+
+Valid priorities: "critical", "high", "medium", "low"
+
+
+The rules above also hold for implementation_notes and source_references.
+
+Respond only with valid JSON. Do not include any text before or after the JSON.
+MARKER-rag_user_prompt
+

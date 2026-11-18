@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from nicegui import events, run, ui
 from secreqgen.application.documentation import count_documentation
@@ -701,7 +702,7 @@ class Foot:
     """The foot of a form: a summary, the start button and the busy line.
 
     Under the button the block shows the command of the run. The function
-    command gives (command, lines) for a form that is complete, or None.
+    command gives the command of a form that is complete, or None.
     """
 
     def __init__(
@@ -710,7 +711,7 @@ class Foot:
         ready: Callable[[], bool],
         summary: Callable[[], str],
         start: Callable[[], Awaitable[None]],
-        command: Callable[[], tuple | None] | None = None,
+        command: Callable[[], Any] | None = None,
     ) -> None:
         self.ready = ready
         self.summary = summary
@@ -742,11 +743,7 @@ class Foot:
         """Show the command of the form, or hide the block when it is not complete."""
         if self.command is None:
             return
-        shown = self.command() if self.ready() else None
-        if shown is None:
-            self.block.show(None)
-        else:
-            self.block.show(*shown)
+        self.block.show(self.command() if self.ready() else None)
 
     def update(self) -> None:
         """Show the summary and switch the button on or off."""

@@ -1,0 +1,2 @@
+exit=1
+Error: The prompt folder does not exist: sets/nothing

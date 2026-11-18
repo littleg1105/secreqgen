@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
+import random
 import shlex
 from pathlib import Path
 
@@ -21,9 +22,6 @@ from secreqgen_gui.settings import GuiSettings, save_settings  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 
-SUBSET = "The command runs all {total} stories, not your {picked}."
-PROMPT_FORM = "The command uses the tested prompts, not your set."
-PROMPT_RUN = "The command uses the tested prompts, not the set of this run."
 ABOUT_TEXT = "Demo is a chat tool for teams."
 
 
@@ -129,7 +127,36 @@ def _command(user) -> str:
 
 
 def _notes(user):
-    return [e.text for e in _found(user, "command-note") if _shown(e)]
+    """Return the lines under the block. There are none any more."""
+    return [e.text for e in _found(user, "command-note")]
+
+
+def _parse(argv):
+    """Give the arguments of a command to the real parser. Return its values."""
+    import secreqgen.cli
+    import typer.main
+
+    root = typer.main.get_command(secreqgen.cli.app)
+    words = list(argv)
+    start = words.index("secreqgen")  # variables may stand in front
+    name = words[start + 2]
+    sub = root.commands["generate"].commands[name]
+    values = dict(sub.make_context(name, words[start + 3 :]).params)
+    if values.get("prompts_dir") is not None:
+        values["prompts_dir"] = Path(values["prompts_dir"])
+    return values
+
+
+def _parsed(text):
+    """Return the values that the command line reads from the text of a command."""
+    return _parse(shlex.split(text))
+
+
+def _make_set(kind, name="mine"):
+    """Copy the tested prompts into a set of the person. Return its folder."""
+    from secreqgen.application.prompt_sets import copy_prompt_set
+
+    return copy_prompt_set(kind, name, storage.prompt_sets_dir())
 
 
 def _input(user, label):
@@ -203,7 +230,9 @@ async def test_the_picked_stories_change_the_command(user, tmp_path, recorder):
     assert "--story-id US-003" in _command(user)
     next(b for b in boxes if "US-004" in b.text).set_value(True)
     await _settle()
-    assert "--story-id" not in _command(user)
+    # The command names each picked story.
+    assert "--story-id US-003 --story-id US-004" in _command(user)
+    assert _parsed(_command(user))["story_id"] == ("US-003", "US-004")
 
 
 async def test_the_docs_folder_changes_the_command(user, tmp_path, recorder):
@@ -242,8 +271,9 @@ async def test_the_models_and_the_checker_switch_change_the_command(
     user, tmp_path, recorder
 ):
     await _open(user, tmp_path)
+    # The models are always in the command, also the tested ones.
     text = _command(user)
-    assert "--model" not in text and "--checker-model" not in text
+    assert "--model gemma4:26b" in text and "--checker-model qwen3.8:27b" in text
     _input(user, "Writer").set_value("llama3:8b")
     await _settle()
     assert "--model llama3:8b" in _command(user)
@@ -276,17 +306,17 @@ async def test_the_paragraph_changes_the_command(user, tmp_path, recorder):
     assert "--about-file" not in _command(user)
 
 
-async def test_the_prompt_set_changes_the_command_and_shows_its_line(
-    user, tmp_path, recorder
-):
-    (storage.prompt_sets_dir() / "threats" / "mine").mkdir(parents=True)
+async def test_the_prompt_set_changes_the_command(user, tmp_path, recorder):
+    folder = _make_set("threats")
     await _open(user, tmp_path)
-    assert _notes(user) == []
+    assert "--prompts-dir" not in _command(user)
     user.find(kind=ui.select).click()
     user.find("mine").click()
     await _settle()
-    assert _notes(user) == [PROMPT_FORM]
-    assert "mine" not in _command(user)  # the command has no option for it
+    # The folder is the one that the run itself gets.
+    assert _parsed(_command(user))["prompts_dir"] == folder
+    assert f"--prompts-dir {folder}" in _command(user)
+    assert _notes(user) == []
 
 
 async def test_the_context_file_changes_the_requirements_command(
@@ -306,18 +336,18 @@ async def test_the_context_file_changes_the_requirements_command(
 
 async def test_the_requirements_model_changes_the_command(user, tmp_path, recorder):
     await _open(user, tmp_path, route="/requirements/new")
-    # The model of the GUI is not the default of the tool: the variable is needed.
-    assert _command(user).startswith(
-        "SECREQGEN_LLM_MODEL_NAME=gemma4:26b secreqgen generate requirements "
-    )
+    # The model is always in the command, as an option. No variable.
+    text = _command(user)
+    assert text.startswith("secreqgen generate requirements ")
+    assert _parsed(text)["model"] == "gemma4:26b"
     _input(user, "Model").set_value("llama3:8b")  # the default of the tool
+    await _settle()
+    assert _parsed(_command(user))["model"] == "llama3:8b"
+    _input(user, "Model").set_value("mistral:7b")
     await _settle()
     text = _command(user)
     assert "SECREQGEN_LLM_MODEL_NAME" not in text
-    assert text.startswith("secreqgen generate requirements ")
-    _input(user, "Model").set_value("mistral:7b")
-    await _settle()
-    assert _command(user).startswith("SECREQGEN_LLM_MODEL_NAME=mistral:7b secreqgen")
+    assert _parsed(text)["model"] == "mistral:7b"
 
 
 async def test_the_settings_of_the_gui_count(user, tmp_path, recorder):
@@ -333,7 +363,6 @@ async def test_the_settings_of_the_gui_count(user, tmp_path, recorder):
     text = _command(user)
     assert text.startswith("SECREQGEN_LLM_BASE_URL=http://10.0.0.5:11434 secreqgen")
     assert "--model llama3:8b" in text
-    await _open(user, tmp_path / "again", route="/requirements/new") if False else None
     stories = _stories(tmp_path, 2, name="again.json")
     docs = tmp_path / "docs"
     await user.open(_url("/requirements/new", stories, docs))
@@ -341,7 +370,8 @@ async def test_the_settings_of_the_gui_count(user, tmp_path, recorder):
     await _settle()
     text = _command(user)
     assert "SECREQGEN_LLM_BASE_URL=http://10.0.0.5:11434" in text
-    assert "SECREQGEN_LLM_MODEL_NAME=mistral:7b" in text
+    assert "SECREQGEN_LLM_MODEL_NAME" not in text
+    assert _parsed(text)["model"] == "mistral:7b"
 
 
 # the text of the block is the command of the spec of the click
@@ -358,7 +388,8 @@ async def test_the_block_equals_the_command_of_the_threat_spec(
     next(b for b in boxes if "US-002" in b.text).set_value(False)
     await _settle(0.9)
     shown = _command(user)
-    assert _notes(user) == [SUBSET.format(picked=7, total=8)]
+    assert _notes(user) == []
+    assert shown.count("--story-id") == 7 and "--story-id US-002" not in shown
     user.find("Start threat list").click()
     await _settle()
     spec = recorder.threats[0]
@@ -399,35 +430,214 @@ async def test_the_block_equals_the_command_of_the_requirements_spec(
     assert f"--context {context}" in shown
 
 
-# the two lines
+async def _fill_random_form(user, rng, count=8):
+    """Fill a form with random picks. Return the picked ids and the prompt set."""
+    user.find("Pick none").click()
+    boxes = {
+        b.text.split()[0]: b
+        for b in user.find(kind=ui.checkbox).elements
+        if b.text.startswith("US-")
+    }
+    ids = sorted(boxes)
+    picked = sorted(rng.sample(ids, rng.randint(1, len(ids))))
+    for story_id in picked:
+        boxes[story_id].set_value(True)
+    return picked
 
 
-async def test_the_story_line_shows_word_for_word_when_true_and_not_otherwise(
+def _set_select(user, value):
+    user.find(kind=ui.select).elements.pop().set_value(value)
+
+
+async def test_the_block_equals_the_command_of_the_spec_for_random_threat_forms(
+    user, tmp_path, recorder
+):
+    rng = random.Random(20261118)
+    sets = {
+        "mine": _make_set("threats", "mine"),
+        "other-set": _make_set("threats", "other-set"),
+    }
+    seen: set = set()
+    for turn in range(8):
+        work = tmp_path / f"turn{turn}"
+        work.mkdir()
+        await _open(user, work)
+        picked = await _fill_random_form(user, rng)
+        writer, checker = rng.sample(
+            ["gemma4:26b", "llama3:8b", "mistral:7b", "qwen3.8:27b", "phi4:14b"], 2
+        )
+        _input(user, "Writer").set_value(writer)
+        # The form keeps its values from the turn before: set the switch.
+        use_checker = rng.random() >= 0.3
+        user.find("Use a checker").elements.pop().set_value(use_checker)
+        if use_checker:
+            _input(user, "Checker").set_value(checker)
+        else:
+            checker = None
+        product = rng.choice(["", "Acme Chat"])
+        _input(user, "Product name (optional)").set_value(product)
+        chosen = rng.choice([None, "mine", "other-set"])
+        _set_select(user, chosen or "__tested__")
+        await _settle(0.5)
+        shown = _command(user)
+        assert _notes(user) == []
+        user.find("Start threat list").click()
+        await _settle()
+        spec = recorder.threats[-1]
+        expected = jobs.command_for_threats(
+            spec,
+            total_stories=8,
+            default_product="Demo",
+            about_file=None,
+            base_url=jobs.load_settings().base_url,
+        )
+        assert shown == expected.text, turn
+        # The command, read by the real parser, holds what the form held.
+        parsed = _parsed(shown)
+        assert set(parsed["story_id"]) == (set(picked) if len(picked) < 8 else set())
+        assert parsed["writer_model"] == writer
+        assert parsed["checker_model"] == checker
+        assert parsed["check"] is (checker is not None)
+        assert parsed["prompts_dir"] == (sets[chosen] if chosen else None)
+        assert parsed["product"] == (product or None)
+        assert spec.prompt_set == chosen
+        assert set(spec.story_ids or ()) == (set(picked) if len(picked) < 8 else set())
+        seen.update({("set", chosen), ("checker", checker is None)})
+    # The seed must reach each kind of form: a set of the person, the tested
+    # prompts, a form with the checker and a form without it.
+    assert {
+        ("set", None),
+        ("set", "mine"),
+        ("checker", True),
+        ("checker", False),
+    } <= seen
+
+
+async def test_the_block_equals_the_command_of_the_spec_for_random_requirements_forms(
+    user, tmp_path, recorder
+):
+    rng = random.Random(20261119)
+    sets = {
+        "mine": _make_set("requirements", "mine"),
+        "other-set": _make_set("requirements", "other-set"),
+    }
+    seen: set = set()
+    for turn in range(8):
+        work = tmp_path / f"turn{turn}"
+        work.mkdir()
+        await _open(user, work, route="/requirements/new")
+        picked = await _fill_random_form(user, rng)
+        model = rng.choice(["gemma4:26b", "llama3:8b", "mistral:7b", "qwen3:30b"])
+        _input(user, "Model").set_value(model)
+        chosen = rng.choice([None, "mine", "other-set"])
+        _set_select(user, chosen or "__tested__")
+        await _settle(0.5)
+        shown = _command(user)
+        assert _notes(user) == []
+        user.find("Start requirements").click()
+        await _settle()
+        spec = recorder.requirements[-1]
+        expected = jobs.command_for_requirements(
+            spec,
+            total_stories=8,
+            default_product="Demo",
+            base_url=jobs.load_settings().base_url,
+        )
+        assert shown == expected.text, turn
+        parsed = _parsed(shown)
+        assert set(parsed["story_id"]) == (set(picked) if len(picked) < 8 else set())
+        assert parsed["model"] == model
+        assert parsed["prompts_dir"] == (sets[chosen] if chosen else None)
+        assert "SECREQGEN_LLM_MODEL_NAME" not in shown
+        assert spec.model == model and spec.prompt_set == chosen
+        seen.add(("set", chosen))
+    assert {("set", None), ("set", "mine")} <= seen
+
+
+# the picked stories, the prompt set and the models are in the command
+
+
+async def test_two_of_eight_stories_give_two_story_options_and_no_line(
     user, tmp_path, recorder
 ):
     await _open(user, tmp_path)
-    assert _notes(user) == []
-    boxes = user.find(kind=ui.checkbox).elements
-    for number in ("US-001", "US-002"):
-        next(b for b in boxes if number in b.text).set_value(False)
-    await _settle()
-    # A threat list with 6 of 8 stories: the command cannot say that.
-    assert _notes(user) == [SUBSET.format(picked=6, total=8)]
+    assert "--story-id" not in _command(user)  # all stories: no option
     user.find("Pick none").click()
-    next(b for b in boxes if "US-005" in b.text).set_value(True)
+    boxes = user.find(kind=ui.checkbox).elements
+    for number in ("US-002", "US-007"):
+        next(b for b in boxes if number in b.text).set_value(True)
     await _settle()
-    assert _notes(user) == []  # one story: --story-id says it
-    assert "--story-id US-005" in _command(user)
+    text = _command(user)
+    assert text.count("--story-id") == 2
+    assert _parsed(text)["story_id"] == ("US-002", "US-007")
+    assert _notes(user) == []
+    # One story: one option.
+    next(b for b in boxes if "US-007" in b.text).set_value(False)
+    await _settle()
+    assert _parsed(_command(user))["story_id"] == ("US-002",)
+    assert _notes(user) == []
 
 
-async def test_the_requirements_form_has_no_story_option(user, tmp_path, recorder):
+async def test_the_requirements_form_names_the_picked_stories_too(
+    user, tmp_path, recorder
+):
     await _open(user, tmp_path, route="/requirements/new")
     user.find("Pick none").click()
     boxes = user.find(kind=ui.checkbox).elements
-    next(b for b in boxes if "US-005" in b.text).set_value(True)
+    for number in ("US-005", "US-001"):
+        next(b for b in boxes if number in b.text).set_value(True)
     await _settle()
-    assert _notes(user) == [SUBSET.format(picked=1, total=8)]
-    assert "--story-id" not in _command(user)
+    text = _command(user)
+    assert text.count("--story-id") == 2
+    # The command line takes the stories in the order of the file.
+    assert sorted(_parsed(text)["story_id"]) == ["US-001", "US-005"]
+    assert _notes(user) == []
+
+
+async def test_a_prompt_set_of_the_person_names_its_folder(user, tmp_path, recorder):
+    for route, kind in (
+        ("/threats/new", "threats"),
+        ("/requirements/new", "requirements"),
+    ):
+        folder = _make_set(kind, "mine-" + kind)
+        stories = _stories(tmp_path, 3, name=kind + ".json")
+        docs = tmp_path / "docs"
+        docs.mkdir(exist_ok=True)
+        (docs / "page.md").write_text("# Page\nText")
+        await user.open(_url(route, stories, docs))
+        await user.should_see("3 stories found.")
+        await _settle()
+        assert "--prompts-dir" not in _command(user)
+        user.find(kind=ui.select).click()
+        user.find("mine-" + kind).click()
+        await _settle()
+        text = _command(user)
+        assert _parsed(text)["prompts_dir"] == folder
+        assert shlex.split(text)[shlex.split(text).index("--prompts-dir") + 1] == str(
+            folder
+        )
+        assert _notes(user) == []
+
+
+async def test_no_page_has_a_line_under_the_block(user, tmp_path, recorder):
+    _make_set("threats")
+    _run_folder(THREAT_ID, "threats", story_ids=["S-1"])
+    await _open(user, tmp_path)
+    assert _found(user, "command-note") == []
+    await user.open(f"/runs/{THREAT_ID}")
+    await user.should_see("Command")
+    assert _found(user, "command-note") == []
+
+
+async def test_the_block_always_names_the_models(user, tmp_path, recorder):
+    await _open(user, tmp_path)
+    parsed = _parsed(_command(user))
+    assert parsed["writer_model"] == "gemma4:26b"
+    assert parsed["checker_model"] == "qwen3.8:27b"
+    user.find("Use a checker").click()
+    await _settle()
+    parsed = _parsed(_command(user))
+    assert parsed["writer_model"] == "gemma4:26b" and parsed["check"] is False
 
 
 # the paragraph file
@@ -547,7 +757,8 @@ async def test_settings_saved_on_another_page_change_the_command(
     user, tmp_path, recorder
 ):
     await _open(user, tmp_path)
-    assert "SECREQGEN_LLM_BASE_URL" not in _command(user)
+    # The default address: no variable in front.
+    assert _command(user).startswith("secreqgen ")
     changed = dataclasses.replace(
         jobs.load_settings(), base_url="http://10.1.1.1:11434"
     )
@@ -574,17 +785,26 @@ async def test_the_dialog_shows_the_command_for_its_fields(user, tmp_path, recor
     block = [
         e.text
         for e in boxes[0].descendants()
-        if isinstance(e, ui.label) and e.text.startswith("secreqgen")
+        if isinstance(e, ui.label) and e.text.startswith("secreqgen ")
     ]
-    assert block == [f"secreqgen generate context {folder}"]
+    assert shlex.split(block[0]) == [
+        "secreqgen",
+        "generate",
+        "context",
+        str(folder),
+        "--model",
+        "gemma4:26b",
+    ]
     _found(user, "context-product")[0].set_value("Acme Chat")
     await _settle()
     block = [
         e.text
         for e in boxes[0].descendants()
-        if isinstance(e, ui.label) and e.text.startswith("secreqgen")
+        if isinstance(e, ui.label) and e.text.startswith("secreqgen ")
     ]
-    assert block == [f"secreqgen generate context {folder} --product 'Acme Chat'"]
+    assert len(block) == 1 and "--product 'Acme Chat'" in block[0]
+    parsed = _parsed(block[0])
+    assert parsed["product"] == "Acme Chat" and parsed["writer_model"] == "gemma4:26b"
     folder_field.set_value("")
     await _settle()
     assert _found(user, "context-command") == []
@@ -607,9 +827,9 @@ async def test_the_dialog_command_holds_an_absolute_folder(
     block = [
         e.text
         for e in boxes[0].descendants()
-        if isinstance(e, ui.label) and e.text.startswith("secreqgen")
+        if isinstance(e, ui.label) and e.text.startswith("secreqgen ")
     ]
-    assert block == [f"secreqgen generate context {tmp_path / 'code'}"]
+    assert shlex.split(block[0])[3] == str(tmp_path / "code")
 
 
 # Copy
@@ -695,6 +915,10 @@ async def test_the_run_page_shows_the_command_of_a_threat_run(user, tmp_path, re
         str(folder / "stories.json"),
         "--docs",
         "/data/docs",
+        "--model",
+        "gemma4:26b",
+        "--checker-model",
+        "qwen3.8:27b",
         "--about-file",
         str(folder / "about.txt"),
     ]
@@ -726,21 +950,18 @@ async def test_the_run_page_shows_the_command_of_a_requirements_run(
     )
     await user.open(f"/runs/{REQ_ID}")
     await user.should_see("Requirements run")
-    assert shlex.split(_command(user)) == [
-        "SECREQGEN_LLM_BASE_URL=http://10.0.0.5:11434",
-        "SECREQGEN_LLM_MODEL_NAME=mistral:7b",
-        "secreqgen",
-        "generate",
-        "requirements",
-        str(folder / "stories.json"),
-        "--docs",
-        "/data/docs",
-        "--context",
-        "/data/ctx.yaml",
-    ]
+    words = shlex.split(_command(user))
+    assert words[0] == "SECREQGEN_LLM_BASE_URL=http://10.0.0.5:11434"
+    assert "SECREQGEN_LLM_MODEL_NAME=mistral:7b" not in words
+    parsed = _parse(words)
+    assert parsed["model"] == "mistral:7b"
+    assert str(parsed["context"]) == "/data/ctx.yaml"
+    assert str(parsed["input_file"]) == str(folder / "stories.json")
+    assert parsed["story_id"] == ()
 
 
-async def test_a_run_with_a_prompt_set_shows_its_line(user, tmp_path, recorder):
+async def test_a_run_with_a_prompt_set_names_its_folder(user, tmp_path, recorder):
+    folder = _make_set("threats")
     _run_folder(
         THREAT_ID,
         "threats",
@@ -748,8 +969,27 @@ async def test_a_run_with_a_prompt_set_shows_its_line(user, tmp_path, recorder):
     )
     await user.open(f"/runs/{THREAT_ID}")
     await user.should_see("Command")
-    assert _notes(user) == [PROMPT_RUN]
-    assert "mine" not in _command(user)
+    assert _notes(user) == []
+    assert _parsed(_command(user))["prompts_dir"] == folder
+
+
+async def test_a_run_with_a_prompt_set_that_was_deleted_has_no_command(
+    user, tmp_path, recorder
+):
+    _make_set("threats")
+    _run_folder(
+        THREAT_ID,
+        "threats",
+        prompt_set={"kind": "threats", "name": "mine", "tested": False},
+    )
+    assert jobs.stored_run_command(THREAT_ID, storage.read_manifest(THREAT_ID))
+    from secreqgen.application.prompt_sets import delete_user_prompt_set
+
+    delete_user_prompt_set("threats", "mine", storage.prompt_sets_dir())
+    assert jobs.stored_run_command(THREAT_ID, storage.read_manifest(THREAT_ID)) is None
+    await user.open(f"/runs/{THREAT_ID}")
+    await user.should_see("Threat list run")
+    assert _texts(user) == []
 
 
 async def test_the_run_page_shows_the_option_story_id_of_an_old_one_story_run(
@@ -762,13 +1002,38 @@ async def test_the_run_page_shows_the_option_story_id_of_an_old_one_story_run(
     assert "--story-id S-2" in _command(user)
 
 
-async def test_an_old_run_with_a_subset_that_the_command_cannot_say_has_no_block(
+async def test_an_old_run_of_several_stories_with_the_whole_file_has_a_command(
     user, tmp_path, recorder
 ):
+    # The copy holds 3 stories. The run had 2 of them. Before, the page showed
+    # no command for this run. Now the command names the stories.
     _run_folder(THREAT_ID, "threats", story_ids=["S-1", "S-2"])
     await user.open(f"/runs/{THREAT_ID}")
-    await user.should_see("Threat list run")
-    assert _texts(user) == []
+    await user.should_see("Command")
+    assert _parsed(_command(user))["story_id"] == ("S-1", "S-2")
+    assert _notes(user) == []
+
+
+async def test_a_run_of_today_with_a_copy_of_only_its_stories_needs_no_story_option(
+    user, tmp_path, recorder
+):
+    items = [
+        {"id": f"S-{n}", "title": f"Story {n}", "story": "As a user."} for n in (1, 2)
+    ]
+    _run_folder(THREAT_ID, "threats", stories=items, story_ids=["S-1", "S-2"])
+    await user.open(f"/runs/{THREAT_ID}")
+    await user.should_see("Command")
+    assert "--story-id" not in _command(user)
+    assert _parsed(_command(user))["story_id"] == ()
+
+
+def test_a_stored_run_names_an_id_that_is_in_the_copy_only(tmp_path):
+    _run_folder(THREAT_ID, "threats", story_ids=["S-2"])
+    found = jobs.stored_run_command(THREAT_ID, storage.read_manifest(THREAT_ID))
+    assert _parse(found.argv)["story_id"] == ("S-2",)
+    # An id that the copy lacks would make the command fail: no command.
+    _run_folder(THREAT_ID, "threats", story_ids=["S-2", "S-9"])
+    assert jobs.stored_run_command(THREAT_ID, storage.read_manifest(THREAT_ID)) is None
 
 
 async def test_an_old_manifest_builds_what_is_known(user, tmp_path, recorder):
@@ -788,6 +1053,10 @@ async def test_an_old_manifest_builds_what_is_known(user, tmp_path, recorder):
         str(folder / "stories.json"),
         "--docs",
         "/data/docs",
+        "--model",
+        "gemma4:26b",
+        "--checker-model",
+        "qwen3.8:27b",
     ]
 
 
@@ -850,13 +1119,14 @@ async def test_a_new_requirements_run_with_no_context_has_a_block(
     await user.open(f"/runs/{REQ_ID}")
     await user.should_see("Command")
     assert shlex.split(_command(user)) == [
-        "SECREQGEN_LLM_MODEL_NAME=gemma4:26b",
         "secreqgen",
         "generate",
         "requirements",
         str(folder / "stories.json"),
         "--docs",
         "/data/docs",
+        "--model",
+        "gemma4:26b",
     ]
 
 
@@ -946,15 +1216,19 @@ def test_a_run_without_a_paragraph_writes_no_file(tmp_path):
     assert "about" not in storage.read_manifest(run_id)
 
 
-def test_a_run_of_some_stories_keeps_only_those_stories(tmp_path):
-    run_id, seen = _start(_job_spec(tmp_path, story_ids=("US-002", "S-3")))
+def test_a_run_of_some_stories_keeps_the_whole_file(tmp_path):
+    spec = _job_spec(tmp_path, story_ids=("US-002", "S-3"))
+    run_id, seen = _start(spec)
     manifest = storage.read_manifest(run_id)
     copy = storage.run_dir(run_id) / manifest["stories_file"]
-    data = json.loads(copy.read_text("utf-8"))
-    assert [s["id"] for s in data["user_stories"]] == ["US-002", "S-3"]
-    assert data["project"] == "demo"
-    assert manifest["stories_total"] == 2
+    # The copy is the file as it is, byte for byte. The run reads that copy.
+    assert copy.read_bytes() == Path(spec.stories_file).read_bytes()
     assert seen["file"] == copy
+    assert manifest["story_ids"] == ["US-002", "S-3"]
+    assert manifest["stories_total"] == 2  # the stories of the run
+    # The command of the page names the stories of the run.
+    found = jobs.stored_run_command(run_id, manifest)
+    assert _parse(found.argv)["story_id"] == ("US-002", "S-3")
 
 
 def test_a_run_of_all_stories_keeps_the_file_as_it_is(tmp_path):
@@ -965,7 +1239,7 @@ def test_a_run_of_all_stories_keeps_the_file_as_it_is(tmp_path):
     assert seen["text"] == copy.read_text("utf-8")
 
 
-def test_a_yaml_file_of_some_stories_becomes_a_json_copy(tmp_path):
+def test_a_yaml_file_of_some_stories_stays_a_yaml_file(tmp_path):
     spec = _job_spec(tmp_path, story_ids=("S-1",))
     yaml_path = tmp_path / "s.yaml"
     yaml_path.write_text(
@@ -974,10 +1248,15 @@ def test_a_yaml_file_of_some_stories_becomes_a_json_copy(tmp_path):
         "  - {id: S-3, title: Three, story: As a user, I act.}\n"
     )
     spec.stories_file = yaml_path
-    run_id, _seen = _start(spec)
+    run_id, seen = _start(spec)
     manifest = storage.read_manifest(run_id)
-    assert manifest["stories_file"] == "stories.json"
-    assert not (storage.run_dir(run_id) / "stories.yaml").exists()
+    assert manifest["stories_file"] == "stories.yaml"
+    copy = storage.run_dir(run_id) / "stories.yaml"
+    assert copy.read_bytes() == yaml_path.read_bytes()
+    assert seen["file"] == copy
+    assert not (storage.run_dir(run_id) / "stories.json").exists()
+    found = jobs.stored_run_command(run_id, manifest)
+    assert _parse(found.argv)["story_id"] == ("S-1",)
 
 
 def test_a_requirements_run_keeps_the_context_path(tmp_path):
@@ -1002,56 +1281,33 @@ def test_a_requirements_run_keeps_the_context_path(tmp_path):
     assert "system_context" in manifest and manifest["system_context"] is None
 
 
-def test_a_copy_that_cannot_be_made_does_not_stop_the_run(tmp_path, monkeypatch):
-    def broken(*_args, **_kw):
-        raise RecursionError("a story file that points to itself")
-
-    monkeypatch.setattr(jobs.JobManager, "_chosen_copy", staticmethod(broken))
-    spec = _job_spec(tmp_path, story_ids=("S-1", "S-3"))
-    run_id, seen = _start(spec)
-    manifest = storage.read_manifest(run_id)
-    assert manifest["status"] == "finished", manifest.get("error")
-    # The whole file stays, so the run page shows no command for this run.
-    copy = storage.run_dir(run_id) / manifest["stories_file"]
-    assert copy.read_bytes() == Path(spec.stories_file).read_bytes()
-    assert seen["file"] == copy
-    assert jobs.stored_run_command(run_id, manifest) is None
+def test_the_job_has_no_copy_of_only_the_chosen_stories():
+    # The whole file is the copy. The helpers of the old copy are gone.
+    assert not hasattr(jobs.JobManager, "_chosen_copy")
+    assert not hasattr(jobs, "_plain")
 
 
-def test_a_copy_that_fails_while_it_is_written_leaves_the_file_whole(
-    tmp_path, monkeypatch
-):
-    real = Path.replace
+def test_a_run_of_some_stories_notes_the_skipped_entries_of_the_run_function(tmp_path):
+    from types import SimpleNamespace
 
-    def no_replace(self, target):
-        if self.name == "stories.json.tmp":
-            raise OSError("the disk is full")
-        return real(self, target)
+    def run(options, *, cfg=None, on_progress=None, **_kw):
+        return SimpleNamespace(
+            lists=[],
+            failures=[],
+            skipped=[(2, ValueError("the entry is not valid"))],
+            stopped=False,
+            aborted=None,
+            not_run=[],
+        )
 
-    monkeypatch.setattr(Path, "replace", no_replace)
     spec = _job_spec(tmp_path, story_ids=("S-1",))
-    run_id, _seen = _start(spec)
+    manager = jobs.JobManager(check_server=_good_server)
+    manager._run_threats = run
+    run_id = manager.start_threats(spec)
+    manager.join(10)
     manifest = storage.read_manifest(run_id)
     assert manifest["status"] == "finished", manifest.get("error")
-    copy = storage.run_dir(run_id) / "stories.json"
-    assert copy.read_bytes() == Path(spec.stories_file).read_bytes()
-    assert not (storage.run_dir(run_id) / "stories.json.tmp").exists()
-
-
-def test_a_run_of_some_stories_still_names_the_skipped_entries(tmp_path):
-    # The run reads a copy that has only the chosen stories. The record of
-    # the run must still name the entry of the file that is not valid.
-    spec = _job_spec(tmp_path, story_ids=("S-1",))
-    data = json.loads(Path(spec.stories_file).read_text())
-    bad = {"id": "BAD", "title": "Bad", "story": "x", "acceptance_criteria": "no list"}
-    data["user_stories"].insert(1, bad)
-    Path(spec.stories_file).write_text(json.dumps(data))
-    run_id, _seen = _start(spec)
-    manifest = storage.read_manifest(run_id)
-    assert manifest["status"] == "finished", manifest.get("error")
-    assert [item["position"] for item in manifest["skipped"]] == [2]
-    copy = json.loads((storage.run_dir(run_id) / "stories.json").read_text("utf-8"))
-    assert [s["id"] for s in copy["user_stories"]] == ["S-1"]
+    assert manifest["skipped"] == [{"position": 2, "message": "the entry is not valid"}]
 
 
 def test_a_date_as_product_name_keeps_the_whole_file(tmp_path):
@@ -1077,7 +1333,7 @@ def test_a_date_as_product_name_keeps_the_whole_file(tmp_path):
 
 
 def test_a_yaml_file_with_dates_and_some_stories_runs(tmp_path):
-    """F1: the copy of a YAML file with dates must be JSON that can be read."""
+    """F1: a YAML file with dates runs, and the copy is the file as it is."""
     spec = _job_spec(tmp_path, story_ids=("S-1",))
     yaml_path = tmp_path / "s.yaml"
     yaml_path.write_text(
@@ -1090,31 +1346,10 @@ def test_a_yaml_file_with_dates_and_some_stories_runs(tmp_path):
     manifest = storage.read_manifest(run_id)
     assert manifest["status"] == "finished", manifest.get("error")
     copy = storage.run_dir(run_id) / manifest["stories_file"]
-    data = json.loads(copy.read_text("utf-8"))
-    assert data["reviewed"] == "2026-01-05"
-    assert [s["id"] for s in data["user_stories"]] == ["S-1"]
-    assert data["user_stories"][0]["created"] == "2026-01-01"
+    assert copy.read_bytes() == yaml_path.read_bytes()
     from secreqgen.application.inputs import read_story_file
 
-    assert len(read_story_file(copy).stories) == 1
-
-
-def test_a_copy_of_some_stories_keeps_odd_yaml_values_readable(tmp_path):
-    """F1: keys that are not text and nested dates also pass."""
-    spec = _job_spec(tmp_path, story_ids=("S-1",))
-    yaml_path = tmp_path / "s.yaml"
-    yaml_path.write_text(
-        "project: demo\nmeta: {2026-01-05: [2026-02-02, 7], 3: x}\nuser_stories:\n"
-        "  - {id: S-1, title: One, story: As a user, I act., tags: [2026-01-01]}\n"
-        "  - {id: S-3, title: Three, story: As a user, I act.}\n"
-    )
-    spec.stories_file = yaml_path
-    run_id, _seen = _start(spec)
-    manifest = storage.read_manifest(run_id)
-    assert manifest["status"] == "finished", manifest.get("error")
-    copy = storage.run_dir(run_id) / manifest["stories_file"]
-    data = json.loads(copy.read_text("utf-8"))
-    assert data["meta"] == {"2026-01-05": ["2026-02-02", 7], "3": "x"}
+    assert len(read_story_file(copy).stories) == 2
 
 
 def test_a_command_holds_absolute_paths(tmp_path, monkeypatch):
@@ -1250,17 +1485,6 @@ def test_a_project_key_that_is_not_text_is_found(tmp_path):
     assert jobs.project_key_is_text(tmp_path / "missing.json")
 
 
-def _parse_requirements(argv):
-    import secreqgen.cli
-    import typer.main
-
-    root = typer.main.get_command(secreqgen.cli.app)
-    sub = root.commands["generate"].commands["requirements"]
-    start = list(argv).index("secreqgen")  # variables may stand in front
-    args = list(argv)[start + 3 :]
-    return dict(sub.make_context("requirements", args).params)
-
-
 async def test_a_number_as_project_gives_the_option_product(user, tmp_path, recorder):
     """F5: the command names the product, so the tool gets text as the GUI does."""
     stories = _number_project_file(tmp_path)
@@ -1270,7 +1494,7 @@ async def test_a_number_as_project_gives_the_option_product(user, tmp_path, reco
     await _settle(0.5)
     text = _command(user)
     assert "--product 123" in text
-    parsed = _parse_requirements(shlex.split(text))
+    parsed = _parsed(text)
     assert parsed["product"] == "123"
 
 
@@ -1287,5 +1511,5 @@ def test_the_run_page_command_names_a_number_product(tmp_path):
     )
     found = jobs.stored_run_command(REQ_ID, storage.read_manifest(REQ_ID))
     assert found is not None
-    assert "--product" in found[0].argv
-    assert _parse_requirements(found[0].argv)["product"] == "123"
+    assert "--product" in found.argv
+    assert _parse(found.argv)["product"] == "123"

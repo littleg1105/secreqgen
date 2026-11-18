@@ -146,22 +146,17 @@ def page(
                 other_formats=docs_part.other_formats,
             )
 
-        def command() -> tuple | None:
-            """Return the command of the form and its lines."""
+        def command():
+            """Return the command of the form."""
             spec = make_spec()
             if spec is None:
                 return None
-            total = len(stories_part.checks)
-            found = jobs.command_for_requirements(
+            return jobs.command_for_requirements(
                 spec,
-                total_stories=total,
+                total_stories=len(stories_part.checks),
                 default_product=stories_part.requirements_default,
                 base_url=load_settings().base_url,
             )
-            lines = jobs.command_lines(
-                found, picked=len(stories_part.selected), total=total
-            )
-            return found, lines
 
         async def start() -> None:
             if not stories_part.path or not docs_part.path:

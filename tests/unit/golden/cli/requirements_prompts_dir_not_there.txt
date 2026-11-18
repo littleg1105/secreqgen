@@ -1,0 +1,11 @@
+exit=1
+╭────────────────────────────────────────────────────────────────────────────────── Generating Security Requirements ──────────────────────────────────────────────────────────────────────────────────╮
+│ Input: stories.json                                                                                                                                                                                  │
+│ Mode: RAG-enhanced                                                                                                                                                                                   │
+│ Search: word search over docs                                                                                                                                                                        │
+│ Format: markdown                                                                                                                                                                                     │
+│ Output: stdout                                                                                                                                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+* Loading user stories...
+✓ Loaded 1 user stories
+Error: The prompt folder does not exist: sets/nothing

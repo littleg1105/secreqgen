@@ -417,3 +417,232 @@ def test_the_paragraph_that_the_command_writes_goes_into_generate_threats(
     assert lines[0] == "exit=0", lines
     saved = json.loads(Path("out/US-1/threats.json").read_text(encoding="utf-8"))
     assert saved["about"] == " ".join(written.split())
+
+
+# the options --story-id, --prompts-dir and --model ------------------------------
+# Each case has a golden file. The cases that must stop before any model call
+# also assert that no client was made.
+
+IDS3 = ("US-1", "US-2", "US-3")
+THREATS = ["generate", "threats", "stories.json", "--docs", "docs"]
+REQUIREMENTS = ["generate", "requirements", "stories.json", "--docs", "docs"]
+
+
+def three_stories() -> None:
+    g.threat_stories_file(IDS3)
+    g.docs_folder()
+
+
+def use_requirements_client(monkeypatch):
+    """The command passes model_name only with --model. The log shows it."""
+    made = []
+
+    def factory(cfg, tested_setup, model_name=None):
+        g.log_call("_ollama_client", model_name=model_name, tested_setup=tested_setup)
+        client = g.StandInClient(model_name or cfg.llm.model_name)
+        made.append(client)
+        return client
+
+    monkeypatch.setattr("secreqgen.cli._ollama_client", factory)
+    return made
+
+
+def prompt_folder(kind: str, missing: str | None = None) -> str:
+    """Copy the tested prompt files to sets/<kind>/mine and change each text.
+
+    missing: the name of one file to remove. Return the folder as a text.
+    """
+    from secreqgen.application.prompt_sets import FILE_NAMES, copy_prompt_set
+
+    folder = copy_prompt_set(kind, "mine", Path("sets"))
+    for filename in FILE_NAMES[kind]:
+        path = folder / filename
+        marker = "MARKER-" + filename.removesuffix(".txt")
+        path.write_text(
+            path.read_text(encoding="utf-8").rstrip("\n") + "\n" + marker + "\n",
+            encoding="utf-8",
+        )
+    if missing is not None:
+        (folder / missing).unlink()
+    return folder.as_posix()
+
+
+def test_threats_two_stories_of_three(monkeypatch):
+    g.use_threat_clients(monkeypatch)
+    three_stories()
+    g.run_case(
+        "threats_two_stories_of_three",
+        [
+            *THREATS,
+            "--story-id",
+            "US-3",
+            "--story-id",
+            "US-1",
+            "--no-check",
+            "--output",
+            "out",
+        ],
+        files=("out/US-1/threats.json", "out/US-3/threats.json"),
+    )
+    assert not Path("out/US-2").exists()
+    assert sorted(p.name for p in Path("out").iterdir()) == ["US-1", "US-3"]
+
+
+def test_threats_story_id_not_in_the_file(monkeypatch):
+    g.use_threat_clients(monkeypatch)
+    three_stories()
+    g.run_case(
+        "threats_story_id_not_in_the_file",
+        [*THREATS, "--story-id", "US-1", "--story-id", "NOPE", "--output", "out"],
+    )
+    assert not g.CALLS  # no model client was made
+    assert not Path("out").exists()
+
+
+def test_threats_same_story_id_two_times(monkeypatch):
+    g.use_threat_clients(monkeypatch)
+    three_stories()
+    g.run_case(
+        "threats_same_story_id_two_times",
+        [*THREATS, "--story-id", "US-1", "--story-id", "US-1", "--output", "out"],
+        files=("out/US-1/threats.json",),
+    )
+    assert sorted(p.name for p in Path("out").iterdir()) == ["US-1"]
+    # The screen text is the text of one --story-id.
+    g.CALLS.clear()
+    g.PROMPTS.clear()
+    once = g.describe([*THREATS, "--story-id", "US-1", "--output", "out2"])
+    twice = g.describe(
+        [*THREATS, "--story-id", "US-1", "--story-id", "US-1", "--output", "out3"]
+    )
+    assert once == twice
+
+
+def test_threats_prompts_dir(monkeypatch):
+    g.use_threat_clients(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    folder = prompt_folder("threats")
+    g.run_case(
+        "threats_prompts_dir",
+        [*THREATS, "--prompts-dir", folder, "--output", "out"],
+        files=g.THREAT_FILES,
+    )
+    saved = json.loads(Path("out/US-1/threats.json").read_text(encoding="utf-8"))
+    assert saved["prompt_set"] == "user:mine"
+    assert saved["tested_prompts"] is False
+
+
+def test_threats_prompts_dir_not_there(monkeypatch):
+    g.use_threat_clients(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    g.run_case(
+        "threats_prompts_dir_not_there",
+        [*THREATS, "--prompts-dir", "sets/nothing", "--output", "out"],
+    )
+    assert not g.CALLS
+    assert not Path("out").exists()
+
+
+def test_threats_prompts_dir_with_a_file_missing(monkeypatch):
+    g.use_threat_clients(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    folder = prompt_folder("threats", missing="labels_prompt.txt")
+    g.run_case(
+        "threats_prompts_dir_file_missing",
+        [*THREATS, "--prompts-dir", folder, "--output", "out"],
+    )
+    assert not g.CALLS
+    assert not Path("out").exists()
+
+
+def test_requirements_two_stories_of_three(monkeypatch):
+    use_requirements_client(monkeypatch)
+    three_stories()
+    g.run_case(
+        "requirements_two_stories_of_three",
+        [*REQUIREMENTS, "--story-id", "US-3", "--story-id", "US-1"],
+    )
+    assert len(g.PROMPTS) == 2
+
+
+def test_requirements_story_id_not_in_the_file(monkeypatch):
+    use_requirements_client(monkeypatch)
+    three_stories()
+    g.run_case(
+        "requirements_story_id_not_in_the_file",
+        [*REQUIREMENTS, "--story-id", "US-2", "--story-id", "NOPE"],
+    )
+    assert not g.CALLS
+    assert not g.PROMPTS
+
+
+def test_requirements_same_story_id_two_times(monkeypatch):
+    use_requirements_client(monkeypatch)
+    three_stories()
+    g.run_case(
+        "requirements_same_story_id_two_times",
+        [*REQUIREMENTS, "--story-id", "US-2", "--story-id", "US-2"],
+    )
+    assert len(g.PROMPTS) == 1
+
+
+def test_requirements_prompts_dir(monkeypatch):
+    use_requirements_client(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    folder = prompt_folder("requirements")
+    g.run_case("requirements_prompts_dir", [*REQUIREMENTS, "--prompts-dir", folder])
+    joined = "\n".join(g.PROMPTS)
+    assert "MARKER-system_prompt" in joined
+    assert "MARKER-rag_user_prompt" in joined
+
+
+def test_requirements_prompts_dir_not_there(monkeypatch):
+    use_requirements_client(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    g.run_case(
+        "requirements_prompts_dir_not_there",
+        [*REQUIREMENTS, "--prompts-dir", "sets/nothing"],
+    )
+    assert not g.CALLS
+
+
+def test_requirements_prompts_dir_with_a_file_missing(monkeypatch):
+    use_requirements_client(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    folder = prompt_folder("requirements", missing="rag_user_prompt.txt")
+    g.run_case(
+        "requirements_prompts_dir_file_missing",
+        [*REQUIREMENTS, "--prompts-dir", folder],
+    )
+    assert not g.CALLS
+
+
+def test_requirements_model(monkeypatch):
+    use_requirements_client(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    g.run_case("requirements_model", [*REQUIREMENTS, "--model", " other-model:7b "])
+    assert all("other-model:7b generate" in text for text in g.PROMPTS)
+
+
+def test_requirements_model_short_option(monkeypatch):
+    use_requirements_client(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    lines = g.describe([*REQUIREMENTS, "-m", "short:1"])
+    assert lines[0] == "exit=0", lines
+    assert "model_name='short:1'" in "\n".join(g.CALLS)
+
+
+def test_requirements_empty_model(monkeypatch):
+    use_requirements_client(monkeypatch)
+    g.threat_stories_file()
+    g.docs_folder()
+    g.run_case("requirements_empty_model", [*REQUIREMENTS, "--model", "  "])
+    assert not g.CALLS
