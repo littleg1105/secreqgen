@@ -89,7 +89,31 @@ SECRET_PATTERNS = (
     "*.secrets",
     "kubeconfig*",
     "service-account*.json",
+    "*serviceaccount*.json",
+    "firebase-adminsdk*.json",
+    "google-services.json",
+    "auth.json",
     "wallet.dat",
+    "*.env",
+    ".envrc",
+    "env.*",
+    ".dockerconfigjson",
+    ".terraformrc",
+    "terraform.rc",
+    "deploy_key*",
+    "*_rsa",
+    "*_ed25519",
+    "*.key.*",
+    "*vault*.yml",
+    "*vault*.yaml",
+    "gradle.properties",
+    "local.properties",
+)
+# Code files that hold the secrets of an installation.
+CODE_SECRET_NAMES = frozenset({"wp-config.php", "local_settings.py"})
+# A file of these folders is a secret file, when it is not a code file.
+SECRET_FOLDERS = frozenset(
+    {"secrets", ".secrets", "secret", "private_keys", ".private"}
 )
 # A data file with one of these words in its name is a secret file too.
 SECRET_NAME_WORDS = (
@@ -100,12 +124,19 @@ SECRET_NAME_WORDS = (
     "private_key",
     "private-key",
     "privatekey",
+    "token",
+    "apikey",
+    "api_key",
+    "api-key",
 )
+# The whole name of a data file (with no suffix) that is a secret file.
+SECRET_STEMS = frozenset({"pass", "pwd", "pw", "key", "keys", "auth"})
 DATA_SUFFIXES = frozenset(
     " .txt .json .yml .yaml .xml .ini .cfg .conf .properties .toml .csv .bak .old "
-    ".backup .dump .db .sqlite .enc".split(" ")
+    ".backup .dump .db .sqlite .enc .zip .tar .gz .tgz .7z .rar".split(" ")
 )
 MAX_FILES = 20_000
+FOLDER_CHUNK = 2_000  # the files of one folder that the walk takes in one turn
 MAX_FILE_BYTES = 1_000_000
 TOTAL_WORDS = 6_500
 MAX_LINE_CHARS = 2_000
@@ -305,21 +336,32 @@ class CodebaseFacts:
     languages: dict[str, int]
     parts: list[Part] = field(default_factory=list)
     stopped_early: bool = False  # the folder has more files than the scan reads
+    suffixes: dict[str, int] = field(default_factory=dict)  # every file type
 
 
 def is_secret_name(name: str) -> bool:
     """True when the file name is one of the secret file names.
 
     A data file (.txt, .json, .yml and so on) with a word such as "password"
-    or "secret" in its name counts too. A code file with such a name does not:
-    its name says what the product does.
+    or "secret" in its name counts too. A code file does not, with two known
+    exceptions: its name says what the product does (credentials_controller.rb).
     """
     lower = name.lower()
+    suffix = Path(lower).suffix
+    if suffix in CODE_SUFFIXES:
+        return lower in CODE_SECRET_NAMES
     if any(fnmatch.fnmatchcase(lower, p.lower()) for p in SECRET_PATTERNS):
         return True
-    if Path(lower).suffix not in DATA_SUFFIXES:
+    if suffix not in DATA_SUFFIXES:
         return False
+    if Path(lower).stem in SECRET_STEMS:
+        return True
     return any(word in lower for word in SECRET_NAME_WORDS)
+
+
+def has_control_character(name: str) -> bool:
+    """True for a name with a line break or another control character."""
+    return any(ord(ch) < 32 or ch in "\x7f\x85\u2028\u2029" for ch in name)
 
 
 def looks_random(token: str) -> bool:
@@ -388,30 +430,48 @@ def cut_words(text: str, limit: int) -> str:
 def _walk(folder: Path) -> tuple[list[str], int, int, bool]:
     """Return the usable files, the count, the secret files, and "stopped early".
 
-    The walk goes level by level, so the files near the root are never lost
-    when the folder has more files than the limit.
+    The walk goes level by level and takes at most FOLDER_CHUNK files of one
+    folder before it goes on to the next folder. So one very large folder
+    cannot hide the folders beside it when the limit ends the walk.
     """
     root = folder.resolve()
     files: list[str] = []
     seen = secrets = 0
-    queue: deque[Path] = deque([root])
+    # one entry: a folder, and its files that are left (None: not listed yet)
+    queue: deque[tuple[Path, list | None]] = deque([(root, None)])
     while queue:
-        base = queue.popleft()
-        try:
-            entries = sorted(os.scandir(base), key=lambda e: e.name)
-        except OSError:
-            continue
-        for entry in entries:
+        base, left = queue.popleft()
+        if left is None:
             try:
-                if entry.is_dir(follow_symlinks=False):
-                    if entry.name not in SKIPPED_FOLDERS:
-                        queue.append(Path(entry.path))
+                entries = sorted(os.scandir(base), key=lambda e: e.name)
+            except OSError:
+                continue
+            left = []
+            for entry in entries:
+                if has_control_character(entry.name):
+                    continue  # such a name could forge lines in the text for the model
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        if entry.name not in SKIPPED_FOLDERS:
+                            queue.append((Path(entry.path), None))
+                    else:
+                        left.append(entry)
+                except OSError:
                     continue
+        if len(left) > FOLDER_CHUNK:
+            queue.append((base, left[FOLDER_CHUNK:]))
+            left = left[:FOLDER_CHUNK]
+        pieces = base.relative_to(root).parts
+        secret_folder = any(piece.lower() in SECRET_FOLDERS for piece in pieces)
+        for entry in left:
+            try:
                 if entry.is_symlink():
                     target = Path(entry.path).resolve()
                     inside = target.relative_to(root)
                     if not target.is_file():
                         continue
+                    if any(piece in SKIPPED_FOLDERS for piece in inside.parts):
+                        continue  # a link into a folder that the scan never reads
                     if any(is_secret_name(piece) for piece in inside.parts):
                         seen += 1
                         secrets += 1  # a link with a harmless name to a secret file
@@ -423,19 +483,44 @@ def _walk(folder: Path) -> tuple[list[str], int, int, bool]:
             if seen >= MAX_FILES:
                 return files, seen, secrets, True
             seen += 1
-            if is_secret_name(entry.name):
+            in_secret_folder = (
+                secret_folder and Path(entry.name).suffix.lower() not in CODE_SUFFIXES
+            )
+            if is_secret_name(entry.name) or in_secret_folder:
                 secrets += 1
                 continue
             files.append(Path(entry.path).relative_to(root).as_posix())
     return files, seen, secrets, False
 
 
-def _read(folder: Path, rel: str) -> str | None:
-    """Read a text file, or return None when it is too large or unreadable."""
+def _safe_file(folder: Path, rel: str) -> Path | None:
+    """The path of a file that the scan may open now, or None.
+
+    The check runs again at the time of the read: a file that became a link
+    to a secret file or to a place outside the folder is not opened.
+    """
     path = folder / rel
     try:
-        if path.stat().st_size > MAX_FILE_BYTES:
+        if path.is_symlink():
+            root = folder.resolve()
+            inside = path.resolve().relative_to(root)
+            if any(piece in SKIPPED_FOLDERS for piece in inside.parts):
+                return None
+            if any(is_secret_name(piece) for piece in inside.parts):
+                return None
+        if not path.is_file() or path.stat().st_size > MAX_FILE_BYTES:
             return None
+    except (ValueError, OSError):
+        return None
+    return path
+
+
+def _read(folder: Path, rel: str) -> str | None:
+    """Read a text file, or return None when it is too large or unreadable."""
+    path = _safe_file(folder, rel)
+    if path is None:
+        return None
+    try:
         return _decode(path.read_bytes())
     except OSError:
         return None
@@ -469,10 +554,11 @@ def _read_doc(folder: Path, rel: str) -> str | None:
     suffix = Path(rel).suffix.lower()
     if suffix not in getattr(formats, "OTHER_SUFFIXES", ()):
         return None
+    path = _safe_file(folder, rel)
+    if path is None:
+        return None
     try:
-        if (folder / rel).stat().st_size > MAX_FILE_BYTES:
-            return None
-        return formats.to_markdown(folder / rel)
+        return formats.to_markdown(path)
     except Exception:  # noqa: BLE001
         return None
 
@@ -600,7 +686,12 @@ def scan_codebase(folder: Path) -> CodebaseFacts:
         candidates.append(("code_folders", "(largest code folders)", code))
     candidates += [p for p in parts if p[0] != "readme"]
     facts = CodebaseFacts(
-        folder.resolve().name, seen, secrets, dict(top), stopped_early=stopped
+        folder.resolve().name,
+        seen,
+        secrets,
+        dict(top),
+        stopped_early=stopped,
+        suffixes=counts,
     )
     budget = TOTAL_WORDS
     for kind, path, raw in candidates:
