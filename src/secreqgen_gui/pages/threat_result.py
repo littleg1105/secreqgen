@@ -22,6 +22,7 @@ from secreqgen.application.threat_view import (
 
 from secreqgen_gui import storage
 from secreqgen_gui.widgets import (
+    about_tag,
     empty_state,
     formats_tag,
     has_mirror_names,
@@ -589,6 +590,7 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                 if _not_tested(model):
                     tag("untested prompts", "caution")
                 formats_tag(data["manifest"])
+                about_tag(data["manifest"])
             with ui.row().classes("items-baseline gap-3"):
                 ui.label(_steps_line(model)).classes("sr-small").mark("steps-line")
                 address = (

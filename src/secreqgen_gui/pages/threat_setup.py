@@ -9,7 +9,7 @@ from secreqgen.application.errors import InputError
 from secreqgen.application.inputs import check_about
 
 from secreqgen_gui import form_memory, jobs, storage
-from secreqgen_gui.form_memory import COMMON, THREATS
+from secreqgen_gui.form_memory import COMMON, REQUIREMENTS, THREATS
 from secreqgen_gui.pages._setup_parts import (
     UNTESTED_PROMPTS,
     DocsPart,
@@ -25,10 +25,15 @@ from secreqgen_gui.pages._setup_parts import (
     section,
     set_message,
 )
+from secreqgen_gui.pages.about_dialog import (
+    ABOUT_LIMIT,
+    counter_text,
+    open_about_dialog,
+)
+from secreqgen_gui.pages.context_dialog import BUTTON as ABOUT_BUTTON
 from secreqgen_gui.settings import load_settings
 from secreqgen_gui.widgets import page_title
 
-ABOUT_LIMIT = 120
 ABOUT_PAUSE = 0.3  # seconds with no change before the paragraph goes to its file
 SAME_MODEL = "The checker must be a different model from the writer."
 ABOUT_HINT = "What the product does and who uses it. The writer reads this."
@@ -90,6 +95,19 @@ def page(
                 .classes("w-full")
             )
             counter = ui.label().classes("sr-small")
+            ui.button(
+                ABOUT_BUTTON,
+                on_click=lambda: open_about_dialog(
+                    saved(REQUIREMENTS, "context_folder", "", str),
+                    (docs_part.product.value or "").strip(),
+                    lambda: about.value or "",
+                    use_paragraph,
+                ),
+            ).props("outline no-caps unelevated color=primary").mark(
+                "about-write-open"
+            ).classes(
+                "self-start"
+            )
             choices = prompt_set_choices("threats")
             old_set = saved(THREATS, "prompts", None, str)
             if old_set is not None and old_set not in choices:
@@ -139,8 +157,7 @@ def page(
             checker.set_enabled(bool(check.value))
             set_message(same, SAME_MODEL if same_model() else "", "caution")
             over = words() > ABOUT_LIMIT
-            size = f"{words()} of {ABOUT_LIMIT} words"
-            counter.set_text(size + (". Shorten the paragraph." if over else ""))
+            counter.set_text(counter_text(words()))
             counter.classes(remove="text-negative")
             if over:
                 counter.classes(add="text-negative")
@@ -148,6 +165,29 @@ def page(
             set_message(untested, UNTESTED_PROMPTS if chosen else "", "caution")
             foot.update()
             foot.show_command()
+
+        # The mark "generated": a model wrote the facts of the paragraph. It
+        # stays while the field has text, also when the person changes the
+        # text. It goes when the field is empty. The memory keeps it too.
+        generated = {
+            "on": saved(THREATS, "about_generated", False, bool)
+            and bool((about.value or "").strip())
+        }
+        if not generated["on"]:
+            form_memory.remember(THREATS, "about_generated", None)
+
+        def follow_mark(_e=None) -> None:
+            if generated["on"] and not (about.value or "").strip():
+                generated["on"] = False
+                form_memory.remember(THREATS, "about_generated", None)
+
+        def use_paragraph(text: str) -> None:
+            """Put a paragraph of the dialog into the form, with the mark."""
+            generated["on"] = True
+            form_memory.remember(THREATS, "about_generated", True)
+            about.set_value(text)
+
+        about.on_value_change(follow_mark)
 
         def make_spec(about_text: str | None) -> jobs.ThreatRunSpec | None:
             """Return what a click on Start gives to the run."""
@@ -163,6 +203,7 @@ def page(
                 checker_model=checker.value.strip() if check.value else None,
                 labels=bool(labels.value),
                 about=about_text,
+                about_generated=bool(about_text and generated["on"]),
                 prompt_set=prompt_set_value(prompt.value),
                 other_formats=docs_part.other_formats,
             )
@@ -288,6 +329,7 @@ def page(
             checker.set_value(defaults.checker_model)
             labels.set_value(True)
             about.set_value("")
+            generated["on"] = False
             prompt.set_value(next(iter(choices)))
             muted["on"] = False
             stories_part.reset()

@@ -23,6 +23,7 @@ from secreqgen_gui.widgets import (
     COMMAND_HINT,
     COMMAND_LABEL,
     CommandBlock,
+    about_tag,
     context_tag,
     empty_state,
     formats_tag,
@@ -279,9 +280,10 @@ def _head(view: View) -> None:
         ui.label(f"Untested prompts: {view.prompt_name}").style(
             "color:var(--sr-caution)"
         )
-    with ui.row().classes("gap-2 items-center"):  # the two tags side by side
+    with ui.row().classes("gap-2 items-center"):  # the tags side by side
         formats_tag(view.manifest)
         context_tag(view.manifest)
+        about_tag(view.manifest)
 
 
 def _replay_address(view: View, story_id: str) -> str:

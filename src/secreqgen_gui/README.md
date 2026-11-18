@@ -17,20 +17,24 @@ Open `http://127.0.0.1:8080`. Ollama must run and must have the models of the Se
 2. In "Stories", click "Use the example stories". The GUI comes with 8 generic stories (login, password reset, roles, API tokens, single sign-on, file uploads, audit log, webhooks). Your copy is `examples/generic_stories.json` in the data folder. You can change it.
 3. In "Documentation", click "Browse" and pick the folder with the documentation of the product. It can be the folder of the codebase itself. The line under the field says what the search will read.
 4. On "Requirements" only: click "Write one with the model" under the context file field. Pick the codebase folder and click "Write". The model writes a draft system context. Check each line against its source, change what is wrong, and click "Save and use".
-5. Click "Start requirements" or "Start threat list".
+5. On "Threat list" only: click "Write one with the model" under the field "About the product (optional)". Pick the codebase folder and click "Write". Check each line of the draft against its source, change what is wrong, and click "Use this paragraph".
+6. Click "Start requirements" or "Start threat list".
 
 "Browse" shows a list of folders in the page. It works the same way on every system and in a container.
 
 ## Outside the tested setup
 
-The thesis tests used Markdown files and system context files that a person wrote. Two options of the GUI go beyond that. A run that uses one of them gets a tag on its pages.
+The thesis tests used Markdown files and system context files that a person wrote. Three options of the GUI go beyond that. A run that uses one of them gets a tag on its pages.
 
 | Option | What it does | Tag of the run |
 |---|---|---|
 | Switch "Read other file types too" (on) | The search also reads `.rst`, `.adoc`, `.txt`, `.mdx`, `.html`, `.pdf` and `.docx` files. The GUI converts them to Markdown in a copy of the folder. Your folder is never changed. Files that are no documentation are left out (dependency, test and template folders, licence files). | untested file types |
 | "Write one with the model" | A model writes the system context from the files of a codebase. Plain code removes each line that names no real file, and each technology that no file names. The security rating is the judgement of the model. | generated context |
+| "Write one with the model" (About the product) | The dialog starts the same job as the system context. Then plain code makes the paragraph from the checked system context with the rule of the test of 17 November 2026: name, description, main parts, features (about 80 words). No model writes the paragraph. | generated paragraph |
 
 With the switch off and a context file of your own (or none), a run is the tested path.
+
+A threat list run with a paragraph from the model is outside the tested setup: the thesis tests used facts that a person wrote. The tag "generated paragraph" stays while the field has text, also when you change a word, because the facts still come from a model. It goes away when you empty the field (also with "Clear the form"). The GUI keeps a record of each paragraph that you use, with the sources of its lines, in the folder `paragraphs` of the data folder.
 
 ## The forms keep their values
 
@@ -38,7 +42,7 @@ The two forms keep what you enter, also after a restart of the GUI. The stories,
 
 ## The command of a run
 
-Under the Start button of each form, the block "Command" shows the command of `secreqgen` that starts the same run in a terminal. It changes with each option that you change. "Copy" puts it on the clipboard. The dialog "Write a system context" and the page of a run show their command too (on the page of a run: click "Command").
+Under the Start button of each form, the block "Command" shows the command of `secreqgen` that starts the same run in a terminal. It changes with each option that you change. "Copy" puts it on the clipboard. The dialogs "Write a system context" and "Write a paragraph about the product" and the page of a run show their command too (on the page of a run: click "Command").
 
 The GUI does not run this command. The GUI and the command call the same code. A test compares the two: the models get the same prompts from the command and from the GUI.
 
@@ -81,7 +85,7 @@ The lanes are the parts of the tool. The boxes are the steps of one story, in th
 | Variable | Default | What it does |
 |---|---|---|
 | `SECREQGEN_GUI_PORT` | `8080` | The port |
-| `SECREQGEN_GUI_HOME` | `.secreqgen` in your home folder | The data folder: uploads, runs, your prompt sets, saved system contexts, the form values and the copies of converted documentation |
+| `SECREQGEN_GUI_HOME` | `.secreqgen` in your home folder | The data folder: uploads, runs, your prompt sets, saved system contexts, the records of the paragraphs, the form values and the copies of converted documentation |
 | `SECREQGEN_GUI_HOST` | `127.0.0.1` | The address that the server listens on |
 | `SECREQGEN_GUI_ALLOWED_HOSTS` | empty | More host names that a request can use, separated by commas |
 | `SECREQGEN_GUI_START_RUN` | empty | A JSON file that starts one run when the server starts |

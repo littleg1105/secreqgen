@@ -434,10 +434,10 @@ def save_upload(name: str, data: bytes) -> Path:
     return target
 
 
-def _safe_part(text: str) -> str:
+def _safe_part(text: str, default: str = "context") -> str:
     """Keep letters, digits, dot, hyphen and underscore. Cut to 40 characters."""
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", str(text or ""))
-    return cleaned.strip("-._")[:40] or "context"
+    return cleaned.strip("-._")[:40] or default
 
 
 def save_context(yaml_text: str, result: dict, name: str) -> Path:
@@ -458,6 +458,32 @@ def save_context(yaml_text: str, result: dict, name: str) -> Path:
         number += 1
     _write_json(target.with_suffix(".json"), result)
     target.write_text(yaml_text, encoding="utf-8")
+    return target
+
+
+def paragraphs_dir() -> Path:
+    """Return the folder of the records of the paragraphs that a model drafted."""
+    return _sub_dir("paragraphs")
+
+
+def save_about_draft(text: str, result: dict, name: str) -> Path:
+    """Write the record of a paragraph about the product that a model drafted.
+
+    The file is <name>-<date and time>.json in the folder paragraphs. It holds
+    the text as the person left it and the result of the job, with the sources
+    of each line. Return the path.
+    """
+    folder = paragraphs_dir()
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    base = f"{_safe_part(name, 'paragraph')}-{stamp}"
+    number = 1
+    while True:
+        suffix = "" if number == 1 else f"-{number}"
+        target = folder / f"{base}{suffix}.json"
+        if not target.exists():
+            break
+        number += 1
+    _write_json(target, {"schema_version": 1, "paragraph": text, "result": result})
     return target
 
 

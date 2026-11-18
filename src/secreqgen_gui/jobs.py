@@ -82,6 +82,7 @@ class ThreatRunSpec:
     about: str | None = None
     prompt_set: str | None = None  # the name of a user prompt set
     other_formats: bool = False  # convert files of other types to Markdown
+    about_generated: bool = False  # a model wrote the facts of the paragraph
 
 
 @dataclass
@@ -547,6 +548,8 @@ class JobManager:
             )
             if spec.about:
                 manifest["about"] = spec.about  # for the command of the run
+                if spec.about_generated:
+                    manifest["generated_about"] = True
         else:
             manifest["model"] = spec.model
             # For the command of the run. The key is always there: None says

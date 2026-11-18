@@ -86,6 +86,21 @@ def context_tag(manifest: dict | None) -> None:
         ui.tooltip(CONTEXT_HINT)
 
 
+ABOUT_HINT = (
+    "A model wrote the facts in the paragraph about the product. "
+    "The thesis tests used facts that a person wrote."
+)
+
+
+def about_tag(manifest: dict | None) -> None:
+    """Show the tag "generated paragraph" when a model wrote the facts."""
+    if not manifest or not manifest.get("generated_about"):
+        return
+    with ui.element("span").mark("tag-generated-about"):
+        tag("generated paragraph", "caution")
+        ui.tooltip(ABOUT_HINT)
+
+
 COMMAND_LABEL = "Command"
 COMMAND_HINT = "This command starts the same run in a terminal."
 COPY_LABEL = "Copy"

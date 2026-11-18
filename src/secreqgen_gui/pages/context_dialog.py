@@ -41,6 +41,7 @@ STOPPED_EARLY = (
     "The scan stopped at {n} files. Pick a smaller folder to scan all files."
 )
 CAUTION = "color: var(--sr-caution)"
+OWNER = "context"  # the name of this dialog for the shared job
 
 
 def _files(count: int) -> str:
@@ -102,9 +103,11 @@ def open_context_dialog(
     """Open the dialog. on_saved gets the short path of the saved file."""
     shown = {"token": None}
     # A new dialog starts empty. It shows a job only when that job is in
-    # progress now or starts after the dialog opened.
+    # progress now or starts after the dialog opened, and only a job of this
+    # dialog (the dialog for the paragraph uses the same job).
     first = context_job.writer.state()
-    old = {"serial": None if first["state"] == "running" else first["serial"]}
+    own = first.get("owner", OWNER) == OWNER
+    old = {"serial": None if first["state"] == "running" and own else first["serial"]}
     pending = {"start": False}
     with (
         ui.dialog() as dialog,
@@ -285,7 +288,9 @@ def open_context_dialog(
             state = context_job.writer.state()
             another = jobs.manager.busy()
             working = state["state"] == "running"
-            mine = state["serial"] != old["serial"]
+            mine = (
+                state["serial"] != old["serial"] and state.get("owner", OWNER) == OWNER
+            )
             busy_line.set_visibility(another)
             write_button.set_enabled(
                 not another and not working and not pending["start"]

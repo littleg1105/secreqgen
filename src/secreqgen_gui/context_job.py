@@ -42,6 +42,7 @@ def _empty_state() -> dict:
         "message": "",
         "result": None,
         "serial": 0,  # changes with each start
+        "owner": "",  # the dialog that started the job
     }
 
 
@@ -82,8 +83,14 @@ class ContextJob:
         if thread is not None:
             thread.join(timeout)
 
-    def start(self, folder: Path, product: str | None, model: str) -> None:
-        """Start the job. A run or another job in progress gives RuntimeError."""
+    def start(
+        self, folder: Path, product: str | None, model: str, owner: str = "context"
+    ) -> None:
+        """Start the job. A run or another job in progress gives RuntimeError.
+
+        Two dialogs share this job. Owner names the dialog that starts it, so
+        that a dialog never shows the draft of the other one as its own.
+        """
         with jobs.START_LOCK:
             if self.busy() or jobs.manager.busy():
                 raise RuntimeError(BUSY)
@@ -92,6 +99,7 @@ class ContextJob:
                 self._serial += 1
                 self._state = _empty_state()
                 self._state["serial"] = self._serial
+                self._state["owner"] = owner
                 self._state["state"] = "running"
                 self._state["stage"] = "scan"
                 self._state["stages"]["scan"]["state"] = "running"
