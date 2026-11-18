@@ -5,7 +5,12 @@ folder in which every other file type is also a `.md` file. No model and no
 network is used here.
 """
 
-from secreqgen.documents.formats import OTHER_SUFFIXES, FormatError, to_markdown
+from secreqgen.documents.formats import (
+    OTHER_SUFFIXES,
+    FormatError,
+    decode_text,
+    to_markdown,
+)
 from secreqgen.documents.mirror import (
     MAX_FILE_BYTES,
     SKIPPED_FOLDERS,
@@ -21,6 +26,7 @@ __all__ = [
     "FormatError",
     "MirrorReport",
     "build_mirror",
+    "decode_text",
     "other_files",
     "to_markdown",
 ]
