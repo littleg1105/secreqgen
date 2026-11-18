@@ -26,6 +26,8 @@ from secreqgen_gui.pages.context_dialog import open_context_dialog
 from secreqgen_gui.settings import expand_path, load_settings
 from secreqgen_gui.widgets import page_title, path_field
 
+CONTEXT_MISSING = "File not found. Check the path or click Browse."
+
 
 def page(
     stories: str | None = None,
@@ -39,13 +41,13 @@ def page(
     with ui.column().classes("w-full max-w-[680px] gap-6"):
         stories_part = StoriesPart(
             lambda: refresh(),
-            initial_path(stories) or saved(COMMON, "stories_file", ""),
+            initial_path(stories) or saved(COMMON, "stories_file", "", str),
         )
         docs_part = DocsPart(
             lambda: refresh(),
             stories_part,
-            initial_path(docs) or saved(COMMON, "docs", ""),
-            initial_product(product) or saved(COMMON, "product", ""),
+            initial_path(docs) or saved(COMMON, "docs", "", str),
+            initial_product(product) or saved(COMMON, "product", "", str),
         )
 
         body = section("Options")
@@ -53,27 +55,33 @@ def page(
             model = (
                 ui.input(
                     "Model",
-                    value=saved(REQUIREMENTS, "model", defaults.requirements_model),
+                    value=saved(
+                        REQUIREMENTS, "model", defaults.requirements_model, str
+                    ),
                 )
                 .props("outlined dense")
                 .classes("w-full")
             )
-            context = path_field(
-                "System context file (optional)",
-                saved(REQUIREMENTS, "context_file", ""),
-            )
+            context_start = saved(REQUIREMENTS, "context_file", "", str)
+            context = path_field("System context file (optional)", context_start)
+            context_note = message()
+            context_note.set_visibility(False)
             ui.button(
                 CONTEXT_BUTTON,
                 on_click=lambda: open_context_dialog(
-                    saved(REQUIREMENTS, "context_folder", ""),
+                    saved(REQUIREMENTS, "context_folder", "", str),
                     (docs_part.product.value or "").strip(),
                     context.set_value,
                 ),
             ).props("outline no-caps unelevated color=primary").mark(
                 "context-write-open"
-            ).classes("self-start")
+            ).classes(
+                "self-start"
+            )
             choices = prompt_set_choices("requirements")
-            old_set = saved(REQUIREMENTS, "prompts")
+            old_set = saved(REQUIREMENTS, "prompts", None, str)
+            if old_set is not None and old_set not in choices:
+                form_memory.remember(REQUIREMENTS, "prompts", None)  # the set is gone
             prompt = ui.select(
                 choices,
                 value=old_set if old_set in choices else next(iter(choices)),
@@ -82,11 +90,34 @@ def page(
             prompt.classes("w-full")
             untested = message()
 
+        # The check of the context file runs off the event loop. While it
+        # runs, the file counts as not ready. An empty field is always fine.
+        context_state = {"ok": not context_start.strip(), "token": 0}
+
+        async def check_context() -> None:
+            context_state["token"] += 1
+            token = context_state["token"]
+            text = (context.value or "").strip()
+            if not text:
+                context_state["ok"] = True
+                set_message(context_note, "")
+                refresh()
+                return
+            context_state["ok"] = False
+            set_message(context_note, "")
+            there = await run.io_bound(expand_path(text).is_file)
+            if token != context_state["token"]:
+                return
+            context_state["ok"] = there
+            set_message(context_note, "" if there else CONTEXT_MISSING, "bad")
+            refresh()
+
         def ready() -> bool:
             return bool(
                 stories_part.path
                 and stories_part.selected
                 and docs_part.ok
+                and context_state["ok"]
                 and (model.value or "").strip()
             )
 
@@ -98,6 +129,11 @@ def page(
 
         async def start() -> None:
             if not stories_part.path or not docs_part.path:
+                return
+            await check_context()
+            if not context_state["ok"]:
+                return
+            if not await docs_part.still_there():
                 return
             context_text = (context.value or "").strip()
             context_path = str(expand_path(context_text)) if context_text else None
@@ -127,6 +163,9 @@ def page(
         )
         prompt.on_value_change(lambda _e: refresh())
         model.on_value_change(lambda _e: refresh())
+        context.on_value_change(lambda _e: check_context())
+        if context_start.strip():
+            ui.timer(0.05, check_context, once=True)
         kept = {"model": model, "context_file": context, "prompts": prompt}
         muted = {"on": False}
 
@@ -151,7 +190,7 @@ def page(
             muted["on"] = False
             stories_part.reset()
             docs_part.reset()
-            form_memory.clear()
+            form_memory.clear(COMMON, REQUIREMENTS)
             refresh()
 
         clear_button(reset)

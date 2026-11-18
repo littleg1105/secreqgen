@@ -43,30 +43,32 @@ def page(
     with ui.column().classes("w-full max-w-[680px] gap-6"):
         stories_part = StoriesPart(
             lambda: refresh(),
-            initial_path(stories) or saved(COMMON, "stories_file", ""),
+            initial_path(stories) or saved(COMMON, "stories_file", "", str),
         )
         docs_part = DocsPart(
             lambda: refresh(),
             stories_part,
-            initial_path(docs) or saved(COMMON, "docs", ""),
-            initial_product(product) or saved(COMMON, "product", ""),
+            initial_path(docs) or saved(COMMON, "docs", "", str),
+            initial_product(product) or saved(COMMON, "product", "", str),
         )
 
         body = section("Options")
         with body:
             writer = (
                 ui.input(
-                    "Writer", value=saved(THREATS, "writer", defaults.writer_model)
+                    "Writer",
+                    value=saved(THREATS, "writer", defaults.writer_model, str),
                 )
                 .props('outlined dense hint="The model that writes the threats."')
                 .classes("w-full")
             )
             check = ui.switch(
-                "Use a checker", value=bool(saved(THREATS, "check", True))
+                "Use a checker", value=saved(THREATS, "check", True, bool)
             )
             checker = (
                 ui.input(
-                    "Checker", value=saved(THREATS, "checker", defaults.checker_model)
+                    "Checker",
+                    value=saved(THREATS, "checker", defaults.checker_model, str),
                 )
                 .props('outlined dense hint="The model that checks each threat."')
                 .classes("w-full")
@@ -74,18 +76,21 @@ def page(
             same = message()
             labels = ui.switch(
                 "Add a threat actor and a STRIDE category",
-                value=bool(saved(THREATS, "labels", True)),
+                value=saved(THREATS, "labels", True, bool),
             )
             about = (
                 ui.textarea(
-                    "About the product (optional)", value=saved(THREATS, "about", "")
+                    "About the product (optional)",
+                    value=saved(THREATS, "about", "", str),
                 )
                 .props(f'outlined autogrow hint="{ABOUT_HINT}"')
                 .classes("w-full")
             )
             counter = ui.label().classes("sr-small")
             choices = prompt_set_choices("threats")
-            old_set = saved(THREATS, "prompts")
+            old_set = saved(THREATS, "prompts", None, str)
+            if old_set is not None and old_set not in choices:
+                form_memory.remember(THREATS, "prompts", None)  # the set is gone
             prompt = ui.select(
                 choices,
                 value=old_set if old_set in choices else next(iter(choices)),
@@ -108,9 +113,7 @@ def page(
                 return False
             if not (writer.value or "").strip():
                 return False
-            if check.value and (
-                not (checker.value or "").strip() or same_model()
-            ):
+            if check.value and (not (checker.value or "").strip() or same_model()):
                 return False
             return words() <= ABOUT_LIMIT
 
@@ -135,6 +138,8 @@ def page(
                 ui.notify(str(exc), type="negative")
                 return
             if not stories_part.path or not docs_part.path:
+                return
+            if not await docs_part.still_there():
                 return
             spec = jobs.ThreatRunSpec(
                 stories_file=stories_part.path,
@@ -198,7 +203,7 @@ def page(
             muted["on"] = False
             stories_part.reset()
             docs_part.reset()
-            form_memory.clear()
+            form_memory.clear(COMMON, THREATS)
             refresh()
 
         clear_button(reset)

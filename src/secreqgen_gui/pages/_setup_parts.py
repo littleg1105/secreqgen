@@ -7,12 +7,11 @@ Text from a story file or from a folder is untrusted. It is shown as text.
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from nicegui import events, run, ui
-from secreqgen.application.documentation import convertible_files
+from secreqgen.application.documentation import count_documentation
 from secreqgen.application.errors import InputError
 from secreqgen.application.inputs import (
     UPLOAD_EXTENSIONS,
@@ -28,6 +27,7 @@ from secreqgen_gui.widgets import path_field
 
 TESTED_SET = "__tested__"
 FOLDER_MISSING = "Folder not found. Check the path or click Browse."
+READING = "Reading the folder."
 NO_FILES = "This folder has no documentation files that the search can read."
 WRONG_TYPE = "Use a .json, .yaml or .yml file."
 STORIES_HINT = "JSON or YAML, with a list named user_stories"
@@ -35,6 +35,7 @@ EXAMPLES_HINT = "Eight generic stories that fit most products."
 DOCS_HINT = "The folder with the documentation of the product"
 OTHER_SWITCH = "Read other file types too"
 BUSY = "Another run is in progress. Wait for it to end, or stop it."
+CONTEXT_BUSY = "A model is writing a system context. Wait for it to end."
 UNTESTED_PROMPTS = "A run with these prompts gets the tag: untested prompts."
 PRODUCT_NOTE = "Product name (optional)"
 PRODUCT_LIMIT = 80
@@ -63,7 +64,7 @@ def initial_product(text: str | None) -> str:
 
 def plural(count: int, one: str, many: str) -> str:
     """Return the count with the right form of the noun."""
-    return f"{count} {one if count == 1 else many}"
+    return f"{count:,} {one if count == 1 else many}"
 
 
 def section(title: str) -> ui.column:
@@ -90,28 +91,42 @@ def set_message(label: ui.label, text: str, kind: str = "plain") -> None:
     label.set_visibility(bool(text))
 
 
-def count_markdown(folder: Path) -> int:
-    """Count the Markdown files that the search reads.
-
-    The search reads each file whose name ends in ".md" (small letters), in
-    the folder and in every folder below it.
-    """
-    return sum(
-        1 for _root, _dirs, names in os.walk(folder) for n in names if n.endswith(".md")
-    )
+def reason_text(exc: Exception) -> str:
+    """Return the text of an error as a sentence that ends in a full stop."""
+    text = str(exc).strip()
+    return text if text.endswith((".", "!", "?")) else text + "."
 
 
-def docs_line(markdown: int, others: dict[str, int], convert: bool) -> str:
+def folders_text(folders: tuple[str, ...]) -> str:
+    """Return the names of dependency folders: two are named, the rest counted."""
+    if len(folders) <= 2:
+        return " and ".join(folders)
+    more = len(folders) - 2
+    rest = f"{more} more {'folder' if more == 1 else 'folders'}"
+    return f"{folders[0]}, {folders[1]} and {rest}"
+
+
+def docs_line(
+    markdown: int,
+    others: dict[str, int],
+    convert: bool,
+    in_dependencies: int = 0,
+    dependency_folders: tuple[str, ...] = (),
+) -> str:
     """Return the line under the documentation folder field.
 
-    Markdown is the count of .md files. Others counts the files of other
+    Markdown is the count of .md files. In_dependencies is the part of them
+    that is in folders such as node_modules. Others counts the files of other
     types by suffix. Convert is the state of the switch.
     """
     total = sum(others.values())
+    found = f"{plural(markdown, 'Markdown file', 'Markdown files')} found."
+    if markdown and in_dependencies and dependency_folders:
+        be = "is" if in_dependencies == 1 else "are"
+        place = folders_text(dependency_folders)
+        found += f" {in_dependencies:,} {be} in {place}."
     if not total:
-        if markdown:
-            return f"{plural(markdown, 'Markdown file', 'Markdown files')} found."
-        return NO_FILES
+        return found if markdown else NO_FILES
     kinds = ", ".join(sorted(others, key=lambda kind: (-others[kind], kind))[:3])
     one = total == 1
     if not markdown:
@@ -122,12 +137,11 @@ def docs_line(markdown: int, others: dict[str, int], convert: bool) -> str:
                 f"{'another type' if one else 'other types'} {verb} converted "
                 f"({kinds})."
             )
-        rest = f"the {total} other {'file' if one else 'files'}"
+        rest = f"the {total:,} other {'file' if one else 'files'}"
         return (
             "This folder has no Markdown files. "
             f'Turn on "{OTHER_SWITCH}" to read {rest}.'
         )
-    found = f"{plural(markdown, 'Markdown file', 'Markdown files')} found."
     verb = ("is" if one else "are") + (" converted" if convert else " not read")
     kind = "another type" if one else "other types"
     return f"{found} {plural(total, 'file', 'files')} of {kind} {verb} ({kinds})."
@@ -161,22 +175,26 @@ class StoriesPart:
         self._token = 0
         self.loaded: Path | None = None
         self.muted = False
-        previous = form_memory.recall(COMMON, "stories_file", "")
+        self.pick_count = 0  # how often the person changed the file
+        self.named_pick: int | None = (
+            None  # the pick of the file that named the project
+        )
+        previous = form_memory.recall(COMMON, "stories_file", "", str)
         if initial != previous:
             form_memory.remember(COMMON, "stories_file", initial)
             form_memory.remember(COMMON, "story_ids", None)
         # The chosen stories wait for the first redraw of the list.
-        self._restore = form_memory.recall(COMMON, "story_ids")
-        if not isinstance(self._restore, list):
-            self._restore = None
-        saved = form_memory.recall(COMMON, "stories_tab", "path")
+        self._restore = form_memory.recall(COMMON, "story_ids", None, list)
+        saved = form_memory.recall(COMMON, "stories_tab", "path", str)
         if saved not in TABS:
             saved = "path"
         body = section("Stories")
         with body:
-            with ui.tabs(value=saved).props("dense align=left no-caps").classes(
-                "w-full"
-            ) as tabs:
+            with (
+                ui.tabs(value=saved)
+                .props("dense align=left no-caps")
+                .classes("w-full") as tabs
+            ):
                 self.tabs = tabs
                 tab_file = ui.tab("path", TABS["path"])
                 tab_up = ui.tab("upload", TABS["upload"])
@@ -217,8 +235,9 @@ class StoriesPart:
         """Remember the file. A different file forgets the chosen stories."""
         if self.muted:
             return
+        self.pick_count += 1
         value = (self.field.value or "").strip()
-        if value != form_memory.recall(COMMON, "stories_file", ""):
+        if value != form_memory.recall(COMMON, "stories_file", "", str):
             self._restore = None
             form_memory.remember(COMMON, "story_ids", None)
         form_memory.remember(COMMON, "stories_file", value)
@@ -244,6 +263,10 @@ class StoriesPart:
             box.set_value(TYPED_DEFAULT[name])
         self.field.set_value("")
         self.muted = False
+        # No story file is left, so no project name is left.
+        self._token += 1
+        self.named_pick = None
+        self._clear("")
 
     # ways to give a file
 
@@ -255,9 +278,7 @@ class StoriesPart:
     def _upload_panel(self) -> None:
         ui.upload(
             on_upload=self._on_upload,
-            on_rejected=lambda: set_message(
-                self.problem, WRONG_TYPE, "bad"
-            ),
+            on_rejected=lambda: set_message(self.problem, WRONG_TYPE, "bad"),
             max_file_size=storage.MAX_UPLOAD_BYTES,
             max_files=1,
             auto_upload=True,
@@ -276,14 +297,12 @@ class StoriesPart:
             set_message(self.problem, f"{reason} Pick another file.", "bad")
             return
         except ValueError as exc:
-            set_message(self.problem, f"{exc} Pick another file.", "bad")
+            set_message(self.problem, f"{reason_text(exc)} Pick another file.", "bad")
             return
         self.field.set_value(show_path(path))
 
     def _type_panel(self) -> None:
-        saved = form_memory.recall(COMMON, "typed_story", {})
-        if not isinstance(saved, dict):
-            saved = {}
+        saved = form_memory.recall(COMMON, "typed_story", {}, dict)
 
         def old(name: str) -> str:
             value = saved.get(name)
@@ -357,6 +376,7 @@ class StoriesPart:
         """Read the story file in the background and show the stories."""
         self._token += 1
         token = self._token
+        pick = self.pick_count
         value = (self.field.value or "").strip()
         if not value:
             self._clear("")
@@ -366,12 +386,18 @@ class StoriesPart:
             result = await run.io_bound(read_story_file, path)
         except Exception as exc:  # the text of the error is the message
             if token == self._token:
-                self._clear(str(exc))
+                self._clear(f"{reason_text(exc)} Pick another file.")
+                if not pick and self.tabs.value != "path":
+                    # A remembered file failed: show the path that it came from.
+                    self.muted = True
+                    self.tabs.set_value("path")
+                    self.muted = False
             return
         if token != self._token:
             return
         self.stories = list(result.stories)
         self.project = result.project
+        self.named_pick = pick if result.project else None
         self.loaded = path
         set_message(self.problem, "")
         found = len(self.stories)
@@ -379,10 +405,12 @@ class StoriesPart:
         skipped = len(result.skipped)
         set_message(
             self.skipped,
-            f"{plural(skipped, 'story', 'stories')} could not be read "
-            f"and {'is' if skipped == 1 else 'are'} skipped."
-            if skipped
-            else "",
+            (
+                f"{plural(skipped, 'story', 'stories')} could not be read "
+                f"and {'is' if skipped == 1 else 'are'} skipped."
+                if skipped
+                else ""
+            ),
             "caution",
         )
         self._draw_list()
@@ -393,6 +421,7 @@ class StoriesPart:
         self.project = None
         self.loaded = None
         self.checks = {}
+        self.named_pick = None
         self.list_box.clear()
         set_message(self.problem, problem, "bad")
         set_message(self.info, "")
@@ -468,10 +497,14 @@ class DocsPart:
         self.on_change = on_change
         self.stories = stories
         self.files = 0
+        self.in_dependencies = 0
+        self.dependency_folders: tuple[str, ...] = ()
         self.others: dict[str, int] = {}
         self.isdir = False
+        self.scanning = bool(initial.strip())  # the first scan starts at once
         self._token = 0
         self._auto_product = ""
+        self._typed_pick = -1  # the pick of the story file at the last typing
         self.muted = False
         form_memory.remember(COMMON, "docs", initial)
         form_memory.remember(COMMON, "product", product)
@@ -480,10 +513,12 @@ class DocsPart:
             self.field = path_field(
                 "Documentation folder", initial, folder=True, hint=DOCS_HINT
             )
-            on = bool(form_memory.recall(COMMON, "other_formats", True))
+            on = form_memory.recall(COMMON, "other_formats", True, bool)
             self.switch = ui.switch(OTHER_SWITCH, value=on).mark("other_formats")
             self.info = message()
             self.info.set_visibility(False)
+            if self.scanning:
+                set_message(self.info, READING)
             self.product = (
                 ui.input(PRODUCT_NOTE, value=product)
                 .props("outlined dense")
@@ -508,10 +543,18 @@ class DocsPart:
         """Show the line under the field from the last scan."""
         if not (self.field.value or "").strip():
             set_message(self.info, "")
+        elif self.scanning:
+            set_message(self.info, READING)
         elif not self.isdir:
             set_message(self.info, FOLDER_MISSING, "bad")
         else:
-            line = docs_line(self.files, self.others, bool(self.switch.value))
+            line = docs_line(
+                self.files,
+                self.others,
+                bool(self.switch.value),
+                self.in_dependencies,
+                self.dependency_folders,
+            )
             set_message(self.info, line, "plain" if self.ok else "bad")
 
     def _field_changed(self, _e=None) -> None:
@@ -523,44 +566,91 @@ class DocsPart:
         value = (self.product.value or "").strip()
         if not self.muted and value != self._auto_product:
             form_memory.remember(COMMON, "product", value)
+            self._typed_pick = self.stories.pick_count
         self.on_change()
 
     def reset(self) -> None:
         """Show the defaults in place. The caller empties the memory."""
         self.muted = True
         self._auto_product = ""
+        self._typed_pick = -1
         self.field.set_value("")
         self.product.set_value("")
         self.switch.set_value(True)
         self.muted = False
+        self._token += 1  # a scan in progress must not show its result
+        self._forget_scan()
+        self.scanning = False
+        set_message(self.info, "")
+
+    def _forget_scan(self) -> None:
+        self.files = 0
+        self.in_dependencies = 0
+        self.dependency_folders = ()
+        self.others = {}
+        self.isdir = False
 
     async def check(self) -> None:
+        """Read the folder in the background. The old result is never shown."""
         self._token += 1
         token = self._token
         value = (self.field.value or "").strip()
+        self._forget_scan()
         if not value:
-            self.files = 0
-            self.others = {}
-            self.isdir = False
+            self.scanning = False
             set_message(self.info, "")
             self.on_change()
             return
+        self.scanning = True
+        set_message(self.info, READING)
+        self.on_change()
         folder = expand_path(value)
         isdir = await run.io_bound(folder.is_dir)
-        count = await run.io_bound(count_markdown, folder) if isdir else 0
-        others = await run.io_bound(convertible_files, folder) if isdir else {}
+        count = await run.io_bound(count_documentation, folder) if isdir else None
         if token != self._token:
             return
-        self.files, self.others, self.isdir = count, others, isdir
+        if count is not None:
+            self.files = count.markdown
+            self.in_dependencies = count.in_dependencies
+            self.dependency_folders = count.dependency_folders
+            self.others = dict(count.others)
+        self.isdir = isdir
+        self.scanning = False
         self._show()
         self.on_change()
 
+    async def still_there(self) -> bool:
+        """Check once more that the folder is there. Show the text if not."""
+        folder = self.path
+        if folder is None:
+            return False
+        if await run.io_bound(folder.is_dir):
+            return True
+        self._token += 1  # a scan in progress must not show its old result
+        self._forget_scan()
+        self.scanning = False
+        self._show()
+        self.on_change()
+        return False
+
     def fill_product(self) -> None:
-        """Fill the product name from the story file when the person did not."""
+        """Fill the product name from the story file.
+
+        An empty box, or a name that came from a file, takes the project name.
+        So does any name, when the person picked another stories file after
+        the typing and that file names a project.
+        """
         name = self.stories.project or ""
-        if name and self.product.value in ("", self._auto_product):
+        if not name:
+            return
+        pick = self.stories.named_pick
+        another = pick is not None and pick > 0 and self._typed_pick != pick
+        if another or self.product.value in ("", self._auto_product):
             self._auto_product = name
-            self.product.set_value(name)
+            if self.product.value != name:
+                self.product.set_value(name)
+            if another:
+                form_memory.remember(COMMON, "product", None)
 
     @property
     def path(self) -> Path | None:
@@ -574,6 +664,8 @@ class DocsPart:
     @property
     def ok(self) -> bool:
         """True when the folder has files that the run can read."""
+        if self.scanning:
+            return False
         if self.files > 0:
             return True
         return bool(self.switch.value) and sum(self.others.values()) > 0
@@ -601,8 +693,10 @@ class Foot:
                 )
                 self.busy_row = ui.row().classes("items-center gap-2")
                 with self.busy_row:
-                    ui.label(BUSY).classes("sr-small").style(
-                        "color: var(--sr-caution)"
+                    self.busy_label = (
+                        ui.label(BUSY)
+                        .classes("sr-small")
+                        .style("color: var(--sr-caution)")
                     )
                     self.link_slot = ui.element("span")
         self._link_id: str | None = None
@@ -614,6 +708,7 @@ class Foot:
         running = jobs.manager.busy()
         current = running or context_job.writer.busy()
         self.summary_label.set_text(self.summary())
+        self.busy_label.set_text(BUSY if running else CONTEXT_BUSY)
         self.busy_row.set_visibility(current)
         self.link_slot.set_visibility(running)
         state = jobs.manager.current() if running else None

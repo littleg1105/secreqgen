@@ -50,10 +50,18 @@ def _save(data: dict) -> None:
         pass
 
 
-def recall(block: str, name: str, default=None):
-    """Return the stored value, or the default when there is none."""
+def recall(block: str, name: str, default=None, kind: type | tuple | None = None):
+    """Return the stored value, or the default when there is none.
+
+    Kind is the type that the caller needs. A stored value of another type
+    gives the default, so that a wrong file never breaks a page.
+    """
     value = _load().get(block, {}).get(name)
-    return default if value is None else value
+    if value is None:
+        return default
+    if kind is not None and not isinstance(value, kind):
+        return default
+    return value
 
 
 def remember(block: str, name: str, value) -> None:
@@ -76,7 +84,13 @@ def remember(block: str, name: str, value) -> None:
         _save(data)
 
 
-def clear() -> None:
-    """Empty the memory."""
+def clear(*blocks: str) -> None:
+    """Empty the named blocks. With no name, empty the whole memory."""
     with _LOCK:
-        _save({})
+        if not blocks:
+            _save({})
+            return
+        data = _load()
+        for block in blocks:
+            data.pop(block, None)
+        _save(data)
