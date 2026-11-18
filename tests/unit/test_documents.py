@@ -354,6 +354,7 @@ def test_rst_footnotes_and_citations_stay_in_the_text(tmp_path):
         "========\n"
         "\n"
         "The data comes from a contest [1]_ and from a study [CIT2002]_.\n"
+        "It is part of |product|.\n"
         "\n"
         ".. this line is a comment and no reader sees it\n"
         "\n"
@@ -374,6 +375,112 @@ def test_rst_footnotes_and_citations_stay_in_the_text(tmp_path):
     assert "Detection Evaluation, Richard Lippmann." in text
     assert "[CIT2002] A book about data, 2002." in text
     assert "References" in text
-    assert "the Example product" in text
+    assert "It is part of the Example product." in text  # as the reader sees it
+    assert text.count("the Example product") == 1  # the definition adds no text
+    assert "|product|" not in text
     assert "comment" not in text
     assert "logo.png" not in text
+
+
+def test_a_file_that_cannot_be_read_is_skipped(tmp_path: Path) -> None:
+    source = tmp_path / "docs"
+    source.mkdir()
+    (source / "guide.md").write_text("# Guide\n\nRead this.\n", encoding="utf-8")
+    (source / "good.txt").write_text("A page of text.\n", encoding="utf-8")
+    (source / "broken.html").symlink_to(source / "missing" / "page.html")
+    report = build_mirror(source, tmp_path / "mirror")
+    assert report.markdown == 1
+    assert report.converted == {".txt": 1}
+    assert report.skipped == [("broken.html", "the file cannot be read")]
+    assert (tmp_path / "mirror" / "good.txt.md").is_file()
+
+
+def test_files_that_are_not_documentation_are_left_out(tmp_path: Path) -> None:
+    source = tmp_path / "product"
+    for name in (
+        "docs/install.rst",
+        "docs/notes.txt",
+        "LICENSE.txt",
+        "requirements.txt",
+        "requirements-dev.txt",
+        "robots.txt",
+        "tests/fixtures/reply.txt",
+        "spec/sample.html",
+        "src/main/resources/templates/owners/list.html",
+        "util/Seeder/Seeds/attachments/mock-bank-statement.txt",
+        "pkg.egg-info/SOURCES.txt",
+        "node_modules/x/readme.txt",
+    ):
+        path = source / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("Title\n=====\n\nSome words here.\n", encoding="utf-8")
+    (source / "tests" / "README.md").write_text("# Tests\n", encoding="utf-8")
+    assert other_files(source) == {".rst": 1, ".txt": 1}
+    report = build_mirror(source, tmp_path / "mirror")
+    made = sorted(
+        p.relative_to(tmp_path / "mirror").as_posix()
+        for p in (tmp_path / "mirror").rglob("*.md")
+    )
+    assert made == ["docs/install.rst.md", "docs/notes.txt.md", "tests/README.md"]
+    assert report.skipped == []
+
+
+def test_a_converted_file_never_replaces_a_real_file(tmp_path: Path) -> None:
+    source = tmp_path / "docs"
+    source.mkdir()
+    (source / "a.rst").write_text("Title\n=====\n\nConverted words.\n")
+    (source / "a.rst.md").write_text("# real one\n")
+    (source / "a.rst.converted.md").write_text("# real two\n")
+    report = build_mirror(source, tmp_path / "mirror")
+    mirror = tmp_path / "mirror"
+    assert (mirror / "a.rst.md").read_text() == "# real one\n"
+    assert (mirror / "a.rst.converted.md").read_text() == "# real two\n"
+    assert "Converted words." in (mirror / "a.rst.converted2.md").read_text()
+    assert report.markdown == 2
+    assert report.converted == {".rst": 1}
+
+
+def test_an_error_of_one_file_does_not_stop_the_mirror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import secreqgen.documents.mirror as mirror_module
+
+    source = tmp_path / "docs"
+    source.mkdir()
+    (source / "bad.rst").write_text("x\n")
+    (source / "good.txt").write_text("Good words.\n")
+    real = mirror_module.to_markdown
+
+    def fake(path: Path) -> str:
+        if path.name == "bad.rst":
+            raise RecursionError("too deep")
+        return real(path)
+
+    monkeypatch.setattr(mirror_module, "to_markdown", fake)
+    report = build_mirror(source, tmp_path / "mirror")
+    assert report.converted == {".txt": 1}
+    assert report.skipped == [
+        ("bad.rst", "the file cannot be converted (RecursionError)")
+    ]
+
+
+@pytest.mark.skipif(not hasattr(__import__("os"), "mkfifo"), reason="needs pipes")
+def test_a_named_pipe_is_skipped(tmp_path: Path) -> None:
+    import os
+    import threading
+
+    source = tmp_path / "docs"
+    source.mkdir()
+    (source / "good.txt").write_text("Good words.\n")
+    os.mkfifo(source / "pipe.txt")
+    os.mkfifo(source / "pipe.md")
+    found: list = []
+    worker = threading.Thread(
+        target=lambda: found.append(build_mirror(source, tmp_path / "mirror")),
+        daemon=True,
+    )
+    worker.start()
+    worker.join(10)
+    assert not worker.is_alive()
+    assert found[0].converted == {".txt": 1}
+    assert found[0].skipped == [("pipe.txt", "the file cannot be read")]

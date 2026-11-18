@@ -212,3 +212,29 @@ def test_model_rule():
     assert resolve_context_model(cfg(), None) == TESTED_WRITER
     with pytest.raises(InputError):
         resolve_context_model(cfg(), "  ")
+
+
+def test_context_lines():
+    from secreqgen.application.system_context import context_lines
+
+    result = {
+        "context": {
+            "tech_stack": [{"kind": "language", "value": "Go", "path": "go.mod"}],
+            "features": [
+                {"group": "Messages", "items": [{"text": "Send", "path": "README.md"}]}
+            ],
+            "data_sensitivity": {"critical": [{"text": "Tokens", "path": "README.md"}]},
+            "security_profile": "High - keeps tokens",
+        }
+    }
+    lines = context_lines(result)
+    assert [line["where"] for line in lines] == [
+        "tech_stack",
+        "features: Messages",
+        "data_sensitivity: critical",
+        "security_profile",
+    ]
+    assert lines[0] == {"where": "tech_stack", "text": "language: Go", "path": "go.mod"}
+    assert lines[-1]["path"] == "Chosen by the model, not taken from a file."
+    assert context_lines({}) == []
+    assert context_lines({"context": "x"}) == []

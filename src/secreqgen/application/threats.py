@@ -83,6 +83,31 @@ def threat_folder_name(story_id: str, used_names: set[str]) -> str:
     return name
 
 
+def real_file_names(model: dict) -> dict:
+    """Give each passage the name of the real file, after a run on a mirror.
+
+    A converted file has the name "install.rst.md" in the mirror. The person
+    has the file "install.rst". Only the name in the header of a passage
+    changes. The text of the passage and the quotes stay as they are.
+    """
+    from secreqgen.application.documentation import shown_name
+
+    for passage in model.get("passages", []):
+        if not isinstance(passage, dict):
+            continue
+        header = str(passage.get("header", ""))
+        page, divider, section = header.partition(" > ")
+        real = shown_name(page)
+        if real == page:
+            continue
+        passage["header"] = real + divider + section
+        first, line_end, rest = str(passage.get("text", "")).partition("\n")
+        if header in first:
+            first = first.replace(header, passage["header"], 1)
+            passage["text"] = first + line_end + rest
+    return model
+
+
 def write_threat_files(folder: Path, model: dict) -> None:
     """Write threats.json and threats.md into the folder. An OSError passes through."""
     import json
@@ -218,9 +243,7 @@ def _check_output_folder(folder: Path) -> None:
         ) from e
 
 
-def _build_generator(
-    options, llm_client, checker, product, about, strict, docs=None
-):
+def _build_generator(options, llm_client, checker, product, about, strict, docs=None):
     """Build the threat list generator. A user prompt folder gives a subclass.
 
     docs is the documentation folder to search. None means options.docs.
@@ -312,9 +335,7 @@ def run_threat_lists(
     if options.story_id is not None:
         stories = select_stories(stories, options.story_id)
         if not stories:
-            raise InputError(
-                f"Story not found in the input file: {options.story_id}"
-            )
+            raise InputError(f"Story not found in the input file: {options.story_id}")
     if options.story_ids is not None:
         stories = _select_story_ids(stories, options.story_ids)
     if not stories:
@@ -362,9 +383,7 @@ def run_threat_lists(
             llm_client = make_client(cfg, tested_setup=True, model_name=writer)
             checker = None
             if checker_name:
-                checker = make_client(
-                    cfg, tested_setup=True, model_name=checker_name
-                )
+                checker = make_client(cfg, tested_setup=True, model_name=checker_name)
             generator = _build_generator(
                 options, llm_client, checker, product, about, strict, docs
             )
@@ -411,6 +430,8 @@ def run_threat_lists(
                     run.failures.append((story.id, e))
                     error = e
                 else:
+                    if run.docs_report is not None:
+                        model = real_file_names(model)
                     folder = None
                     if options.output is not None:
                         name = threat_folder_name(story.id, used_names)

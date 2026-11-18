@@ -2,11 +2,13 @@
 
 A model writes the draft from the facts that plain code collects. Plain code
 checks it. A person must read the draft before use. run_system_context writes
-a file only when an output path is given. It has no default path.
+a file only when an output path is given. It has no default path, and it never
+replaces a file that exists.
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -59,11 +61,47 @@ def resolve_context_model(cfg: SecReqGenConfig, writer_model: str | None) -> str
     return TESTED_WRITER
 
 
+def check_output_path(path: Path) -> None:
+    """Raise InputError when the output file cannot be written as a new file.
+
+    The check runs before the model works, so that no finished draft is lost.
+    A file that exists is never replaced.
+    """
+    path = Path(path)
+    if path.is_dir():
+        raise InputError(f"The output path is a folder: {path}. Give a file name.")
+    if path.exists():
+        raise InputError(
+            f"The output file exists: {path}. Give the name of a new file, "
+            "or delete the file first."
+        )
+    parent = path.parent
+    while not parent.exists() and parent != parent.parent:
+        parent = parent.parent
+    if not parent.is_dir() or not os.access(parent, os.W_OK | os.X_OK):
+        raise InputError(
+            f"Cannot write to {path}: {parent} is not a folder to write in."
+        )
+
+
 def write_context_file(path: Path, result: dict) -> None:
     """Write result["yaml"] as UTF-8 text. An OSError passes through."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(result["yaml"], encoding="utf-8")
+
+
+def context_lines(result: dict) -> list[dict]:
+    """The lines of a draft with the source of each, for a review page.
+
+    Each entry has "where" (the place in the YAML text), "text" and "path"
+    (the file of the codebase that the line comes from). The last entry is the
+    security rating. The model chose it; it comes from no file.
+    """
+    from secreqgen.context import source_lines
+
+    context = result.get("context") if isinstance(result, dict) else None
+    return source_lines(context) if isinstance(context, dict) else []
 
 
 def _stage_sender(on_step: StepCallback | None, name: str):
@@ -113,6 +151,8 @@ def run_system_context(
     from secreqgen.context import ContextError, SystemContextWriter
 
     check_codebase_folder(options.folder)
+    if options.output is not None:
+        check_output_path(options.output)
     if cfg is None:
         from secreqgen.config import get_config
 

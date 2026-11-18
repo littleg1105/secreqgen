@@ -175,9 +175,7 @@ def test_off_returns_the_folder_and_loads_nothing(tmp_path):
         f"assert p.folder == Path({str(docs)!r}) and p.report is None\n"
         "assert 'secreqgen.documents' not in sys.modules\n"
     )
-    done = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True
-    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
 
 
@@ -272,14 +270,21 @@ def test_docs_note():
     assert docs_note(None) is None
     assert docs_note(report({".rst": 10, ".txt": 2}, [("a", "x")])) == (
         "12 files of other types were converted to Markdown (.rst 10, .txt 2). "
-        "1 file was skipped. This is outside the tested setup."
+        "1 file was skipped: a (x). This is outside the tested setup."
     )
     assert docs_note(report({".pdf": 1})) == (
         "1 file of another type was converted to Markdown (.pdf 1). "
         "This is outside the tested setup."
     )
-    assert "2 files were skipped." in docs_note(
+    assert "2 files were skipped: a (x), b (y)." in docs_note(
         report({".pdf": 1}, [("a", "x"), ("b", "y")])
+    )
+    many = [(f"f{n}.pdf", "no text in the PDF (a scan?)") for n in range(8)]
+    assert "8 files were skipped: f0.pdf (no text in the PDF (a scan?)), " in docs_note(
+        report({".rst": 1}, many)
+    )
+    assert "f4.pdf (no text in the PDF (a scan?)), and 3 more." in docs_note(
+        report({".rst": 1}, many)
     )
     assert docs_note(report({})).startswith("No file of other types")
 
@@ -304,15 +309,30 @@ def test_threats_with_a_converted_file(clean_env):
         make_client=factory(ThreatWriter()),
     )
     passages = run.lists[0].model["passages"]
-    assert any(".rst.md" in p["header"] for p in passages)
+    converted = [p for p in passages if p["header"].startswith("tokens.rst >")]
+    assert converted  # the passage has the name of the real file
+    assert all("tokens.rst >" in p["text"].splitlines()[0] for p in converted)
+    assert not any(".rst.md" in p["header"] + p["text"] for p in passages)
     assert run.docs_report.converted == {".rst": 1}
     assert not run.docs_report.folder.exists()  # the temporary mirror is gone
     run = run_threat_lists(
         threat_options(clean_env, docs),
         make_client=factory(ThreatWriter()),
     )
-    assert not any(".rst.md" in p["header"] for p in run.lists[0].model["passages"])
+    assert not any("tokens.rst" in p["header"] for p in run.lists[0].model["passages"])
     assert run.docs_report is None
+
+
+def test_a_real_file_with_a_double_name_keeps_it_in_a_tested_run(clean_env):
+    """Without the option, a real file notes.txt.md keeps its name."""
+    docs = clean_env / "docs"
+    docs.mkdir()
+    (docs / "notes.txt.md").write_text(MD_PAGE, encoding="utf-8")
+    run = run_threat_lists(
+        threat_options(clean_env, docs), make_client=factory(ThreatWriter())
+    )
+    headers = [p["header"] for p in run.lists[0].model["passages"]]
+    assert headers and all(h.startswith("notes.txt.md >") for h in headers)
 
 
 # 6 ---------------------------------------------------------------------------
@@ -350,9 +370,7 @@ def test_requirements_md_only_is_equal_with_the_option_on(clean_env):
         make_client=factory(ReqClient()),
     )
     assert on.docs_report is None and off.docs_report is None
-    assert [r.requirements for r in on.results] == [
-        r.requirements for r in off.results
-    ]
+    assert [r.requirements for r in on.results] == [r.requirements for r in off.results]
     assert [r.retrieval_context for r in on.results] == [
         r.retrieval_context for r in off.results
     ]
@@ -397,3 +415,121 @@ def test_no_new_call_when_off(clean_env, monkeypatch):
     options = threat_options(clean_env, docs)
     run_threat_lists(options, make_client=factory(ThreatWriter()))
     assert options.docs == docs and options.other_formats is False
+
+
+def _mirrors(cache: Path) -> list[str]:
+    return sorted(p.name for p in cache.iterdir() if p.is_dir())
+
+
+def test_a_new_version_of_the_code_builds_the_mirror_again(tmp_path, monkeypatch):
+    from secreqgen.documents import mirror
+
+    docs = make_docs(tmp_path, md=True, rst=True)
+    cache = tmp_path / "cache"
+    first = prepare_documentation(docs, other_formats=True, cache_dir=cache)
+    monkeypatch.setattr(mirror, "MIRROR_VERSION", mirror.MIRROR_VERSION + 1)
+    second = prepare_documentation(docs, other_formats=True, cache_dir=cache)
+    assert second.folder != first.folder
+    assert _mirrors(cache) == [second.folder.name]  # the old one is removed
+
+
+def test_the_cache_stays_small(tmp_path):
+    cache = tmp_path / "cache"
+    folders = []
+    for n in range(6):
+        root = tmp_path / f"product{n}"
+        root.mkdir()
+        docs = make_docs(root, md=True, rst=True)
+        folders.append(prepare_documentation(docs, other_formats=True, cache_dir=cache))
+    assert len(_mirrors(cache)) == documentation.KEPT_MIRRORS + 1
+    assert folders[-1].folder.is_dir()
+    assert not folders[0].folder.exists()
+    assert len(list(cache.glob("*.json"))) == documentation.KEPT_MIRRORS + 1
+
+
+def test_a_changed_folder_leaves_one_mirror(tmp_path):
+    docs = make_docs(tmp_path, md=True, rst=True)
+    cache = tmp_path / "cache"
+    for n in range(4):
+        (docs / "extra.rst").write_text(f"Page\n====\n\nText {n} here.\n" * (n + 1))
+        prepared = prepare_documentation(docs, other_formats=True, cache_dir=cache)
+    assert _mirrors(cache) == [prepared.folder.name]
+
+
+def test_a_broken_link_does_not_stop_the_run(tmp_path):
+    docs = make_docs(tmp_path, md=True, rst=True)
+    (docs / "gone.html").symlink_to(docs / "nowhere.html")
+    prepared = prepare_documentation(docs, other_formats=True, cache_dir=tmp_path / "c")
+    assert ("gone.html", "the file cannot be read") in prepared.report.skipped
+    again = prepare_documentation(docs, other_formats=True, cache_dir=tmp_path / "c")
+    assert again.folder == prepared.folder
+
+
+def test_a_folder_with_nothing_to_read_is_an_input_error(tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "empty.txt").write_text("  \n", encoding="utf-8")
+    (docs / "broken.pdf").write_bytes(b"junk")
+    for cache in (None, tmp_path / "cache"):
+        with pytest.raises(InputError) as error:
+            prepare_documentation(docs, other_formats=True, cache_dir=cache)
+        text = str(error.value)
+        assert text.startswith("No file of the documentation folder can be read:")
+        assert str(docs) in text  # the folder of the person, not a temporary one
+        assert "empty.txt (no text in the file)" in text
+    assert not list((tmp_path / "cache").iterdir())
+
+
+def test_a_build_leaves_no_half_built_folder(tmp_path, monkeypatch):
+    import os
+
+    docs = make_docs(tmp_path, md=True, rst=True)
+    cache = tmp_path / "cache"
+    old = cache / "0123456789abcdef.building-1"
+    old.mkdir(parents=True)
+    os.utime(old, (0, 0))  # a build that stopped long ago
+    young = cache / "fedcba9876543210.building-2"
+    young.mkdir()
+    prepared = prepare_documentation(docs, other_formats=True, cache_dir=cache)
+    assert _mirrors(cache) == sorted([prepared.folder.name, young.name])
+    assert prepared.report.folder == prepared.folder
+
+    def boom(*_a, **_k):
+        raise OSError("disk problem")
+
+    monkeypatch.setattr("secreqgen.documents.mirror.build_mirror", boom)
+    (docs / "tokens.rst").write_text(RST_PAGE + "\nMore.\n", encoding="utf-8")
+    with pytest.raises(InputError):
+        prepare_documentation(docs, other_formats=True, cache_dir=cache)
+    assert not [name for name in _mirrors(cache) if str(os.getpid()) in name]
+
+
+def test_shown_name_of_a_second_clash():
+    assert shown_name("a.rst.converted2.md") == "a.rst"
+    assert shown_name("a.rst.converted.md") == "a.rst"
+    assert shown_name("notes.converted2.md") == "notes.converted2.md"
+
+
+def test_count_documentation(tmp_path):
+    from secreqgen.application.documentation import count_documentation
+
+    docs = tmp_path / "product"
+    for name in (
+        "README.md",
+        "docs/a.md",
+        "docs/b.rst",
+        "node_modules/x/README.md",
+        "node_modules/y/README.md",
+        "vendor/z/doc.md",
+        "node_modules/x/notes.txt",
+        "LICENSE.txt",
+    ):
+        (docs / name).parent.mkdir(parents=True, exist_ok=True)
+        (docs / name).write_text("words\n", encoding="utf-8")
+    count = count_documentation(docs)
+    assert count.markdown == 5
+    assert count.in_dependencies == 3
+    assert count.dependency_folders == ("node_modules", "vendor")
+    assert count.others == {".rst": 1}
+    empty = count_documentation(tmp_path / "missing")
+    assert (empty.markdown, empty.others) == (0, {})
