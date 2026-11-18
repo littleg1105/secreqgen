@@ -1,0 +1,113 @@
+1
+00:00:00,000 --> 00:00:04,520
+This is SecReqGen, the tool
+I built for my MSc thesis.
+
+2
+00:00:04,840 --> 00:00:10,420
+A user story says what a feature should
+do, but often not which parts of the
+
+3
+00:00:10,460 --> 00:00:12,100
+product must protect it.
+
+4
+00:00:12,300 --> 00:00:17,120
+And without the product's documentation,
+a language model gives mostly general
+
+5
+00:00:17,160 --> 00:00:23,360
+advice. So SecReqGen searches the
+documentation first, then drafts security
+
+6
+00:00:23,400 --> 00:00:25,700
+requirements and a threat list.
+
+7
+00:00:25,780 --> 00:00:29,500
+Here it is in the browser,
+first for security requirements.
+
+8
+00:00:29,780 --> 00:00:34,800
+I give it a Mattermost user story,
+the Mattermost documentation, and a short
+
+9
+00:00:34,840 --> 00:00:38,100
+description of the system,
+then I press Start.
+
+10
+00:00:38,380 --> 00:00:44,000
+It searches the documentation, the model
+writes the requirements, and SecReqGen
+
+11
+00:00:44,040 --> 00:00:45,440
+reads the answer.
+
+12
+00:00:45,680 --> 00:00:51,120
+Here is one of them: guests can use
+only the channels they were added to.
+
+13
+00:00:51,360 --> 00:00:56,020
+Priority critical, ASVS
+chapter V4, access control.
+
+14
+00:00:56,060 --> 00:01:02,140
+Its reason cites the passages it used,
+and it comes with acceptance criteria.
+
+15
+00:01:02,680 --> 00:01:08,460
+Now the threat list. Same story and
+documentation, a writer model and a
+
+16
+00:01:08,500 --> 00:01:14,267
+checker model, and I ask for a threat
+actor and a STRIDE category, then press
+
+17
+00:01:14,307 --> 00:01:15,141
+Start.
+
+18
+00:01:14,980 --> 00:01:21,140
+The writer drafts threats with quotes,
+SecReqGen checks each quote against the
+
+19
+00:01:21,180 --> 00:01:26,700
+documentation, the writer adds the actor
+and the STRIDE category, and the checker
+
+20
+00:01:26,740 --> 00:01:29,340
+accepts or flags each threat.
+
+21
+00:01:29,470 --> 00:01:35,730
+Here is one threat: guests find public
+channels, or message people outside their
+
+22
+00:01:35,770 --> 00:01:39,910
+channels. External individual,
+information disclosure.
+
+23
+00:01:40,290 --> 00:01:43,570
+On the right is its quote
+from the documentation.
+
+24
+00:01:43,770 --> 00:01:46,550
+The checker accepted it, so I keep it.

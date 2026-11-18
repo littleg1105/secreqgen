@@ -4,6 +4,8 @@ SecReqGen writes security requirements and a draft threat list for each user sto
 the documentation of a product. It uses local language models that run in Ollama. With an
 Ollama server on your own computer, no data leaves your computer.
 
+New here? Read `USER_GUIDE.md`: the first run step by step, with pictures and two short videos.
+
 ## Requirements
 
 - Python 3.11, 3.12 or 3.13. The tested environment is Python 3.13. Python 3.14 is not supported.
@@ -234,6 +236,7 @@ The tests marked `slow` need a real model server or a model download. The fast r
 
 ## More pages
 
+- `USER_GUIDE.md`: the user guide (install, the GUI, the first run, your own product, problems).
 - `docs/README.md`: the documents of the project and which ones to trust.
 - `scripts/README.md`: the lab scripts that ran the experiments. They are a frozen record.
 - Code map: `src/secreqgen/README.md`: the modules, the layer rule, the test patch points and the golden tests.
