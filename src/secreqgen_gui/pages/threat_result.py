@@ -130,7 +130,7 @@ STYLE = """
 
 VERDICT_COLOR = {"keep": "positive", "delete": "negative"}
 CHECKER_TEXT = {"accepts": "accepted", "refuses": "flagged"}
-NOTICE = "Draft, not a complete threat model. Covers only your documentation."
+NOTICE = "Draft, not a complete threat model."
 KIND_SHORT = {"attack": "Attack", "rule": "Rule breach"}
 KIND_HINT = {
     "attack": "An attack that the documentation describes",
@@ -143,10 +143,6 @@ GROUP_TITLE = {
     "no_verdict": "No answer from the checker",
     "no_weak_sign": "Threats",
     "weak_sign": "Weak support",
-}
-GROUP_NOTE = {
-    "refuses": "Wrong more often than accepted ones in the tests.",
-    "weak_sign": "Wrong more often than the others in the tests.",
 }
 
 
@@ -470,17 +466,14 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
         for group in grouped["groups"]:
             title = GROUP_TITLE.get(group["key"], str(group["title"]))
             ui.label(f"{title} ({len(group['rows'])})").classes("sr-group-title")
-            if GROUP_NOTE.get(group["key"]):
-                ui.label(GROUP_NOTE[group["key"]]).classes("sr-group-note")
             with ui.column().classes("sr-group-box w-full gap-0"):
                 for item in group["rows"]:
                     row_view(item)
         if model.get("about"):
             words = len(str(model["about"]).split())
-            ui.label(
-                f"Paragraph about the product: {words} words. "
-                "Background, not a source."
-            ).classes("sr-small mt-6")
+            ui.label(f"Paragraph about the product: {words} words").classes(
+                "sr-small mt-6"
+            )
 
     @ui.refreshable
     def evidence() -> None:

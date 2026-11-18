@@ -23,7 +23,7 @@ KINDS = tuple(kind for kind, _ in PARTS)
 TESTED = "tested"
 NAME_RULE = "Lowercase letters, digits, hyphens, underscores. Max 40 characters."
 NOT_TESTED_LINE = "Run tag: untested prompts"
-TESTED_LINE = "Locked. Used in the thesis tests."
+TESTED_LINE = "Locked"
 # The short description of each file, by the kind of the set and the file name.
 FILE_WORDS = {
     "threats": {

@@ -108,7 +108,8 @@ async def test_copy_with_bad_name_shows_error(user, bad):
 
 async def test_tested_page_is_read_only(user):
     await user.open("/prompts/threats/tested")
-    await user.should_see("Locked. Used in the thesis tests.")
+    await user.should_see("Locked")
+    await user.should_not_see("Used in the thesis tests")
     await user.should_see("Placeholders: $accep")
     await user.should_not_see("Save")
 

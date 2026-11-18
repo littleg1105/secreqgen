@@ -15,7 +15,7 @@ pytestmark = pytest.mark.anyio
 STORY = "MM-US-007"
 SCRIPT = "<script>alert(1)</script>"
 IMG = '<img src=x onerror="document.title=1">'
-NOTICE = "Draft, not a complete threat model. Covers only your documentation."
+NOTICE = "Draft, not a complete threat model."
 
 
 NOT_FOUND = "Cannot highlight the quote in this passage. The quote is below."
@@ -392,9 +392,15 @@ async def test_the_words_of_the_page_with_a_failed_threat(user):
     await user.should_see(
         "1 passage, 4 threats written, 1 failed the quote check (not shown)."
     )
-    await user.should_see("Wrong more often than accepted ones in the tests.")
     await user.should_see("Pick a threat.")
-    for old in ("From 1 passage", "Pick a threat to see its evidence.", "It covers"):
+    # No sentence under a group title, and no second sentence in the notice.
+    for old in (
+        "From 1 passage",
+        "Pick a threat to see its evidence.",
+        "It covers",
+        "Covers only",
+        "Wrong more often",
+    ):
         await user.should_not_see(old)
 
 
@@ -402,7 +408,7 @@ async def test_the_note_of_the_group_with_weak_support(user):
     run_id = _store(_model(checker=None))
     await user.open(_url(run_id))
     await user.should_see("Weak support (1)")
-    await user.should_see("Wrong more often than the others in the tests.")
+    await user.should_not_see("Wrong more often")
 
 
 async def test_the_hover_texts_of_the_types_and_of_the_labels(user):
@@ -418,9 +424,8 @@ async def test_the_hover_texts_of_the_types_and_of_the_labels(user):
 async def test_the_line_about_the_paragraph(user):
     run_id = _store(_model(about="Demo is a chat tool for teams."))
     await user.open(_url(run_id))
-    await user.should_see(
-        "Paragraph about the product: 7 words. Background, not a source."
-    )
+    await user.should_see("Paragraph about the product: 7 words")
+    await user.should_not_see("Background, not a source")
 
 
 async def test_several_failed_calls_show_the_plural_warning(user):
