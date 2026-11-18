@@ -270,8 +270,9 @@ def _head(view: View) -> None:
         ui.label(f"Untested prompts: {view.prompt_name}").style(
             "color:var(--sr-caution)"
         )
-    formats_tag(view.manifest)
-    context_tag(view.manifest)
+    with ui.row().classes("gap-2 items-center"):  # the two tags side by side
+        formats_tag(view.manifest)
+        context_tag(view.manifest)
 
 
 def _replay_address(view: View, story_id: str) -> str:

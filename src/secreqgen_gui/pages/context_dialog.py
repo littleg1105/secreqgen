@@ -190,7 +190,7 @@ def open_context_dialog(
                                     else "sr-code"
                                 )
                                 ui.label(str(line.get("path", ""))).classes(
-                                    f"{source} w-[190px] shrink-0 break-all"
+                                    f"{source} w-[270px] shrink-0 break-words"
                                 )
                 dropped = result.get("dropped") or []
                 if dropped:
