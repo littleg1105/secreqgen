@@ -1,4 +1,9 @@
-"""Plain code that checks the answer of the model against the files."""
+"""Plain code that checks the answer of the model against the files.
+
+What the checks prove: each item names a real part of the files, and each
+technology is named in the files. What they do not prove: that the part says
+what a feature or a kind of data says. A person checks that.
+"""
 
 from __future__ import annotations
 
@@ -9,18 +14,31 @@ from secreqgen.context.scan import CodebaseFacts
 
 MAX_DESCRIPTION_WORDS = 40
 MAX_ITEM_WORDS = 12
-MAX_TECH = 8
+MAX_TEXT_CHARS = 300
+MAX_TECH = 12
 MAX_GROUPS = 6
 MAX_GROUP_ITEMS = 6
 MAX_LEVEL_ITEMS = 8
 LEVELS = ("critical", "high", "medium")
-_PROFILE_RE = re.compile(r"^\s*(high|medium|low)\b", re.IGNORECASE)
+_PROFILE_RE = re.compile(r"^\s*(critical|high|medium|low)\b", re.IGNORECASE)
 _WORD_RE = re.compile(r"[A-Za-z]{3,}")
+# Words that many product names share. Alone they are no proof of a technology.
+GENERIC_WORDS = frozenset(
+    "apache amazon aws google microsoft azure oracle cloud server service services "
+    "core framework database the and for with open source engine platform storage "
+    "queue cache web api sdk library net sql data app application".split()
+)
+# Other names of a technology that files use.
+ALIASES = {"postgresql": "postgres", "kubernetes": "k8s"}
+SHORT_WORD = 3  # a word of this length or less must stand alone in the text
+_CAMEL_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+")
 
 
 def _text(value: Any) -> str:
-    """The value as one line of text; anything that is not text gives ''."""
-    return " ".join(value.split()) if isinstance(value, str) else ""
+    """The value as one short line of text; anything that is not text gives ''."""
+    if not isinstance(value, str):
+        return ""
+    return " ".join(value[: 4 * MAX_TEXT_CHARS].split())[:MAX_TEXT_CHARS]
 
 
 def _list(value: Any) -> list:
@@ -35,13 +53,56 @@ def _cut(text: str, limit: int) -> str:
     return " ".join(text.split()[:limit])
 
 
-def _find_part(value: str, named: str, texts: dict[str, str]) -> str | None:
-    """The ref of the part that holds the technology; the named part comes first."""
-    needles = [value.lower()] + [w.lower() for w in _WORD_RE.findall(value)]
-    for ref in [named] + [r for r in texts if r != named]:
-        if any(n and n in texts[ref] for n in needles):
-            return ref
-    return None
+def _needed_words(value: str) -> list[str]:
+    """The words of a technology name that the files must hold.
+
+    Generic words (server, cloud, core) do not count when the name has other
+    words. A name with no word of three letters (Go, C#, H2) counts as it is.
+    """
+    words = [w.lower() for w in _WORD_RE.findall(value)]
+    special = [w for w in words if w not in GENERIC_WORDS]
+    return special or words or [value.lower()]
+
+
+class _Text:
+    """The text of one part, ready for the search of a technology name."""
+
+    def __init__(self, text: str) -> None:
+        self.lower = text.lower()
+        # The words of the text. A joined name gives its words: ServiceBus
+        # gives "service" and "bus".
+        self.words = frozenset(w.lower() for w in _CAMEL_RE.findall(text))
+
+
+def _holds(word: str, text: _Text) -> bool:
+    """True when the text names the word. A short word must stand alone."""
+    for name in (word, ALIASES.get(word, "")):
+        if not name:
+            continue
+        if not name.isalpha():  # H2, C#: the name as it is, with a clear end
+            pattern = rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9+#])"
+            if re.search(pattern, text.lower):
+                return True
+        elif len(name) > SHORT_WORD:
+            if name in text.lower:
+                return True
+        elif name in text.words:
+            return True
+    return False
+
+
+def _find_part(value: str, named: str, texts: dict[str, _Text]) -> str | None:
+    """The ref of the part that names the technology, or None.
+
+    Each needed word of the name must be in the files. The source is the part
+    that holds the most of these words; the part that the model named wins
+    when it holds as many.
+    """
+    words = _needed_words(value)
+    if not all(any(_holds(w, text) for text in texts.values()) for w in words):
+        return None
+    order = [named] + [r for r in texts if r != named]
+    return max(order, key=lambda ref: sum(_holds(w, texts[ref]) for w in words))
 
 
 def check_answer(
@@ -50,7 +111,7 @@ def check_answer(
     """Return the checked context and the list of dropped items."""
     answer = _dict(answer)
     paths = {p.ref: p.path for p in facts.parts}
-    texts = {p.ref: p.text.lower() for p in facts.parts}
+    texts = {p.ref: _Text(p.text) for p in facts.parts}
     dropped: list[dict] = []
     seen: set[str] = set()
 
@@ -140,7 +201,10 @@ def check_answer(
         profile = match[1].capitalize() + profile[match.end() :]
     else:
         dropped.append(
-            {"what": "security_profile", "why": "must start with High, Medium or Low"}
+            {
+                "what": "security_profile",
+                "why": "must start with Critical, High, Medium or Low",
+            }
         )
         profile = ""
     context = {

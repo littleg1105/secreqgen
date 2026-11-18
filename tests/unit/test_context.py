@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import os
+import random
+import string
+import threading
+import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -12,11 +19,12 @@ from secreqgen.context import (
     ContextError,
     SystemContextWriter,
     render_yaml,
+    scan,
     scan_codebase,
     source_lines,
 )
 from secreqgen.context.checks import check_answer
-from secreqgen.context.scan import TOTAL_WORDS
+from secreqgen.context.scan import TOTAL_WORDS, looks_random, remove_secrets
 
 SECRET = "0123456789abcdef0123456789abcdef01234567"
 
@@ -52,13 +60,13 @@ def _good_answer():
         "description": "A web shop for small stores.",
         "tech_stack": [
             {"kind": "database", "value": "PostgreSQL 15", "source": "F2"},
-            {"kind": "framework", "value": "Express", "source": "F3"},
+            {"kind": "framework", "value": "Express", "source": "F5"},
         ],
         "security_profile": "Medium - holds orders",
         "features": [
             {
                 "group": "Orders",
-                "items": [{"text": "Orders and payments", "source": "F5"}],
+                "items": [{"text": "Orders and payments", "source": "F7"}],
             }
         ],
         "data_sensitivity": {
@@ -95,13 +103,15 @@ class TestScan:
         assert kinds == [
             "tree",
             "readme",
+            "security_paths",
+            "code_folders",
             "manifest",
             "container",
             "docs",
-            "security_paths",
         ]
-        assert [p.ref for p in facts.parts] == [f"F{i}" for i in range(1, 7)]
+        assert [p.ref for p in facts.parts] == [f"F{i}" for i in range(1, 8)]
         assert facts.name == "shop"
+        assert facts.stopped_early is False
 
     def test_skipped_and_secret_files(self, codebase):
         facts = scan_codebase(codebase)
@@ -137,6 +147,314 @@ class TestScan:
             scan_codebase(tmp_path / "missing")
 
 
+SECRET_LINES = [
+    # (the line, the secret text in it)
+    ("DB_PASS=hunter2", "hunter2"),
+    ("PGPASSWORD=abc123", "abc123"),
+    ("POSTGRES_PASSWORD: example", "example"),
+    ('"password": "x y z"', "x y z"),
+    ("SECRET_KEY_BASE=changeme", "changeme"),
+    ("AWS_SECRET_ACCESS_KEY=abcd", "abcd"),
+    ("apiKey: 'abc 123'", "abc 123"),
+    ('clientSecret = "zzz9"', "zzz9"),
+    ("APP_KEY=base64:abc", "base64:abc"),
+    ("OTP_SALT = pepper", "pepper"),
+    ("DATABASE_URL=postgres://shop:s3cr3t@db:5432/app", "s3cr3t"),
+    ("REDIS_URL=redis://:pw123@redis:6379", "pw123"),
+    ("Authorization: Bearer abcdefghijklmnop1234", "abcdefghijklmnop1234"),
+    ("aws key AKIAIOSFODNN7EXAMPLE in a note", "AKIAIOSFODNN7EXAMPLE"),
+    ("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "ghp_abcdefghij"),
+    ("slack xoxb-123456789012-abcdefghij", "xoxb-123456789012"),
+    (
+        "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fw",
+        "eyJzdWIiOiIxMjM0NTY3ODkwIn0",
+    ),
+    (
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n"
+        "-----END RSA PRIVATE KEY-----",
+        "MIIEowIBAAKCAQEA",
+    ),
+    (
+        "sha256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "9f86d081",
+    ),
+    ("id 123e4567-e89b-12d3-a456-426614174000 of the tenant", "123e4567"),
+    ("Authorization: Bearer abc.def.ghi", "abc.def.ghi"),
+    ("ARG GH_PAT=abc12", "abc12"),
+    ("JWT_SECRET=a1,b2", "b2"),
+    ('password = "my secret pass phrase"', "pass phrase"),
+    ("PASSWORD='p@ss w0rd'", "w0rd"),
+]
+HARMLESS_LINES = [
+    "POSTGRES_HOST_AUTH_METHOD=trust",
+    "image: postgres:14-alpine",
+    '"babel-plugin-transform-react-remove-prop-types": "^0.4.24"',
+    '"@babel/plugin-transform-es2015-modules-commonjs": "^7.0.0"',
+    "https://github.com/mastodon/mastodon/blob/main/docs/DEVELOPMENT.md#docker",
+    "app/controllers/settings/two_factor_authentication/webauthn_credentials_controller.rb",
+    "src/main/java/org/keycloak/authenticators/browser/WebAuthn4jAuthenticator.java",
+    "scripts/tuning_lib/prompt_versions/v1_no_token_rules/rag_user_prompt.txt",
+    "gem 'devise-two-factor', '~> 6.0'",
+    "The key: you must set it.",
+    "password:\n  secretKeyRef:\n    name: db",
+    "=" * 48,
+    "-" * 48,
+]
+
+
+class TestSecretRule:
+    @pytest.mark.parametrize(("line", "secret"), SECRET_LINES)
+    def test_secret_is_removed(self, line, secret):
+        out = remove_secrets(line)
+        assert secret not in out
+        assert "<removed>" in out
+
+    @pytest.mark.parametrize("line", HARMLESS_LINES)
+    def test_harmless_text_stays(self, line):
+        assert remove_secrets(line) == line
+
+    def test_the_name_of_a_key_stays(self):
+        assert remove_secrets("DB_PASS=hunter2") == "DB_PASS=<removed>"
+        assert remove_secrets('"jsonwebtoken": "^9.0.2"').startswith('"jsonwebtoken"')
+        out = remove_secrets("postgres://shop:s3cr3t@db:5432/app")
+        assert out == "postgres://shop:<removed>@db:5432/app"
+
+    def test_random_keys_are_removed(self):
+        rng = random.Random(7)
+        letters = string.ascii_letters + string.digits
+        tokens = []
+        for _ in range(300):
+            tokens.append(base64.b64encode(rng.randbytes(32)).decode())
+            tokens.append(base64.urlsafe_b64encode(rng.randbytes(32)).decode())
+            tokens.append("".join(rng.choice(letters) for _ in range(32)))
+            tokens.append("".join(rng.choice(letters.lower()) for _ in range(32)))
+            tokens.append(rng.randbytes(16).hex())
+        missed = [t for t in tokens if not looks_random(t)]
+        assert len(missed) <= len(tokens) // 100  # 1 of 100 at most
+
+    def test_a_very_long_line_is_fast(self, tmp_path):
+        (tmp_path / "README.md").write_text(
+            "# Shop\n" + "a_b.c-" * 150_000 + "\npassword = hunter2hunter2\n",
+            encoding="utf-8",
+        )
+        start = time.time()
+        facts = scan_codebase(tmp_path)
+        assert time.time() - start < 5
+        readme = next(p for p in facts.parts if p.kind == "readme")
+        assert "hunter2hunter2" not in readme.text
+        assert max(len(line) for line in readme.text.splitlines()) <= 2_000
+
+
+class TestScanOfLargeFolders:
+    def test_long_paths_stay_readable(self, tmp_path):
+        long_path = (
+            "app/controllers/settings/two_factor_authentication/"
+            "webauthn_credentials_controller.rb"
+        )
+        (tmp_path / long_path).parent.mkdir(parents=True)
+        (tmp_path / long_path).write_text("class X; end\n")
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        facts = scan_codebase(tmp_path)
+        paths = next(p for p in facts.parts if p.kind == "security_paths")
+        assert long_path in paths.text
+        assert "<removed>" not in paths.text
+
+    def test_security_paths_leave_out_noise(self, tmp_path):
+        for rel in (
+            "AUTHORS.md",
+            "assets/login.png",
+            "tests/auth_test.py",
+            "src/auth/login.py",
+            "src/more_from_author.py",
+        ):
+            (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / rel).write_text("x\n")
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        facts = scan_codebase(tmp_path)
+        paths = next(p for p in facts.parts if p.kind == "security_paths")
+        assert paths.text.splitlines() == ["src/auth/login.py"]
+
+    def test_security_paths_cover_the_whole_tree(self, tmp_path):
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        for n in range(300):
+            folder = tmp_path / f"part{n // 30:02d}"
+            folder.mkdir(exist_ok=True)
+            (folder / f"session_{n:03d}.py").write_text("x\n")
+        facts = scan_codebase(tmp_path)
+        lines = next(p for p in facts.parts if p.kind == "security_paths").text
+        assert len(lines.splitlines()) == 80
+        assert "part00/" in lines
+        assert "part09/" in lines
+
+    def test_code_folders_part(self, tmp_path):
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        for rel in (
+            "app/models/user.py",
+            "app/models/order.py",
+            "app/models/invoice.py",
+            "app/models/__init__.py",
+            "app/models/user_test.go",
+            "tests/test_user.py",
+            "db/migrate/001_create_users.rb",
+            "web/OwnerControllerTests.java",
+        ):
+            (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / rel).write_text("x\n")
+        facts = scan_codebase(tmp_path)
+        code = next(p for p in facts.parts if p.kind == "code_folders")
+        assert code.text == "app/models (3 code files): invoice, order, user"
+
+    def test_manifests_of_inner_projects(self, tmp_path):
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        for rel in (
+            "src/Api/Api.csproj",
+            "src/Core/Core.csproj",
+            "test/Api.Test/Api.Test.csproj",
+            "a/b/c/d/too_deep/package.json",
+            "backend/requirements-dev.txt",
+        ):
+            (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / rel).write_text("<Project />\n")
+        facts = scan_codebase(tmp_path)
+        manifests = [p.path for p in facts.parts if p.kind == "manifest"]
+        assert manifests == [
+            "backend/requirements-dev.txt",
+            "src/Api/Api.csproj",
+            "src/Core/Core.csproj",
+            "test/Api.Test/Api.Test.csproj",
+        ]
+
+    def test_tree_largest_code_folder_first(self, tmp_path):
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        for n in range(30):
+            (tmp_path / "public" / "emoji").mkdir(parents=True, exist_ok=True)
+            (tmp_path / "public" / "emoji" / f"{n}.svg").write_text("x")
+        for n in range(5):
+            (tmp_path / "app" / "models").mkdir(parents=True, exist_ok=True)
+            (tmp_path / "app" / "models" / f"m{n}.rb").write_text("x")
+        (tmp_path / ".github").mkdir()
+        for n in range(9):
+            (tmp_path / ".github" / f"w{n}.yml").write_text("x")
+        tree = scan_codebase(tmp_path).parts[0].text.splitlines()
+        assert tree[0] == "app/ (5 files)"
+        assert tree[1] == "  models/ (5 files)"
+        assert tree.index("public/ (30 files)") < tree.index(".github/ (9 files)")
+        assert tree[-1] == "README.md"
+
+    def test_files_near_the_root_are_never_lost(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(scan, "MAX_FILES", 70)
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        (tmp_path / "a" / "deep").mkdir(parents=True)
+        for n in range(100):
+            (tmp_path / "a" / "deep" / f"f{n:03d}.py").write_text("x")
+        (tmp_path / "z").mkdir()
+        (tmp_path / "z" / "package.json").write_text('{"name": "z"}')
+        facts = scan_codebase(tmp_path)
+        assert facts.stopped_early is True
+        assert facts.files_seen == 70
+        assert "z/package.json" in [p.path for p in facts.parts]
+
+    @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs named pipes")
+    def test_a_named_pipe_does_not_stop_the_scan(self, tmp_path):
+        os.mkfifo(tmp_path / "README.md")
+        (tmp_path / "package.json").write_text('{"name": "shop"}')
+        found: list = []
+        worker = threading.Thread(
+            target=lambda: found.append(scan_codebase(tmp_path)), daemon=True
+        )
+        worker.start()
+        worker.join(10)
+        assert not worker.is_alive()
+        assert [p.kind for p in found[0].parts] == ["tree", "manifest"]
+
+    def test_a_link_to_a_secret_file_is_not_read(self, tmp_path):
+        (tmp_path / ".env").write_text("DB_USER=admin\nPLAIN=hunter2value\n")
+        (tmp_path / "README.md").symlink_to(tmp_path / ".env")
+        (tmp_path / "package.json").write_text('{"name": "shop"}')
+        facts = scan_codebase(tmp_path)
+        everything = "\n".join(p.text + p.path for p in facts.parts)
+        assert "hunter2value" not in everything
+        assert "readme" not in [p.kind for p in facts.parts]
+        assert facts.secret_files_skipped == 2
+
+    def test_secret_file_names_are_not_shown(self, tmp_path):
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        secret = (
+            "terraform.tfstate",
+            "prod.tfvars",
+            "kubeconfig",
+            ".git-credentials",
+            "deploy.ppk",
+            "service-account.json",
+            "config/prod_password_backup.txt",
+            "config/db_credentials.yml",
+            ".ssh/known_hosts",
+        )
+        shown = ("src/password_validator.py", "app/views/reset_password.html.erb")
+        for rel in secret + shown:
+            (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / rel).write_text("x\n")
+        facts = scan_codebase(tmp_path)
+        everything = "\n".join(p.text for p in facts.parts)
+        for rel in secret:
+            assert Path(rel).name not in everything
+        assert ".ssh" not in everything
+        for rel in shown:
+            assert rel in everything
+        assert facts.secret_files_skipped == 8  # the folder .ssh is not counted
+
+    def test_the_main_readme_wins(self, tmp_path):
+        (tmp_path / "README.de.md").write_text("# Projekt\nAuf Deutsch.\n")
+        (tmp_path / "README.md").write_text("# Project\nIn English.\n")
+        readme = next(p for p in scan_codebase(tmp_path).parts if p.kind == "readme")
+        assert readme.path == "README.md"
+
+    def test_a_readme_in_utf16_is_read(self, tmp_path):
+        text = "# Shop\nA web shop. Uses PostgreSQL.\n"
+        (tmp_path / "README.md").write_bytes(text.encode("utf-16"))
+        readme = next(p for p in scan_codebase(tmp_path).parts if p.kind == "readme")
+        assert "Uses PostgreSQL." in readme.text
+        assert "\x00" not in readme.text
+
+    def test_a_file_that_is_not_text_is_not_read(self, tmp_path):
+        (tmp_path / "README.md").write_bytes(b"abc\x00def\x00" * 50)
+        (tmp_path / "package.json").write_text('{"name": "shop"}')
+        assert "readme" not in [p.kind for p in scan_codebase(tmp_path).parts]
+
+    def test_one_large_part_leaves_room_for_the_others(self, tmp_path):
+        (tmp_path / "README.md").write_text("# App\nA product.\n")
+        (tmp_path / "package.json").write_text(
+            '{"x": "' + "word " * 150_000 + '"}', encoding="utf-8"
+        )
+        (tmp_path / "Dockerfile").write_text("FROM python:3.13\n")
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "index.md").write_text("Orders overview.\n")
+        facts = scan_codebase(tmp_path)
+        kinds = [p.kind for p in facts.parts]
+        assert kinds == ["tree", "readme", "manifest", "container", "docs"]
+        manifest = next(p for p in facts.parts if p.kind == "manifest")
+        assert len(manifest.text.split()) <= 600
+        assert len(manifest.text) <= 6_000
+
+    @pytest.mark.skipif(os.geteuid() == 0, reason="root can read every folder")
+    def test_a_folder_with_no_permission(self, tmp_path):
+        locked = tmp_path / "locked"
+        locked.mkdir()
+        (locked / "README.md").write_text("# App\n")
+        locked.chmod(0)
+        try:
+            with pytest.raises(ContextError, match="no permission"):
+                scan_codebase(locked)
+        finally:
+            locked.chmod(0o755)
+
+    def test_only_names_is_not_enough(self, tmp_path):
+        (tmp_path / "src" / "auth").mkdir(parents=True)
+        (tmp_path / "src" / "auth" / "login.py").write_text("x\n")
+        with pytest.raises(ContextError):
+            scan_codebase(tmp_path)
+
+
 class TestChecks:
     def test_unknown_source_dropped(self, codebase):
         facts = scan_codebase(codebase)
@@ -150,12 +468,41 @@ class TestChecks:
     def test_technology_not_in_files(self, codebase):
         facts = scan_codebase(codebase)
         answer = _good_answer()
-        answer["tech_stack"].append(
-            {"kind": "cache", "value": "Redis", "source": "F2"}
-        )
+        answer["tech_stack"].append({"kind": "cache", "value": "Redis", "source": "F2"})
         context, dropped = check_answer(answer, facts, None)
         assert "Redis" not in [t["value"] for t in context["tech_stack"]]
         assert any(d["why"] == "not in the files" for d in dropped)
+
+    @pytest.mark.parametrize(
+        ("value", "files", "kept"),
+        [
+            ("PostgreSQL", "gorm.io/driver/postgres v1.5", True),
+            ("Ruby on Rails", "gem 'rails'\nruby '3.4'", True),
+            ("Ruby on Rails", "gem 'sinatra'\nruby '3.4'", False),
+            ("Apache Kafka", "Apache License 2.0", False),
+            ("Apache Kafka", "image: apache/kafka:3.7", True),
+            ("Amazon SQS", '<PackageReference Include="AWSSDK.SQS" />', True),
+            ("Azure Service Bus", "Azure.Messaging.ServiceBus", True),
+            ("SQL Server", "Microsoft.Data.SqlClient for a server", True),
+            ("Google Cloud Storage", "google analytics in the cloud", False),
+            ("Go", "google and mongo are going", False),
+            ("Go", "module x\n\ngo 1.22", True),
+            ("Gin", "the login plugin engine", False),
+            ("Gin", "github.com/gin-gonic/gin v1.9", True),
+            ("H2", "runtimeOnly 'com.h2database:h2'", True),
+            ("C#", '<Project Sdk="x">c# 12</Project>', True),
+            ("C#", "a doc about c++ and c", False),
+            ("Redis", "the word is not here", False),
+        ],
+    )
+    def test_technology_must_be_named(self, tmp_path, value, files, kept):
+        (tmp_path / "README.md").write_text(files + "\n", encoding="utf-8")
+        facts = scan_codebase(tmp_path)
+        readme = _refs(facts)["readme"]
+        answer = {"tech_stack": [{"kind": "x", "value": value, "source": readme}]}
+        context, dropped = check_answer(answer, facts, None)
+        assert [t["value"] for t in context["tech_stack"]] == ([value] if kept else [])
+        assert bool(dropped) is not kept or dropped[0]["what"] == "security_profile"
 
     def test_source_is_corrected(self, codebase):
         facts = scan_codebase(codebase)
@@ -178,12 +525,8 @@ class TestChecks:
             }
             for n in range(8)
         ]
-        answer["features"][0]["items"].append(
-            {"text": "w " * 13, "source": "F2"}
-        )
-        answer["features"][1]["items"].append(
-            {"text": "ITEM 0 0", "source": "F2"}
-        )
+        answer["features"][0]["items"].append({"text": "w " * 13, "source": "F2"})
+        answer["features"][1]["items"].append({"text": "ITEM 0 0", "source": "F2"})
         answer["security_profile"] = "Great - fine"
         context, dropped = check_answer(answer, facts, None)
         assert len(context["features"]) == 6
@@ -220,7 +563,9 @@ class TestRender:
         facts = scan_codebase(codebase)
         context, _ = check_answer(_good_answer(), facts, None)
         lines = source_lines(context)
-        assert len(lines) == 4
+        assert len(lines) == 5
+        assert lines[-1]["where"] == "security_profile"
+        assert lines[-1]["path"] == "Chosen by the model, not taken from a file."
         assert lines[0]["where"] == "tech_stack"
         assert {"where", "text", "path"} == set(lines[0])
         assert any(x["where"] == "features: Orders" for x in lines)
@@ -248,6 +593,7 @@ class TestPipeline:
         assert result["draft_notice"] == DRAFT_NOTICE
         assert result["model"] == "stand-in"
         assert result["facts"]["secret_files_skipped"] == 1
+        assert result["facts"]["stopped_early"] is False
         assert [s[:2] for s in stages] == [
             ("scan", "start"),
             ("scan", "done"),
@@ -263,6 +609,28 @@ class TestPipeline:
         result = SystemContextWriter(client).generate(codebase)
         assert result["calls"][0]["attempts"] == 3
         assert result["calls"][0]["ok"] is True
+
+    def test_an_answer_with_nothing_of_use_gets_a_second_try(self, codebase):
+        empty = {"tech_stack": "x", "features": {"a": 1}}
+        client = Stand([json.dumps(empty), json.dumps(_good_answer())])
+        result = SystemContextWriter(client).generate(codebase)
+        assert result["calls"][0] == {
+            "attempts": 2,
+            "ok": True,
+            "seconds": result["calls"][0]["seconds"],
+        }
+        assert result["context"]["name"] == "Shop"
+
+    def test_very_long_texts_are_cut(self, codebase):
+        answer = _good_answer()
+        answer["name"] = "N" * 2_000_000
+        answer["security_profile"] = "High - " + "x" * 2_000_000
+        answer["features"][0]["group"] = "g" * 2_000_000
+        facts = scan_codebase(codebase)
+        context, _ = check_answer(answer, facts, None)
+        assert len(context["name"]) == 300
+        assert len(context["security_profile"]) <= 300
+        assert len(render_yaml(context)) < 5_000
 
     def test_three_bad_answers(self, codebase):
         client = Stand(["a", "b", "c"])

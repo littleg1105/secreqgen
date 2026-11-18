@@ -13,7 +13,7 @@ Write the system context of this product. Use only what the parts above say.
 - name: the name of the product.
 - description: one sentence, 25 words at most. It says what the product does and for whom.
 - tech_stack: the main technologies of the product: language, framework, database, cache, search, message queue, frontend. Give a technology only if a part names it.
-- security_profile: "High", "Medium" or "Low", then " - " and a short reason from the parts.
+- security_profile: how much harm a security failure of this product can do: "Critical", "High", "Medium" or "Low". Then " - " and a short reason: what the product keeps and who uses it, as the parts show it. This is your judgement; the person will check it.
 - features: 3 to 6 groups of features. Each group has a short name and 2 to 6 short features, 8 words at most each.
 - data_sensitivity: the kinds of data that the product keeps, in three lists. critical: for example passwords, keys and tokens. high: private data of users. medium: other data of the product.
 
@@ -28,7 +28,7 @@ When the parts do not say something, leave it out. An empty list is a correct an
  "tech_stack": [
   {"kind": "<language, framework, database, cache, search, queue or frontend>", "value": "<technology>", "source": "<source name>"}
  ],
- "security_profile": "<High, Medium or Low> - <short reason>",
+ "security_profile": "<Critical, High, Medium or Low> - <short reason>",
  "features": [
   {"group": "<short name>", "items": [{"text": "<short feature>", "source": "<source name>"}]}
  ],

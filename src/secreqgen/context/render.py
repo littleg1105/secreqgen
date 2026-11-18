@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+MODEL_RATING = "Chosen by the model, not taken from a file."
 
 
 def _slug(text: str) -> str:
@@ -68,7 +69,13 @@ def source_lines(context: dict) -> list[dict]:
         ]
     for level, items in context.get("data_sensitivity", {}).items():
         where = f"data_sensitivity: {level}"
-        lines += [
-            {"where": where, "text": i["text"], "path": i["path"]} for i in items
-        ]
+        lines += [{"where": where, "text": i["text"], "path": i["path"]} for i in items]
+    if context.get("security_profile"):
+        lines.append(
+            {
+                "where": "security_profile",
+                "text": context["security_profile"],
+                "path": MODEL_RATING,
+            }
+        )
     return lines

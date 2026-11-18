@@ -25,9 +25,7 @@ StageCallback = Callable[[str, str, dict], None]
 
 
 def _evidence(facts: CodebaseFacts) -> str:
-    blocks = [
-        f"### [{p.ref}] {p.path} ({p.kind})\n{p.text}" for p in facts.parts
-    ]
+    blocks = [f"### [{p.ref}] {p.path} ({p.kind})\n{p.text}" for p in facts.parts]
     return "\n\n---\n\n".join(blocks)
 
 
@@ -65,7 +63,9 @@ class SystemContextWriter:
         name = (product or "").strip() or None
         line = f"The person calls the product: {name}" if name else ""
         prompt = self._user.substitute(evidence=_evidence(facts), product_line=line)
-        answer = None
+        context: dict = {}
+        dropped: list[dict] = []
+        accepted = readable = False
         attempts = 0
         t0 = time.time()
         for attempts in range(1, MAX_JSON_ATTEMPTS + 1):
@@ -80,27 +80,30 @@ class SystemContextWriter:
                 candidate = None
             answered = int(bool(candidate))
             emit("write", "done", {"attempt": attempts, "answered": answered})
-            if candidate:
-                answer = candidate
-                break
+            if not candidate:
+                continue
+            readable = True
+            context, dropped = check_answer(candidate, facts, name)
+            if context["features"] or context["tech_stack"]:
+                accepted = True
+                break  # else: ask again, the answer held nothing of use
         calls = [
             {
                 "attempts": attempts,
-                "ok": answer is not None,
+                "ok": accepted,
                 "seconds": round(time.time() - t0, 1),
             }
         ]
-        if answer is None:
+        if not accepted:
+            if readable:
+                raise ContextError("The model named nothing that the files support.")
             raise ContextError("The model gave no answer that can be read.")
-        context, dropped = check_answer(answer, facts, name)
         kept = (
             len(context["tech_stack"])
             + sum(len(g["items"]) for g in context["features"])
             + sum(len(v) for v in context["data_sensitivity"].values())
         )
         emit("check", "done", {"kept": kept, "dropped": len(dropped)})
-        if not context["features"] and not context["tech_stack"]:
-            raise ContextError("The model named nothing that the files support.")
         model_name = getattr(self.llm, "model_name", None)
         return {
             "draft_notice": DRAFT_NOTICE,
@@ -110,6 +113,7 @@ class SystemContextWriter:
             "calls": calls,
             "facts": {
                 "files_seen": facts.files_seen,
+                "stopped_early": facts.stopped_early,
                 "secret_files_skipped": facts.secret_files_skipped,
                 "languages": facts.languages,
                 "parts": [
