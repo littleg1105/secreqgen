@@ -27,6 +27,7 @@ from secreqgen_gui.widgets import path_field
 
 TESTED_SET = "__tested__"
 FOLDER_MISSING = "Folder not found. Check the path or click Browse."
+FILE_MISSING = "File not found. Check the path or click Browse."
 READING = "Reading the folder."
 NO_FILES = "This folder has no documentation files that the search can read."
 WRONG_TYPE = "Use a .json, .yaml or .yml file."
@@ -383,10 +384,18 @@ class StoriesPart:
             return
         path = expand_path(value)
         try:
+            if not await run.io_bound(path.is_file):
+                raise FileNotFoundError(FILE_MISSING)
             result = await run.io_bound(read_story_file, path)
         except Exception as exc:  # the text of the error is the message
             if token == self._token:
-                self._clear(f"{reason_text(exc)} Pick another file.")
+                missing = isinstance(exc, FileNotFoundError)
+                text = (
+                    FILE_MISSING
+                    if missing
+                    else f"{reason_text(exc)} Pick another file."
+                )
+                self._clear(text)
                 if not pick and self.tabs.value != "path":
                     # A remembered file failed: show the path that it came from.
                     self.muted = True
@@ -533,9 +542,16 @@ class DocsPart:
             ui.timer(0.05, self.check, once=True)
 
     def _switch_changed(self, _e=None) -> None:
-        """Remember the switch and show the line again. No new scan."""
+        """Remember the switch and show the line again.
+
+        The counts of the last scan serve both states of the switch. A folder
+        that was missing is read again: it can be back.
+        """
         if not self.muted:
             form_memory.remember(COMMON, "other_formats", bool(self.switch.value))
+        value = (self.field.value or "").strip()
+        if value and not self.isdir and not self.scanning and not self.muted:
+            ui.timer(0.01, self.check, once=True)
         self._show()
         self.on_change()
 

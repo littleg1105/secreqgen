@@ -699,3 +699,13 @@ def test_the_dialog_uses_the_lines_of_the_tool():
     flat = [line for _place, group in grouped_lines(RESULT) for line in group]
     assert flat == lines
     assert Path(lines[0]["path"]).name == "pyproject.toml"
+
+
+def test_a_run_that_converted_nothing_keeps_every_file_name():
+    """Only a run that converted files can be stored with mirror names."""
+    from secreqgen_gui.widgets import has_mirror_names
+
+    assert has_mirror_names({"docs_formats": {"converted": {}, "skipped": 1}}) is False
+    assert has_mirror_names({"docs_formats": {"converted": {".rst": 2}}}) is True
+    assert has_mirror_names({}) is False
+    assert has_mirror_names(None) is False

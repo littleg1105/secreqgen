@@ -7,6 +7,7 @@ from nicegui import run, ui
 from secreqgen_gui import form_memory, jobs
 from secreqgen_gui.form_memory import COMMON, REQUIREMENTS
 from secreqgen_gui.pages._setup_parts import (
+    FILE_MISSING,
     UNTESTED_PROMPTS,
     DocsPart,
     Foot,
@@ -26,7 +27,7 @@ from secreqgen_gui.pages.context_dialog import open_context_dialog
 from secreqgen_gui.settings import expand_path, load_settings
 from secreqgen_gui.widgets import page_title, path_field
 
-CONTEXT_MISSING = "File not found. Check the path or click Browse."
+CONTEXT_MISSING = FILE_MISSING
 
 
 def page(

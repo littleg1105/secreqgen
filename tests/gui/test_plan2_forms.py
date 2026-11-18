@@ -359,10 +359,12 @@ async def test_a_name_typed_after_the_pick_wins_over_the_late_read(user, tmp_pat
 # A5: a stories file that cannot be read
 
 
-async def test_a_missing_file_shows_the_reason_and_pick_another(user, tmp_path):
+async def test_a_missing_stories_file_shows_the_text_of_a_missing_file(user, tmp_path):
+    """The path of the file is in the field. The line does not repeat it."""
     gone = tmp_path / "gone.json"
     await user.open(_url("/threats/new", gone, _docs(tmp_path)))
-    await user.should_see(f"Input file not found: {gone}. Pick another file.")
+    await user.should_see("File not found. Check the path or click Browse.")
+    await user.should_not_see("Input file not found")
 
 
 async def test_a_bad_file_shows_the_reason_and_pick_another(user, tmp_path):
@@ -395,7 +397,7 @@ async def test_a_remembered_file_that_fails_opens_the_path_tab(user, tmp_path, t
     form_memory.remember("common", "stories_file", str(gone))
     form_memory.remember("common", "stories_tab", tab)
     await user.open("/threats/new")
-    await user.should_see("Pick another file.")
+    await user.should_see("File not found. Check the path or click Browse.")
     assert user.find(kind=ui.tabs).elements.pop().value == "path"
 
 
@@ -561,3 +563,24 @@ async def test_the_foot_keeps_its_text_for_a_run(user, tmp_path, monkeypatch):
     await user.should_see("Another run is in progress. Wait for it to end, or stop it.")
     await user.should_see("Open the run")
     await user.should_not_see("A model is writing a system context.")
+
+
+async def test_a_folder_that_is_back_is_read_again_on_a_click_of_the_switch(
+    user, tmp_path
+):
+    """After "Folder not found", the switch starts a new read of the folder."""
+    import shutil
+
+    docs = _docs(tmp_path)
+    stories = tmp_path / "stories.json"
+    story = '{"id": "S-1", "title": "T", "story": "As a user I log in."}'
+    stories.write_text('{"user_stories": [' + story + "]}")
+    kept = tmp_path / "kept"
+    shutil.copytree(docs, kept)
+    shutil.rmtree(docs)
+    await user.open(_url("/threats/new", stories, docs))
+    await user.should_see("Folder not found. Check the path or click Browse.")
+    shutil.copytree(kept, docs)
+    user.find(marker="other_formats").click()
+    await user.should_not_see("Folder not found. Check the path or click Browse.")
+    await user.should_see("Markdown file")

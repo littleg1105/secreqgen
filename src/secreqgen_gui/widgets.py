@@ -38,16 +38,10 @@ FORMATS_HINT = (
 )
 
 
-def has_mirror_names(manifest: dict | None) -> bool:
-    """Say if a run is stored with the names of mirror files (x.rst.md)."""
-    return isinstance(manifest, dict) and isinstance(manifest.get("docs_formats"), dict)
-
-
 def converted_files(manifest: dict | None) -> int:
     """Return the number of files that the run converted or will convert."""
-    if not has_mirror_names(manifest):
-        return 0
-    converted = manifest["docs_formats"].get("converted")
+    formats = manifest.get("docs_formats") if isinstance(manifest, dict) else None
+    converted = formats.get("converted") if isinstance(formats, dict) else None
     if not isinstance(converted, dict):
         return 0
     total = 0
@@ -57,6 +51,15 @@ def converted_files(manifest: dict | None) -> int:
         except (TypeError, ValueError):
             continue
     return total
+
+
+def has_mirror_names(manifest: dict | None) -> bool:
+    """Say if a run can be stored with the names of mirror files (x.rst.md).
+
+    Only a run that converted files can have such names. A run that converted
+    nothing shows every file name as it is.
+    """
+    return converted_files(manifest) > 0
 
 
 def formats_tag(manifest: dict | None) -> None:
