@@ -36,6 +36,29 @@ With the switch off and a context file of your own (or none), a run is the teste
 
 The two forms keep what you enter, also after a restart of the GUI. The stories, the documentation folder and the product name are the same in both forms. The values are in `forms.json` in the data folder. "Clear the form" empties the shared values and the values of that form.
 
+## The command of a run
+
+Under the Start button of each form, the block "Command" shows the command of `secreqgen` that starts the same run in a terminal. It changes with each option that you change. "Copy" puts it on the clipboard. The dialog "Write a system context" and the page of a run show their command too (on the page of a run: click "Command").
+
+The GUI does not run this command. The GUI and the command call the same code. A test compares the two: the models get the same prompts from the command and from the GUI.
+
+The command line cannot do two things that the GUI can do. Then the block says so in one line.
+
+| In the GUI | In the command |
+|---|---|
+| You pick some of the stories | `generate threats` takes one story (`--story-id`) or all stories. `generate requirements` takes all stories. |
+| You use a prompt set of your own | The command uses the tested prompts. |
+
+More facts:
+
+- An option shows only when it differs from the default of the command line. A run with the tested models and all stories gives a short command.
+- `generate requirements` has no option for the model. The model is the variable `SECREQGEN_LLM_MODEL_NAME` in front of the command. An Ollama address that is not the default is the variable `SECREQGEN_LLM_BASE_URL`.
+- The paragraph "About the product" goes to the command as a file (`--about-file`). The GUI writes the paragraph of an open form into the folder `about` of the data folder, a moment after you stop typing. Each text has its own file, so a command stays true when you change the paragraph later. The GUI removes these files at its next start. The paragraph of a run is in the folder of the run (`about.txt`).
+- A run of some stories keeps a copy of only those stories in its folder. So the command on the page of the run starts exactly that run.
+- The page of a run shows no command when the GUI cannot know it. Examples: a requirements run of an older version of the GUI (it did not store if the run had a system context file), and a run of several stories of an older version.
+- The command writes its result where the command line writes it by default: `generate threats` into the folder `threat_lists` in the current folder, `generate requirements` and `generate context` to the screen. Add `--output` to change that.
+- The command starts with `secreqgen`. When this name is not on your path, use `.venv/bin/python -m secreqgen` in its place (see the README of the tool).
+
 ## Pages
 
 | Page | What it does |
