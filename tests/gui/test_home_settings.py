@@ -55,21 +55,31 @@ async def test_home_shows_the_three_parts(user, monkeypatch):
         "Recent runs",
         "New threat list",
         "New requirements",
-        "Draft threats for each story.",
-        "Security requirements for each story, based on your documentation.",
-        "Get a draft threat list or security requirements for your user stories.",
+        "Draft threats, each with a quote",
+        "Security requirements with ASVS category",
+        "Threat lists and security requirements from your user stories.",
         "Check again",
     ):
         await user.should_see(text)
     await user.should_not_see("Model server")
 
 
-async def test_home_lines_say_ready(user, monkeypatch):
-    patch_check(monkeypatch, stand_in())
+async def test_home_shows_one_status_row_with_all_models(user, monkeypatch):
+    models = (*TESTED, "llama3:8b")
+    patch_check(monkeypatch, stand_in(models=models))
     await user.open("/")
-    await user.should_see("Ollama is running.")
-    await user.should_see("gemma4:26b is ready.")
-    await user.should_see("qwen3.8:27b is ready.")
+    await user.should_see("Ollama OK")
+    await user.should_see("Models: gemma4:26b, qwen3.8:27b, llama3:8b")
+    await user.should_not_see("is ready.")
+    await user.should_not_see("Not in Ollama")
+    await user.should_not_see("Ollama is running.")
+
+
+async def test_home_with_no_model_says_none(user, monkeypatch):
+    patch_check(monkeypatch, stand_in(models=()))
+    await user.open("/")
+    await user.should_see("Ollama OK")
+    await user.should_see("Models: none")
 
 
 async def test_home_server_down_names_the_address(user, monkeypatch):
@@ -81,11 +91,33 @@ async def test_home_server_down_names_the_address(user, monkeypatch):
     )
 
 
-async def test_home_missing_model_gives_the_pull_command(user, monkeypatch):
+async def test_home_missing_checker_names_the_role(user, monkeypatch):
     patch_check(monkeypatch, stand_in(models=("gemma4:26b",)))
     await user.open("/")
-    await user.should_see("gemma4:26b is ready.")
-    await user.should_see("qwen3.8:27b is not installed. Run: ollama pull qwen3.8:27b")
+    await user.should_see("Models: gemma4:26b")
+    await user.should_see(
+        "Not in Ollama: qwen3.8:27b (checker). Run: ollama pull qwen3.8:27b"
+    )
+    await user.should_not_see("Not in Ollama: gemma4:26b")
+
+
+async def test_home_model_with_two_roles_gets_both_roles(user, monkeypatch, gui_home):
+    from secreqgen_gui.settings import GuiSettings, save_settings
+
+    save_settings(
+        GuiSettings(
+            writer_model="gemma4:26b",
+            checker_model="qwen3.8:27b",
+            requirements_model="gemma4:26b",
+        )
+    )
+    patch_check(monkeypatch, stand_in(models=("qwen3.8:27b",)))
+    await user.open("/")
+    await user.should_see(
+        "Not in Ollama: gemma4:26b (writer, requirements). "
+        "Run: ollama pull gemma4:26b"
+    )
+    await user.should_not_see("Not in Ollama: qwen3.8:27b")
 
 
 async def test_check_again_runs_the_check_again(user, monkeypatch):
@@ -98,10 +130,10 @@ async def test_check_again_runs_the_check_again(user, monkeypatch):
 
     patch_check(monkeypatch, check)
     await user.open("/")
-    await user.should_see("gemma4:26b is ready.")
+    await user.should_see("Ollama OK")
     user.find("Check again").click()
     await asyncio.sleep(0.5)
-    await user.should_see("gemma4:26b is ready.")
+    await user.should_see("Ollama OK")
     assert len(calls) == 2
 
 
@@ -168,20 +200,53 @@ async def test_settings_show_the_parts(user, monkeypatch):
         "About",
         "Check Ollama",
         "Save",
+        "SecReqGen 0.1.0",
+    ):
+        await user.should_see(text)
+
+
+async def test_settings_have_no_sentence_under_data_folder_and_about(user, monkeypatch):
+    patch_check(monkeypatch, stand_in())
+    await user.open("/settings")
+    for old in (
         "Runs, uploads and your prompts are stored here.",
+        "SECREQGEN_GUI_HOME",
         "The threat list is a draft, not a complete threat model.",
-        "Tested setup: gemma4:26b writes, qwen3.8:27b checks, with the tested",
+        "Tested setup:",
         "The ingest and evaluate commands are on the command line only.",
     ):
-        await user.should_see(text, retries=3) if False else await user.should_see(text)
+        await user.should_not_see(old)
+
+
+async def test_settings_show_the_two_tested_models(user, monkeypatch):
+    from secreqgen.threats import TESTED_WRITER
+    from secreqgen.threats.pipeline import TESTED_CHECKER
+
+    patch_check(monkeypatch, stand_in())
+    await user.open("/settings")
+    await user.should_see(f"Tested: {TESTED_WRITER}")
+    await user.should_see(f"Tested: {TESTED_CHECKER}")
+    assert (TESTED_WRITER, TESTED_CHECKER) == TESTED
 
 
 async def test_settings_check_shows_lines(user, monkeypatch):
     patch_check(monkeypatch, stand_in(models=("gemma4:26b",)))
     await user.open("/settings")
     user.find("Check Ollama").click()
-    await user.should_see("Ollama is running.")
-    await user.should_see("qwen3.8:27b is not installed. Run: ollama pull qwen3.8:27b")
+    await user.should_see("Ollama OK")
+    await user.should_see("Models: gemma4:26b")
+    await user.should_see(
+        "Not in Ollama: qwen3.8:27b (checker). Run: ollama pull qwen3.8:27b"
+    )
+
+
+async def test_settings_check_with_all_models_shows_one_row(user, monkeypatch):
+    patch_check(monkeypatch, stand_in(models=(*TESTED, "llama3:8b")))
+    await user.open("/settings")
+    user.find("Check Ollama").click()
+    await user.should_see("Ollama OK")
+    await user.should_see("Models: gemma4:26b, qwen3.8:27b, llama3:8b")
+    await user.should_not_see("Not in Ollama")
 
 
 async def test_settings_check_down_names_the_address(user, monkeypatch):

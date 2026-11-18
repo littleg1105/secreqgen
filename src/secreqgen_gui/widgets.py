@@ -32,10 +32,7 @@ def tag(text: str, kind: str = "plain") -> None:
     ui.label(text).classes(f"sr-tag sr-tag-{kind}")
 
 
-FORMATS_HINT = (
-    "This run read files that were converted to Markdown. "
-    "The thesis tests used Markdown files only."
-)
+FORMATS_HINT = "Files converted to Markdown. Not in the thesis tests."
 
 
 def converted_files(manifest: dict | None) -> int:
@@ -71,10 +68,7 @@ def formats_tag(manifest: dict | None) -> None:
         ui.tooltip(FORMATS_HINT)
 
 
-CONTEXT_HINT = (
-    "A model wrote the system context of this run. "
-    "The thesis tests used files written by a person."
-)
+CONTEXT_HINT = "System context written by a model. Not in the thesis tests."
 
 
 def context_tag(manifest: dict | None) -> None:
@@ -86,10 +80,7 @@ def context_tag(manifest: dict | None) -> None:
         ui.tooltip(CONTEXT_HINT)
 
 
-ABOUT_HINT = (
-    "A model wrote the facts in the paragraph about the product. "
-    "The thesis tests used facts that a person wrote."
-)
+ABOUT_HINT = "Paragraph facts written by a model. Not in the thesis tests."
 
 
 def about_tag(manifest: dict | None) -> None:
@@ -102,7 +93,7 @@ def about_tag(manifest: dict | None) -> None:
 
 
 COMMAND_LABEL = "Command"
-COMMAND_HINT = "This command starts the same run in a terminal."
+COMMAND_HINT = "The same run, for a terminal"
 COPY_LABEL = "Copy"
 COPIED = "Copied."
 

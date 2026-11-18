@@ -130,16 +130,13 @@ STYLE = """
 
 VERDICT_COLOR = {"keep": "positive", "delete": "negative"}
 CHECKER_TEXT = {"accepts": "accepted", "refuses": "flagged"}
-NOTICE = (
-    "This is a draft, not a complete threat model. It covers only what your "
-    "documentation says. Check each threat against its quote."
-)
+NOTICE = "Draft, not a complete threat model. Covers only your documentation."
 KIND_SHORT = {"attack": "Attack", "rule": "Rule breach"}
 KIND_HINT = {
-    "attack": "The documentation describes an attack.",
-    "rule": "Someone breaks a security rule of the documentation.",
+    "attack": "An attack that the documentation describes",
+    "rule": "A breach of a security rule in the documentation",
 }
-CHOICE_HINT = "Chosen by the writer, not taken from the documentation."
+CHOICE_HINT = "Chosen by the writer, not from the documentation"
 GROUP_TITLE = {
     "accepts": "Accepted by the checker",
     "refuses": "Flagged by the checker",
@@ -148,15 +145,8 @@ GROUP_TITLE = {
     "weak_sign": "Weak support",
 }
 GROUP_NOTE = {
-    "refuses": (
-        "For example, the quote is about another feature, or the threat says "
-        "more than the passage. In the tests, flagged threats were wrong more "
-        "often than accepted ones."
-    ),
-    "weak_sign": (
-        "SecReqGen found a weak point in the support, for example a very short "
-        "quote. In the tests, these threats were wrong more often than the others."
-    ),
+    "refuses": "Wrong more often than accepted ones in the tests.",
+    "weak_sign": "Wrong more often than the others in the tests.",
 }
 
 
@@ -216,14 +206,14 @@ def _steps_line(model: dict) -> str:
     removed = trace["check"]["removed"]
     written = trace["check"]["kept"] + removed
     line = (
-        f"From {_plural(trace['search']['passages'], 'passage')} the writer "
-        f"wrote {_plural(written, 'threat')}."
+        f"{_plural(trace['search']['passages'], 'passage')}, "
+        f"{_plural(written, 'threat')} written"
     )
-    if removed == 1:
-        return line + " 1 failed the quote check and is not in the list."
+    if not written:
+        return line + "."
     if removed:
-        return f"{line} {removed} failed the quote check and are not in the list."
-    return line + " All passed the quote check." if written else line
+        return f"{line}, {removed} failed the quote check (not shown)."
+    return line + ", all passed the quote check."
 
 
 def _count_lines(rows: list[dict], has_checker: bool) -> str:
@@ -244,10 +234,10 @@ def _count_lines(rows: list[dict], has_checker: bool) -> str:
 def _decision_line(total: int, kept: int, deleted: int) -> str:
     """Return the second line of counts: what the reader decided."""
     if not kept and not deleted:
-        return "Keep or delete each threat."
+        return "Check each threat against its quote."
     left = total - kept - deleted
-    line = f"You kept {kept} and deleted {deleted}."
-    return f"{line} {left} left." if left else line
+    line = f"Kept {kept}, deleted {deleted}"
+    return f"{line}, {left} to review." if left else line + "."
 
 
 def _short(label: str) -> str:
@@ -488,15 +478,15 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
         if model.get("about"):
             words = len(str(model["about"]).split())
             ui.label(
-                f"The writer also read your paragraph about the product "
-                f"({words} words). It is background, not a source."
+                f"Paragraph about the product: {words} words. "
+                "Background, not a source."
             ).classes("sr-small mt-6")
 
     @ui.refreshable
     def evidence() -> None:
         item = by_id.get(state["chosen"])
         if item is None:
-            ui.label("Pick a threat to see its evidence.").classes("text-[#5B6570]")
+            ui.label("Pick a threat.").classes("text-[#5B6570]")
             return
         item_row = item["row"]
         row_id = item_row["id"]
@@ -615,9 +605,11 @@ async def page(run_id: str, story_id: str, row: str | None = None) -> None:
                     link.on("click.prevent", lambda _e=None, n=name: download(n))
             failed = sum(1 for c in model["calls"] if not c.get("ok"))
             if failed:
+                answers = (
+                    "1 writer answer" if failed == 1 else f"{failed} writer answers"
+                )
                 text(
-                    f"{failed} of {len(model['calls'])} calls to the writer failed. "
-                    "This list is not complete.",
+                    f"{answers} failed. This list is not complete.",
                     "sr-notice sr-warning",
                 )
             if not flat:

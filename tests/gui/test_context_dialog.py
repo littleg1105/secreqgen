@@ -16,10 +16,7 @@ from nicegui import ui  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 
-HINT = (
-    "A model wrote the system context of this run. "
-    "The thesis tests used files written by a person."
-)
+HINT = "System context written by a model. Not in the thesis tests."
 YAML_TEXT = "project:\n  name: Demo\n"
 RESULT = {
     "draft_notice": "Draft.",
@@ -132,9 +129,10 @@ async def test_the_button_opens_the_dialog(user, tmp_path, job):
     job()
     folder = _open(user, tmp_path)
     await _open_dialog(user, folder)
-    await user.should_see("The model reads the key files of a codebase")
-    await user.should_see("You check it before you use it.")
+    await user.should_not_see("The model reads the key files of a codebase")
+    await user.should_not_see("You check it before you use it.")
     await user.should_see("Codebase folder")
+    assert _field(user, "context-folder").props["hint"] == "Top folder of the code"
     await user.should_see("Product name (optional)")
     assert _field(user, "context-folder").value == str(folder)
 
@@ -166,9 +164,7 @@ async def test_write_shows_the_three_lines_and_then_the_result(user, tmp_path, j
     await asyncio.sleep(1.2)
     await user.should_see("2 files that can hold secrets are not read.")
     await user.should_see("5 of 6 passed")
-    await user.should_see(
-        "This is a draft. Check each line against its source before you use it."
-    )
+    await user.should_see("Draft. Check each line against its source.")
     await user.should_see("Lines and their sources")
     await user.should_see("tech_stack")
     await user.should_see("language: Python")
@@ -259,7 +255,7 @@ async def test_the_dialog_says_when_a_run_is_in_progress(user, tmp_path, job):
     )
     await _open_dialog(user, _open(user, tmp_path))
     await asyncio.sleep(1.2)
-    await user.should_see("Another run is in progress. Wait for it to end, or stop it.")
+    await user.should_see("Another run is in progress. Wait for it to end.")
     assert not _field(user, "context-write").enabled
 
 

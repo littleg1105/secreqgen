@@ -1,4 +1,4 @@
-"""The shell shows the seven entries, and each route opens its page."""
+"""The shell shows the eight entries, and each route opens its page."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ ENTRIES = [
     "History",
     "Prompts",
     "How it works",
+    "Help",
     "Settings",
 ]
 RUN = "20261117-214500-threats"
@@ -27,13 +28,14 @@ ROUTES = [
     (f"/runs/{RUN}/stories/MM-US-007", "Threat list"),
     (f"/runs/{RUN}/requirements", "Requirements"),
     ("/history", "No runs yet."),
-    ("/prompts", "The instructions for the models."),
+    ("/prompts", "Copy a set to change it."),
+    ("/help", "Documentation folder"),
     ("/prompts/threats/my-set", "This prompt set does not exist"),
     ("/settings", "Settings"),
 ]
 
 
-async def test_rail_shows_seven_entries(user):
+async def test_rail_shows_eight_entries(user):
     await user.open("/")
     await user.should_see("SecReqGen")
     for entry in ENTRIES:
@@ -60,6 +62,7 @@ def test_route_table_matches_the_design():
         "/prompts",
         "/prompts/{kind}/{name}",
         "/how-it-works",
+        "/help",
         "/settings",
     }
 
@@ -118,7 +121,7 @@ def test_start_file_starts_a_run(tmp_path, monkeypatch):
 
 async def test_rail_shows_the_ollama_state(user):
     await user.open("/")
-    await user.should_see("Ollama is running")
+    await user.should_see("Ollama OK")
 
 
 async def test_the_health_address_answers_without_a_page(user) -> None:
@@ -129,3 +132,10 @@ async def test_the_health_address_answers_without_a_page(user) -> None:
     response = await user.http_client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
+
+
+async def test_help_entry_opens_the_help_page(user):
+    await user.open("/")
+    user.find("Help").click()
+    await user.should_see("Documentation folder")
+    await user.should_see("Read the result")

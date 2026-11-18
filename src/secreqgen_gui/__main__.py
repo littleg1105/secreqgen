@@ -12,8 +12,8 @@ from secreqgen_gui.settings import (
 )
 
 NETWORK_WARNING = (
-    "The GUI listens on %s. It has no login. Every computer that can reach "
-    "this address can start runs and read the files that the GUI can read."
+    "The GUI listens on %s and has no login. Anyone who can reach this address "
+    "can start runs and read the files that the GUI can read."
 )
 
 

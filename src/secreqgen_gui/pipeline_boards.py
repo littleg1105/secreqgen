@@ -32,17 +32,17 @@ from secreqgen_gui.pipeline_view import (
 # For each step: the title, one short sentence, and the details.
 
 _STORY = (
-    "Your story and the documentation",
-    "You pick a user story and the folder with the product documentation.",
+    "Story and documentation",
+    "One user story and the documentation folder.",
     "",
 )
 _SEARCH = (
-    "SecReqGen searches the documentation",
-    "A word search finds the passages that match the story. It uses no AI.",
+    "Search",
+    "Word search (BM25), no AI. Finds the passages that match the story.",
 )
 _PAGE_FILL = (
-    "The search method is BM25. SecReqGen takes up to 3,000 tokens, page by "
-    "page: the best sections of a page first, then its other sections."
+    "Up to 3,000 tokens, page by page: the best sections first, then the rest "
+    "of the page."
 )
 
 TEXTS: dict[str, dict[str, tuple[str, str, str]]] = {
@@ -50,51 +50,49 @@ TEXTS: dict[str, dict[str, tuple[str, str, str]]] = {
         "story": _STORY,
         "search": (
             *_SEARCH,
-            _PAGE_FILL + " A group has 5 passages. If more sections contain a risk "
-            'word such as "attack" or "bypass", one more group takes up to 5 of '
-            "them.",
+            _PAGE_FILL + " Groups of 5 passages. Then one group of up to 5 other "
+            'sections with a risk word such as "attack" or "bypass".',
         ),
         "write": (
-            "The writer writes threats",
-            "The writer reads the story and one group of passages. For each "
-            "threat or security rule in a passage, it writes a threat, its quote "
-            "and a requirement.",
-            "The writer also says if each passage fits the story. If SecReqGen "
-            "cannot read the answer, it asks again, up to 3 times.",
+            "Write threats",
+            "Writer model. Reads the story and one group of passages. For each "
+            "threat or security rule in a passage: a threat, its quote, a "
+            "requirement.",
+            "The writer also says if each passage fits the story. Up to 3 tries "
+            "if the answer cannot be read.",
         ),
         "check": (
-            "SecReqGen checks each quote",
-            "This step is plain code, not AI. A threat passes only if its quote "
-            "is in the passage.",
-            "The check ignores capital letters and Markdown marks. A threat fails "
-            "in these cases: the quote is not in the passage, the passage is not "
-            "in the group, the writer did not say that the passage fits the "
-            "story, a part is missing, the quote has more than 60 words, or "
-            "another threat has the same quote.",
+            "Quote check",
+            "Plain code, no AI. A threat passes only if its quote is in the "
+            "passage.",
+            "Ignores capital letters and Markdown marks. A threat fails when: "
+            "the quote is not in the passage; the passage is not in the group; "
+            "the writer did not say that the passage fits the story; a field is "
+            "empty; the quote has more than 60 words; another threat has the "
+            "same quote.",
         ),
         "labels": (
-            "The writer adds an actor and a STRIDE category",
-            "One call for the story. The writer picks both from fixed lists.",
+            "Actor and STRIDE",
+            "Writer model, asked once for the story. Picks both from fixed lists.",
             "",
         ),
         "second_model": (
-            "The checker reads each threat",
-            "The checker is a second model. It flags a threat if the quote is "
-            "about another feature, or if the threat says more than the passage.",
-            "The checker reads each threat next to its passage and answers OK or "
-            "FAULT. The GUI shows these answers as accepted and flagged. A "
-            "flagged threat stays in the list, in its own group.",
+            "Checker",
+            "Checker model. Flags a threat if the quote is about another "
+            "feature, or if the threat says more than the passage.",
+            "Reads each threat next to its passage: OK (accepted) or FAULT "
+            "(flagged). A flagged threat stays in the list, in its own group.",
         ),
         "weak_signs": (
-            "SecReqGen marks weak support",
-            "SecReqGen looks for signs of weak support, such as a quote of 5 "
-            "words or fewer. It removes nothing.",
+            "Weak support",
+            "Plain code, no AI. Marks threats with weak signs, such as a quote of "
+            "5 words or fewer. Removes nothing.",
             "",
         ),
         "read": (
-            "You read the list",
-            "You check each threat against its quote, and you keep it or delete "
-            "it. The list is a draft, not a complete threat model.",
+            "Your review",
+            "Check each threat against its quote. Keep or delete it. Draft, not a "
+            "complete threat model.",
             "",
         ),
     },
@@ -102,20 +100,19 @@ TEXTS: dict[str, dict[str, tuple[str, str, str]]] = {
         "story": _STORY,
         "search": (*_SEARCH, _PAGE_FILL),
         "write": (
-            "The model writes the requirements",
-            "The model reads the story and the passages, and writes security "
-            "requirements.",
-            "If SecReqGen cannot read the answer, it asks again, up to 3 times.",
+            "Write requirements",
+            "Model, asked once. Reads the story and the passages.",
+            "Up to 3 tries if the answer cannot be read.",
         ),
         "parse": (
-            "SecReqGen parses the answer",
-            "SecReqGen reads the answer and stores each requirement with its ASVS "
-            "category and its priority.",
+            "Parse",
+            "Plain code, no AI. Stores each requirement with its ASVS category "
+            "and priority.",
             "",
         ),
         "read": (
-            "You read the requirements",
-            "Open the result to read them.",
+            "Your review",
+            "Open the result.",
             "",
         ),
     },
@@ -519,7 +516,7 @@ def _threat_frame(trace: Mapping, frame: tuple[str, int], verdicts) -> tuple:
             took = _seconds(this.get("seconds"))
             facts += f", {took}." if took else "."
             if this.get("extra"):
-                facts += " This group has the passages with a risk word."
+                facts += " Passages with a risk word."
             if not this.get("answered"):
                 facts += " SecReqGen could not read the answer."
     elif step == "check":
@@ -587,12 +584,12 @@ def _threat_frame(trace: Mapping, frame: tuple[str, int], verdicts) -> tuple:
             if decided:
                 lines = (f"{decided} of {passed_all} decided",)
                 facts = (
-                    f"You decided {decided} of {passed_all}: "
+                    f"{decided} of {passed_all} decided: "
                     f"{kept} kept, {decided - kept} deleted."
                 )
             else:
-                lines = (f"{passed_all} to read",)
-                facts = f"{plural(passed_all, 'threat')} to read."
+                lines = (f"{passed_all} to review",)
+                facts = f"{plural(passed_all, 'threat')} to review."
         views["read"] = StepView("active", lines)
     loop_used = (in_loop and group_no > 1) or (after_loop and total > 1)
     return views, loop_used, facts

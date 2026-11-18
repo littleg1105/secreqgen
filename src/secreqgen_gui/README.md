@@ -74,6 +74,7 @@ More facts:
 | History | All runs |
 | Prompts | The tested prompt sets (read only) and your own sets |
 | How it works | The parts of the tool and the steps of one story, as a replay of a finished story |
+| Help | The main instructions: start, stories, documentation, models, privacy |
 | Settings | Ollama, models, data folder |
 
 ## The step diagram

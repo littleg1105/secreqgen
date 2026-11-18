@@ -36,7 +36,7 @@ from secreqgen_gui.widgets import page_title
 
 ABOUT_PAUSE = 0.3  # seconds with no change before the paragraph goes to its file
 SAME_MODEL = "The checker must be a different model from the writer."
-ABOUT_HINT = "What the product does and who uses it. The writer reads this."
+ABOUT_HINT = "What it does and who uses it"
 
 
 def page(
@@ -67,7 +67,7 @@ def page(
                     "Writer",
                     value=saved(THREATS, "writer", defaults.writer_model, str),
                 )
-                .props('outlined dense hint="The model that writes the threats."')
+                .props("outlined dense")
                 .classes("w-full")
             )
             check = ui.switch(
@@ -78,7 +78,7 @@ def page(
                     "Checker",
                     value=saved(THREATS, "checker", defaults.checker_model, str),
                 )
-                .props('outlined dense hint="The model that checks each threat."')
+                .props("outlined dense")
                 .classes("w-full")
             )
             same = message()

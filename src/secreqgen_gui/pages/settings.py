@@ -8,7 +8,7 @@ from secreqgen.application.server import check_model_server
 from secreqgen_gui import __version__
 from secreqgen_gui.pages.home import (
     STATUS_CSS,
-    model_names,
+    model_roles,
     section,
     show_server_result,
 )
@@ -22,17 +22,6 @@ from secreqgen_gui.settings import (
 )
 from secreqgen_gui.widgets import page_title
 
-DATA_SENTENCE = (
-    "Runs, uploads and your prompts are stored here. To use another folder, "
-    "set SECREQGEN_GUI_HOME before you start the GUI."
-)
-ABOUT = (
-    "The threat list is a draft, not a complete threat model. It covers only "
-    "what your documentation says.",
-    "Tested setup: gemma4:26b writes, qwen3.8:27b checks, with the tested "
-    "prompts.",
-    "The ingest and evaluate commands are on the command line only.",
-)
 MODEL_FIELDS = (
     ("writer", "Writer", "writer_model", "Enter the writer model."),
     (
@@ -55,10 +44,19 @@ def _clean(value: object) -> str:
     return str(value or "").strip()
 
 
+def _tested_models() -> dict[str, str]:
+    """Return the tested model for the writer and for the checker."""
+    from secreqgen.threats import TESTED_WRITER
+    from secreqgen.threats.pipeline import TESTED_CHECKER
+
+    return {"writer": TESTED_WRITER, "checker": TESTED_CHECKER}
+
+
 def page() -> None:
     ui.add_css(STATUS_CSS)
     ui.add_css(_CSS)
     settings = load_settings()
+    tested = _tested_models()
     selects: dict[str, ui.select] = {}
     notes: dict[str, ui.label] = {}
 
@@ -89,7 +87,7 @@ def page() -> None:
                 )
                 result.clear()
                 with result:
-                    show_server_result(status, _names(), url)
+                    show_server_result(status, _roles(), url)
                 _offer(status)
 
             ui.button("Check Ollama", on_click=check).props(
@@ -111,6 +109,8 @@ def page() -> None:
                     .classes("w-full")
                     .mark(key)
                 )
+                if key in tested:
+                    ui.label(f"Tested: {tested[key]}").classes("sr-small")
                 notes[key] = ui.label().classes("sr-field-error")
 
         def _current(url: str) -> GuiSettings:
@@ -121,8 +121,12 @@ def page() -> None:
                 requirements_model=_clean(selects["requirements"].value),
             )
 
-        def _names() -> list[str]:
-            return model_names(*[_clean(selects[k].value) for k in selects])
+        def _roles() -> list[tuple[str, str]]:
+            return model_roles(
+                _clean(selects["writer"].value),
+                _clean(selects["checker"].value),
+                _clean(selects["requirements"].value),
+            )
 
         def _offer(status) -> None:
             if not status.reachable:
@@ -155,12 +159,9 @@ def page() -> None:
 
         with section("Data folder"):
             ui.label(show_path(data_home())).classes("sr-code break-all")
-            ui.label(DATA_SENTENCE).classes("sr-muted")
 
         with section("About"):
             ui.label(f"SecReqGen {__version__}").classes("sr-small")
-            for sentence in ABOUT:
-                ui.label(sentence).classes("sr-muted")
 
 
 _CSS = """

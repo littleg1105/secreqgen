@@ -28,7 +28,7 @@ async def test_the_diagram_draws_only_when_the_board_changed(user: User) -> None
         # The same board again: no new picture, so the slip does not move again.
         assert not diagram.show(boards.live_board(progress), story_id=STORY)
         assert diagram.picture.content is first
-    await user.should_see("SecReqGen searches the documentation")
+    await user.should_see("Word search (BM25), no AI.")
 
     numbers = {"passages": 4, "groups": 1, "extra_passages": 0}
     boards.apply_event(progress, StepEvent(STORY, "search", "done", 0, 0, numbers))
@@ -38,7 +38,7 @@ async def test_the_diagram_draws_only_when_the_board_changed(user: User) -> None
     with user.client.content:
         assert diagram.show(boards.live_board(progress), story_id=STORY)
         assert "4 passages" in diagram.picture.content
-    await user.should_see("The writer writes threats")
+    await user.should_see("Write threats")
     await user.should_see("Group 1 of 1.")
     # The button and the hint of the full screen are parts of the diagram.
     await user.should_see("Full screen")
@@ -68,4 +68,4 @@ async def test_without_moving_the_picture_has_no_slip(user: User) -> None:
         diagram = StepDiagram()
         assert diagram.show(board, moving=False)
         assert "<animateMotion" not in diagram.picture.content
-    await user.should_see("The model writes the requirements")
+    await user.should_see("Model, asked once. Reads the story and the passages.")

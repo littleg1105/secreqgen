@@ -21,11 +21,23 @@ from secreqgen_gui.widgets import confirm, empty_state, page_title, tag, text
 PARTS = (("threats", "Threat list"), ("requirements", "Requirements"))
 KINDS = tuple(kind for kind, _ in PARTS)
 TESTED = "tested"
-NAME_RULE = (
-    "Use lowercase letters, digits, hyphens and underscores. Up to 40 characters."
-)
-NOT_TESTED_LINE = "A run with these prompts gets the tag: untested prompts."
-TESTED_LINE = "Locked. The thesis tests used these prompts."
+NAME_RULE = "Lowercase letters, digits, hyphens, underscores. Max 40 characters."
+NOT_TESTED_LINE = "Run tag: untested prompts"
+TESTED_LINE = "Locked. Used in the thesis tests."
+# The short description of each file, by the kind of the set and the file name.
+FILE_WORDS = {
+    "threats": {
+        "system_prompt.txt": "Role and rules of the writer",
+        "user_prompt.txt": "Writer task: threats with quotes",
+        "labels_prompt.txt": "Writer task: actor and STRIDE",
+        "check_prompt.txt": "Checker task: accept or flag",
+    },
+    "requirements": {
+        "system_prompt.txt": "Role of the model",
+        "rag_user_prompt.txt": "Task with passages",
+        "zero_shot_user_prompt.txt": "Task without passages",
+    },
+}
 
 
 def _tested_info(kind: str) -> PromptSetInfo | None:
@@ -107,13 +119,16 @@ def _open_copy_dialog(kind: str) -> None:
 
 
 def _file_rows(info: PromptSetInfo) -> None:
-    with ui.column().classes("gap-1"):
+    words = FILE_WORDS.get(info.kind, {})
+    with ui.column().classes("w-full gap-1"):
         for file in info.files:
-            with ui.row().classes("items-baseline gap-4 no-wrap"):
-                ui.label(file.name).classes("sr-code w-[220px]")
-                _hash_label(file.sha256)
-                if not file.used:
-                    ui.label("not used by the GUI").classes("sr-small")
+            with ui.element("div").classes("sr-file-row w-full"):
+                ui.label(file.name).classes("sr-code")
+                ui.label(words.get(file.name, "")).classes("sr-small")
+                with ui.row().classes("items-baseline gap-3 no-wrap"):
+                    _hash_label(file.sha256)
+                    if not file.used:
+                        ui.label("not used by the GUI").classes("sr-small")
 
 
 def _tested_row(info: PromptSetInfo) -> None:
@@ -145,11 +160,8 @@ def _user_row(info: PromptSetInfo, refresh) -> None:
 
 
 def page() -> None:
-    page_title(
-        "Prompts",
-        "The instructions for the models. The tested prompts are locked. "
-        "Copy them, then change the copy.",
-    )
+    ui.add_css(_CSS)
+    page_title("Prompts", "Copy a set to change it.")
 
     @ui.refreshable
     def parts() -> None:
@@ -269,3 +281,14 @@ def set_page(kind: str, name: str) -> None:
         _missing()
         return
     _user_page(info, tested)
+
+
+_CSS = """
+.sr-file-row {
+  display: grid; grid-template-columns: 220px 1fr auto;
+  gap: 4px 16px; align-items: baseline;
+}
+@media (max-width: 760px) {
+  .sr-file-row { grid-template-columns: 1fr; }
+}
+"""

@@ -185,9 +185,9 @@ def _threat_summary(outcome: Any, checked: bool) -> str:
     return ", ".join(parts)
 
 
-SUBSET_LINE = "You picked {picked} of {total} stories. The command runs all {total}."
-PROMPT_LINE = "The command cannot use your prompt set. It uses the tested prompts."
-RUN_PROMPT_LINE = "This run used your prompt set. The command uses the tested prompts."
+SUBSET_LINE = "The command runs all {total} stories, not your {picked}."
+PROMPT_LINE = "The command uses the tested prompts, not your set."
+RUN_PROMPT_LINE = "The command uses the tested prompts, not the set of this run."
 
 
 def _plain(value: Any) -> Any:
@@ -757,8 +757,8 @@ class JobManager:
             return None
         if not _SET_NAME.match(spec.prompt_set):
             raise RunFailedError(
-                "The prompt set name is not allowed. "
-                "Use lowercase letters, digits, hyphens and underscores."
+                "Name not allowed. "
+                "Use lowercase letters, digits, hyphens, underscores."
             )
         folder = storage.prompt_sets_dir() / kind / spec.prompt_set
         if not folder.is_dir():
@@ -907,9 +907,7 @@ class JobManager:
                 url=self._settings.base_url,
             )
         elif stopped:
-            self._finish(
-                run_id, manifest, "stopped", "stopped", message="You stopped the run."
-            )
+            self._finish(run_id, manifest, "stopped", "stopped", message="Stopped.")
         else:
             self._finish(run_id, manifest, "done", "finished", message="Done.")
 

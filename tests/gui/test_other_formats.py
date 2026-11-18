@@ -16,10 +16,7 @@ from nicegui import ui  # noqa: E402
 pytestmark = pytest.mark.anyio
 
 PAGE = "# Page\n\nUsers must log in.\n"
-HINT = (
-    "This run read files that were converted to Markdown. "
-    "The thesis tests used Markdown files only."
-)
+HINT = "Files converted to Markdown. Not in the thesis tests."
 
 
 def _folder(tmp_path, name, markdown=(), others=()):
@@ -96,7 +93,7 @@ def _switch(user):
             0,
             {},
             True,
-            "This folder has no documentation files that the search can read.",
+            "No documentation files in this folder.",
         ),
         (
             1,
@@ -119,8 +116,8 @@ async def test_the_form_counts_files_of_other_types(user, tmp_path):
     await user.should_see(
         "1 Markdown file found. 3 files of other types are converted (.txt, .rst)."
     )
-    hints = [e.props.get("hint") for e in user.find(kind=ui.input).elements]
-    assert "The folder with the documentation of the product" in hints
+    props = {e.props.get("label"): e.props for e in user.find(kind=ui.input).elements}
+    assert "hint" not in props["Documentation folder"]
     _switch(user).click()
     await user.should_see(
         "1 Markdown file found. 3 files of other types are not read (.txt, .rst)."

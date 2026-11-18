@@ -544,7 +544,7 @@ async def test_the_foot_says_when_a_system_context_is_written(
 
     monkeypatch.setattr(context_job.writer, "busy", lambda: True)
     await user.open(_url(route, _stories(tmp_path), _docs(tmp_path)))
-    await user.should_see("A model is writing a system context. Wait for it to end.")
+    await user.should_see("A model is writing a system context.")
     await user.should_not_see("Another run is in progress.")
     links = [e for e in user.find(kind=ui.link).elements if e.text == "Open the run"]
     assert all(not link.parent_slot.parent.visible for link in links)
@@ -560,7 +560,7 @@ async def test_the_foot_keeps_its_text_for_a_run(user, tmp_path, monkeypatch):
 
     monkeypatch.setattr(jobs, "manager", Busy())
     await user.open(_url("/threats/new", _stories(tmp_path), _docs(tmp_path)))
-    await user.should_see("Another run is in progress. Wait for it to end, or stop it.")
+    await user.should_see("Another run is in progress.")
     await user.should_see("Open the run")
     await user.should_not_see("A model is writing a system context.")
 

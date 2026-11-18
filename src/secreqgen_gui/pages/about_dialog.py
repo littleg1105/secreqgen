@@ -34,17 +34,12 @@ from secreqgen_gui.widgets import CommandBlock, path_field
 
 ABOUT_LIMIT = 120
 TITLE = "Write a paragraph about the product"
-INTRO = (
-    "The model reads the key files of a codebase and writes a system context: "
-    "facts about the product."
-)
-INTRO_2 = "SecReqGen makes the paragraph from these facts, with no model."
 TEXT_LABEL = "About the product"
 LINES_TITLE = "Lines and their sources"
-NO_SOURCE = "The model named no source file."
+NO_SOURCE = "No source file named"
 MAKE_STEP = "Make the paragraph"
 USE = "Use this paragraph"
-REPLACES = "This replaces the text in the form."
+REPLACES = "Replaces the text in the form."
 SHORTEN = ". Shorten the paragraph."
 
 
@@ -132,9 +127,6 @@ def open_about_dialog(
         ui.card().classes("w-[760px] max-w-full gap-3 overflow-y-auto"),
     ):
         ui.label(TITLE).classes("sr-section-title")
-        with ui.column().classes("gap-0"):
-            ui.label(INTRO).classes("sr-small")
-            ui.label(INTRO_2).classes("sr-small")
         folder_field = path_field(
             "Codebase folder", folder, folder=True, hint=FOLDER_HINT
         ).mark("about-folder")

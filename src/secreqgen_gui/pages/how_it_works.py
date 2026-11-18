@@ -18,7 +18,7 @@ from secreqgen_gui.widgets import page_title
 
 KINDS = (("threats", "Threat list"), ("requirements", "Requirements"))
 PLAY_SECONDS = 2.8
-NO_RUN = "No finished run yet. Start one to see real numbers."
+NO_RUN = "No finished run yet."
 NO_RESULT = "This story has no stored result."
 CSS = ".sr-link { color: #1D3A6B; }"
 KEYS_HINT = "Arrow keys: next and previous step. Space: play or pause. Esc: exit."

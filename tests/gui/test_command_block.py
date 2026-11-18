@@ -21,9 +21,9 @@ from secreqgen_gui.settings import GuiSettings, save_settings  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 
-SUBSET = "You picked {picked} of {total} stories. The command runs all {total}."
-PROMPT_FORM = "The command cannot use your prompt set. It uses the tested prompts."
-PROMPT_RUN = "This run used your prompt set. The command uses the tested prompts."
+SUBSET = "The command runs all {total} stories, not your {picked}."
+PROMPT_FORM = "The command uses the tested prompts, not your set."
+PROMPT_RUN = "The command uses the tested prompts, not the set of this run."
 ABOUT_TEXT = "Demo is a chat tool for teams."
 
 
@@ -808,7 +808,9 @@ async def test_an_old_manifest_that_lacks_a_value_never_fails_the_page(
     storage.run_dir(run_id).mkdir(parents=True)
     storage.write_manifest(run_id, manifest)
     await user.open(f"/runs/{run_id}")
-    await user.should_see("run")
+    # The page opens: the menu is there. (The old check, "run", matched the
+    # foot of the menu, "Ollama is running". The foot reads "Ollama OK" now.)
+    await user.should_see("Ollama")
     assert _texts(user) == []
 
 

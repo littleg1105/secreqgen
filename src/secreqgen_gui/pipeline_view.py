@@ -341,17 +341,14 @@ def _loop_note(flow: Flow) -> list[str]:
 
 
 def _server_note(flow: Flow, notes: Mapping[str, str]) -> list[str]:
-    """Return two lines at the right end of the last lane: where the models run."""
+    """Return one line at the right end of the last lane: where Ollama runs."""
     server = notes.get("server")
     if not server:
         return []
-    models = sum(1 for _name, key in flow.lanes if key in ("writer", "checker"))
-    first = "The models run in Ollama" if models > 1 else "The model runs in Ollama"
     x = flow.width - 12
     bottom = PAD + len(flow.lanes) * LANE_H
     return [
-        _text(x, bottom - 25, first, "srp-note", "end"),
-        _text(x, bottom - 10, "at " + short(server, 34), "srp-note", "end"),
+        _text(x, bottom - 10, "Ollama at " + short(server, 34), "srp-note", "end"),
     ]
 
 

@@ -178,6 +178,7 @@ def test_a_stop_request_leaves_the_rest_not_run(spec):
     state = manager.get(run_id)
     assert state.state == "stopped"
     assert state.stop_requested is True
+    assert state.message == "Stopped."
     assert [s.state for s in state.stories] == ["done", "not run", "not run"]
     manifest = storage.read_manifest(run_id)
     assert manifest["status"] == "stopped"

@@ -29,15 +29,13 @@ TESTED_SET = "__tested__"
 FOLDER_MISSING = "Folder not found. Check the path or click Browse."
 FILE_MISSING = "File not found. Check the path or click Browse."
 READING = "Reading the folder."
-NO_FILES = "This folder has no documentation files that the search can read."
+NO_FILES = "No documentation files in this folder."
 WRONG_TYPE = "Use a .json, .yaml or .yml file."
-STORIES_HINT = "JSON or YAML, with a list named user_stories"
-EXAMPLES_HINT = "Eight generic stories that fit most products."
-DOCS_HINT = "The folder with the documentation of the product"
+EXAMPLES_HINT = "8 generic stories"
 OTHER_SWITCH = "Read other file types too"
-BUSY = "Another run is in progress. Wait for it to end, or stop it."
-CONTEXT_BUSY = "A model is writing a system context. Wait for it to end."
-UNTESTED_PROMPTS = "A run with these prompts gets the tag: untested prompts."
+BUSY = "Another run is in progress."
+CONTEXT_BUSY = "A model is writing a system context."
+UNTESTED_PROMPTS = "Run tag: untested prompts"
 PRODUCT_NOTE = "Product name (optional)"
 PRODUCT_LIMIT = 80
 TABS = {"path": "File path", "upload": "Upload", "type": "Type a story"}
@@ -204,10 +202,7 @@ class StoriesPart:
             with ui.tab_panels(tabs, value=saved).classes("w-full"):
                 with ui.tab_panel(tab_file).classes("p-0 pt-3"):
                     self.field = path_field(
-                        "Stories file",
-                        initial,
-                        hint=STORIES_HINT,
-                        start=storage.examples_dir(),
+                        "Stories file", initial, start=storage.examples_dir()
                     )
                     with ui.row().classes("items-baseline gap-3 pt-5"):
                         ui.button(
@@ -323,7 +318,7 @@ class StoriesPart:
             .mark("story_text")
         )
         criteria = (
-            ui.textarea("Acceptance criteria (one in each line)", value=old("criteria"))
+            ui.textarea("Acceptance criteria (one per line)", value=old("criteria"))
             .props("outlined autogrow")
             .classes("w-full")
         )
@@ -536,9 +531,7 @@ class DocsPart:
         form_memory.remember(COMMON, "product", product)
         body = section("Documentation")
         with body:
-            self.field = path_field(
-                "Documentation folder", initial, folder=True, hint=DOCS_HINT
-            )
+            self.field = path_field("Documentation folder", initial, folder=True)
             on = form_memory.recall(COMMON, "other_formats", True, bool)
             self.switch = ui.switch(OTHER_SWITCH, value=on).mark("other_formats")
             self.info = message()

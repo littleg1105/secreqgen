@@ -19,6 +19,7 @@ from secreqgen_gui.jobs import (
     manager,
     spec_from_dict,
 )
+from secreqgen_gui.pages import help as help_page
 from secreqgen_gui.pages import (
     history,
     home,
@@ -50,6 +51,7 @@ NAV = (
     ("History", "/history", ("/history", "/runs")),
     ("Prompts", "/prompts", ("/prompts",)),
     ("How it works", "/how-it-works", ("/how-it-works",)),
+    ("Help", "/help", ("/help",)),
     ("Settings", "/settings", ("/settings",)),
 )
 
@@ -65,6 +67,7 @@ ROUTES = {
     "/prompts": prompts.page,
     "/prompts/{kind}/{name}": prompts.set_page,
     "/how-it-works": how_it_works.page,
+    "/help": help_page.page,
     "/settings": settings_page.page,
 }
 
@@ -86,7 +89,7 @@ def _is_active(label: str, prefixes: tuple[str, ...], path: str) -> bool:
 
 
 def _rail() -> None:
-    """Build the left rail: the name, seven entries, the Ollama line."""
+    """Build the left rail: the name, eight entries, the Ollama line."""
     with ui.left_drawer(value=True, fixed=True, bordered=False).props(
         f"width={theme.RAIL_WIDTH} behavior=desktop"
     ).classes("p-0"):
@@ -125,7 +128,7 @@ def _server_line() -> None:
         dot.classes(remove="sr-dot-ok sr-dot-bad")
         if status.reachable:
             dot.classes(add="sr-dot-ok")
-            label.set_text("Ollama is running")
+            label.set_text("Ollama OK")
         else:
             dot.classes(add="sr-dot-bad")
             label.set_text("Ollama is not running")

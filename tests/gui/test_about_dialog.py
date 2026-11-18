@@ -20,10 +20,7 @@ from test_context_dialog import RESULT, make_stand_in  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 
-HINT = (
-    "A model wrote the facts in the paragraph about the product. "
-    "The thesis tests used facts that a person wrote."
-)
+HINT = "Paragraph facts written by a model. Not in the thesis tests."
 LONG = "Feature number {n} has ten plain words in this line."
 
 
@@ -198,17 +195,15 @@ async def test_the_button_opens_the_dialog_with_the_folder_and_the_product(
 ):
     job()
     code = await _open_dialog(user, tmp_path)
-    await user.should_see(
+    await user.should_not_see(
         "The model reads the key files of a codebase and writes a system context: "
         "facts about the product."
     )
-    await user.should_see(
+    await user.should_not_see(
         "SecReqGen makes the paragraph from these facts, with no model."
     )
     await user.should_see("Codebase folder")
-    assert _field(user, "about-folder").props["hint"] == (
-        "The top folder of the product's code"
-    )
+    assert _field(user, "about-folder").props["hint"] == "Top folder of the code"
     await user.should_see("Browse")
     assert _field(user, "about-folder").value == str(code)
     assert _field(user, "about-product").value == "Demo"  # from the form
@@ -317,9 +312,7 @@ async def test_the_paragraph_of_a_long_result_is_the_rule(user, tmp_path, job):
 async def test_the_notes_the_notice_and_the_title(user, tmp_path, job):
     await _done(user, tmp_path, job)
     await user.should_see("2 files that can hold secrets are not read.")
-    await user.should_see(
-        "This is a draft. Check each line against its source before you use it."
-    )
+    await user.should_see("Draft. Check each line against its source.")
     await user.should_see("Lines and their sources")
     assert _field(user, "about-counter").text == "10 of 120 words"
 
@@ -345,14 +338,14 @@ async def test_the_list_holds_the_description_and_the_features_of_the_paragraph(
 
 async def test_a_description_with_no_source_shows_the_line(user, tmp_path, job):
     await _done(user, tmp_path, job)  # the canned result names no source
-    await user.should_see("The model named no source file.")
-    assert _texts(user, "about-line-source")[0] == "The model named no source file."
+    await user.should_see("No source file named")
+    assert _texts(user, "about-line-source")[0] == "No source file named"
     assert _texts(user, "about-line-source")[1] == "README.md"
 
 
 async def test_a_description_with_a_source_shows_the_file(user, tmp_path, job):
     await _done(user, tmp_path, job, big_result())
-    await user.should_not_see("The model named no source file.")
+    await user.should_not_see("No source file named")
 
 
 async def test_the_left_out_part_shows_only_when_a_feature_did_not_fit(
@@ -416,14 +409,14 @@ async def test_the_line_under_the_button_shows_only_when_the_form_has_text(
 ):
     await _done(user, tmp_path, job)
     assert _found(user, "about-replaces") == []
-    await user.should_not_see("This replaces the text in the form.")
+    await user.should_not_see("Replaces the text in the form.")
 
 
 async def test_the_line_under_the_button_shows_when_the_form_has_text(
     user, tmp_path, job
 ):
     await _done(user, tmp_path, job, about="Old text of the form.")
-    await user.should_see("This replaces the text in the form.")
+    await user.should_see("Replaces the text in the form.")
     await user.should_see("Close")
     await user.should_see("Use this paragraph")
 
@@ -502,7 +495,7 @@ async def test_the_dialog_says_when_a_run_is_in_progress(user, tmp_path, job):
     )
     await _open_dialog(user, tmp_path)
     await asyncio.sleep(1.2)
-    await user.should_see("Another run is in progress. Wait for it to end, or stop it.")
+    await user.should_see("Another run is in progress. Wait for it to end.")
     assert not _field(user, "about-write").enabled
 
 

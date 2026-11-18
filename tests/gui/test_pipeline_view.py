@@ -202,7 +202,7 @@ def test_the_live_board_follows_the_reports_of_the_tool():
     )
     assert board.steps["weak_signs"] == StepView("done", ("1 marked",))
     assert board.steps["read"] == StepView("partial", ("your turn",))
-    assert board.title == "You read the list"
+    assert board.title == "Your review"
 
 
 def test_options_that_are_off_show_as_off():
@@ -321,8 +321,8 @@ def test_the_replay_shows_each_group_in_true_order():
 
     board = boards.replay_board("threats", TRACE, ("write", 3))
     assert board.facts == (
-        "Group 3 of 3: 2 passages, 3 attempts, 9 seconds. This group has the "
-        "passages with a risk word. SecReqGen could not read the answer."
+        "Group 3 of 3: 2 passages, 3 attempts, 9 seconds. Passages with a "
+        "risk word. SecReqGen could not read the answer."
     )
 
     board = boards.replay_board("threats", TRACE, ("second_model", 0))
@@ -387,8 +387,8 @@ def test_rows_with_no_verdict_show_in_the_box_of_the_second_model():
 
 def test_no_decision_yet_reads_as_work_to_do():
     board = boards.result_board("threats", TRACE, verdicts={})
-    assert board.steps["read"] == StepView("partial", ("3 to read",))
-    assert board.facts == "3 threats to read."
+    assert board.steps["read"] == StepView("partial", ("3 to review",))
+    assert board.facts == "3 threats to review."
 
 
 def test_the_texts_hold_the_limits_of_the_code():
@@ -401,13 +401,14 @@ def test_the_texts_hold_the_limits_of_the_code():
     )
 
     search = boards.TEXTS["threats"]["search"][2]
-    assert f"up to {DEFAULT_BUDGET:,} tokens" in search
-    assert f"A group has {GROUP_SIZE} passages" in search
-    assert f"up to {EXTRA_SECTIONS} of them" in search
+    assert f"Up to {DEFAULT_BUDGET:,} tokens" in search
+    assert f"Groups of {GROUP_SIZE} passages" in search
+    assert f"up to {EXTRA_SECTIONS} other sections" in search
     assert f"more than {QUOTE_LIMIT} words" in boards.TEXTS["threats"]["check"][2]
-    assert f"{DEFAULT_BUDGET:,} tokens" in boards.TEXTS["requirements"]["search"][2]
+    requirements = boards.TEXTS["requirements"]["search"][2]
+    assert f"Up to {DEFAULT_BUDGET:,} tokens" in requirements
     for kind in ("threats", "requirements"):
-        assert f"up to {MAX_JSON_ATTEMPTS} times" in boards.TEXTS[kind]["write"][2]
+        assert f"Up to {MAX_JSON_ATTEMPTS} tries" in boards.TEXTS[kind]["write"][2]
 
 
 def test_a_trace_with_options_off_and_an_empty_trace():

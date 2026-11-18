@@ -13,10 +13,7 @@ from secreqgen_gui.jobs import manager
 from secreqgen_gui.settings import load_settings, make_config
 from secreqgen_gui.widgets import empty_state, page_title
 
-PURPOSE = (
-    "Get a draft threat list or security requirements for your user stories. "
-    "The models run locally in Ollama."
-)
+PURPOSE = "Threat lists and security requirements from your user stories."
 NEWEST = 5
 KIND_WORDS = {"threats": "Threat list", "requirements": "Requirements"}
 STATE_WORDS = {
@@ -51,27 +48,41 @@ def section(title: str, first: bool = False) -> Iterator[None]:
         yield
 
 
-def model_names(*names: str) -> list[str]:
-    """Return the model names without doubles and without empty names."""
-    seen: list[str] = []
-    for name in names:
-        if name and name not in seen:
-            seen.append(name)
-    return seen
+def model_roles(writer: str, checker: str, requirements: str) -> list[tuple[str, str]]:
+    """Return the pairs (role, model name) of the three model settings."""
+    return [
+        ("writer", writer),
+        ("checker", checker),
+        ("requirements", requirements),
+    ]
 
 
-def show_server_result(status, names: list[str], address: str) -> None:
-    """Show the lines for the answer of the Ollama check."""
+def _missing_lines(status, roles: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Return (name, roles text) for each model that Ollama does not have."""
+    by_name: dict[str, list[str]] = {}
+    for role, name in roles:
+        name = (name or "").strip()
+        if name:
+            by_name.setdefault(name, []).append(role)
+    return [
+        (name, ", ".join(found))
+        for name, found in by_name.items()
+        if not model_available(status, name)
+    ]
+
+
+def show_server_result(status, roles: list[tuple[str, str]], address: str) -> None:
+    """Show the answer of the Ollama check: one status row, then the gaps."""
     with ui.column().classes("gap-1"):
         if status.reachable:
-            ui.label("Ollama is running.").classes("sr-ok")
-            for name in names:
-                if model_available(status, name):
-                    ui.label(f"{name} is ready.").classes("sr-ok")
-                else:
-                    ui.label(
-                        f"{name} is not installed. Run: ollama pull {name}"
-                    ).classes("sr-caution")
+            names = ", ".join(m.name for m in status.models) or "none"
+            with ui.row().classes("items-baseline gap-3"):
+                ui.label("Ollama OK").classes("sr-ok")
+                ui.label(f"Models: {names}").classes("sr-small")
+            for name, role_text in _missing_lines(status, roles):
+                ui.label(
+                    f"Not in Ollama: {name} ({role_text}). Run: ollama pull {name}"
+                ).classes("sr-caution")
         else:
             ui.label(
                 f"Ollama is not running at {address}. "
@@ -136,7 +147,7 @@ def _run_banner() -> None:
 
 def _server_part() -> None:
     settings = load_settings()
-    names = model_names(
+    roles = model_roles(
         settings.writer_model, settings.checker_model, settings.requirements_model
     )
     address = settings.base_url
@@ -149,16 +160,16 @@ def _server_part() -> None:
         status = await run.io_bound(check_model_server, make_config(settings))
         result.clear()
         with result:
-            show_server_result(status, names, address)
+            show_server_result(status, roles, address)
 
     ui.button("Check again", on_click=check).props("outline no-caps unelevated")
     ui.timer(0.1, check, once=True)
 
 
-def _entry(title: str, sentence: str, button: str, target: str) -> None:
+def _entry(title: str, fragment: str, button: str, target: str) -> None:
     with ui.column().classes("gap-2 grow basis-0 min-w-[260px] items-start"):
         ui.label(title).classes("sr-entry-title")
-        ui.label(sentence).classes("sr-muted max-w-[44ch]")
+        ui.label(fragment).classes("sr-muted max-w-[44ch]")
         ui.button(button, on_click=lambda: ui.navigate.to(target)).props(
             "unelevated no-caps color=primary"
         ).classes("mt-1")
@@ -197,15 +208,13 @@ def page() -> None:
             with ui.row().classes("w-full gap-10 no-wrap items-start"):
                 _entry(
                     "Threat list",
-                    "Draft threats for each story. Each threat has a quote "
-                    "from your documentation.",
+                    "Draft threats, each with a quote",
                     "New threat list",
                     "/threats/new",
                 )
                 _entry(
                     "Requirements",
-                    "Security requirements for each story, based on your "
-                    "documentation.",
+                    "Security requirements with ASVS category",
                     "New requirements",
                     "/requirements/new",
                 )

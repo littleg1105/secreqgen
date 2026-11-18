@@ -27,12 +27,10 @@ from secreqgen_gui.widgets import CommandBlock, path_field
 
 BUTTON = "Write one with the model"
 TITLE = "Write a system context"
-INTRO = "The model reads the key files of a codebase and writes a draft."
-INTRO_2 = "You check it before you use it."
-FOLDER_HINT = "The top folder of the product's code"
+FOLDER_HINT = "Top folder of the code"
 PRODUCT_LABEL = "Product name (optional)"
-BUSY = "Another run is in progress. Wait for it to end, or stop it."
-NOTICE = "This is a draft. Check each line against its source before you use it."
+BUSY = "Another run is in progress. Wait for it to end."
+NOTICE = "Draft. Check each line against its source."
 NO_FOLDER = "Enter the codebase folder."
 BAD_YAML = "This is not valid YAML. Correct it, then save again."
 SAVED = "Saved."
@@ -114,9 +112,6 @@ def open_context_dialog(
         ui.card().classes("w-[760px] max-w-full gap-3 overflow-y-auto"),
     ):
         ui.label(TITLE).classes("sr-section-title")
-        with ui.column().classes("gap-0"):
-            ui.label(INTRO).classes("sr-small")
-            ui.label(INTRO_2).classes("sr-small")
         folder_field = path_field(
             "Codebase folder", folder, folder=True, hint=FOLDER_HINT
         ).mark("context-folder")

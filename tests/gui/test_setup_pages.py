@@ -134,9 +134,7 @@ async def test_folder_without_markdown_shows_its_line(user, tmp_path):
     folder = tmp_path / "empty"
     folder.mkdir()
     await user.open(_url("/threats/new", _stories(tmp_path), folder))
-    await user.should_see(
-        "This folder has no documentation files that the search can read."
-    )
+    await user.should_see("No documentation files in this folder.")
     assert not _button(user, "Start threat list").enabled
 
 
@@ -233,7 +231,7 @@ async def test_busy_manager_turns_the_start_off(user, tmp_path, monkeypatch):
 
     monkeypatch.setattr(jobs, "manager", Recorder(busy=True))
     await _ready(user, tmp_path)
-    await user.should_see("Another run is in progress. Wait for it to end, or stop it.")
+    await user.should_see("Another run is in progress.")
     await user.should_see("Open the run")
     assert not _button(user, "Start threat list").enabled
 
@@ -244,12 +242,12 @@ async def test_user_prompt_set_shows_the_caution_line(user, tmp_path):
     folder = storage.prompt_sets_dir() / "threats" / "mine"
     folder.mkdir(parents=True)
     await _ready(user, tmp_path)
-    untested = "A run with these prompts gets the tag: untested prompts."
+    untested = "Run tag: untested prompts"
     await user.should_not_see(untested)
     select = user.find(kind=ui.select)
     select.click()
     user.find("mine").click()
-    await user.should_see("A run with these prompts gets the tag: untested prompts.")
+    await user.should_see("Run tag: untested prompts")
 
 
 async def test_type_one_story_writes_a_file_and_reads_it(user, tmp_path):
@@ -315,9 +313,19 @@ async def test_forms_have_no_sentence_under_the_title_and_use_the_new_names(
     for gone in ("Setup", "Second model", "Writer model", "Prompt set"):
         await user.should_not_see(gone)
     props = {e.props.get("label"): e.props for e in user.find(kind=ui.input).elements}
-    assert props["Writer"]["hint"] == "The model that writes the threats."
-    assert props["Checker"]["hint"] == "The model that checks each threat."
-    assert props["Stories file"]["hint"].startswith("JSON or YAML")
+    # No help line under these fields: the page "Help" holds the reference.
+    for name in ("Writer", "Checker", "Stories file", "Documentation folder"):
+        assert "hint" not in props[name], name
+    assert props["About the product (optional)"]["hint"] == (
+        "What it does and who uses it"
+    )
+    for old in (
+        "The model that writes the threats.",
+        "The model that checks each threat.",
+        "JSON or YAML, with a list named user_stories",
+        "The folder with the documentation of the product",
+    ):
+        await user.should_not_see(old)
 
 
 async def test_skipped_stories_line_uses_the_singular_form(user, tmp_path):
@@ -332,7 +340,7 @@ async def test_skipped_stories_line_uses_the_singular_form(user, tmp_path):
 async def test_the_example_stories_are_one_click_away(user):
     await user.open("/threats/new")
     await user.should_see("Use the example stories")
-    await user.should_see("Eight generic stories that fit most products.")
+    await user.should_see("8 generic stories")
     user.find("Use the example stories").click()
     await user.should_see("8 stories found.")
     await user.should_see("GEN-001")

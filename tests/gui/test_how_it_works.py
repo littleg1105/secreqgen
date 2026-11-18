@@ -96,7 +96,7 @@ async def test_no_run_shows_the_steps_with_no_numbers(user):
     await user.should_see("Step 1 of 8")
     user.find("Next").click()
     await user.should_see("Step 2 of 8")
-    await user.should_see("SecReqGen searches the documentation")
+    await user.should_see("Word search (BM25), no AI.")
     user.find("Previous").click()
     await user.should_see("Step 1 of 8")
 
@@ -110,7 +110,7 @@ async def test_a_stored_story_is_replayed_with_its_numbers(user):
     await user.should_see("The real run took 42 seconds.")
     await user.should_see("Open the result")
     await user.should_see(f"Step 1 of {len(frames)}")
-    await user.should_see("Your story and the documentation")
+    await user.should_see("Story and documentation")
     index = frames.index(("check", 1))
     for _ in range(index):
         user.find("Next").click()
@@ -118,7 +118,7 @@ async def test_a_stored_story_is_replayed_with_its_numbers(user):
     await user.should_see("In total 2 passed and 1 failed.")
     user.find("Previous").click()
     await user.should_see(f"Step {index} of {len(frames)}")
-    await user.should_see("The writer writes threats")
+    await user.should_see("Write threats")
 
 
 async def test_frame_parameter_opens_a_frame(user):
@@ -137,7 +137,7 @@ async def test_requirements_kind_has_five_steps(user):
     for _ in range(3):
         user.find("Next").click()
     await user.should_see("Step 4 of 5")
-    await user.should_see("SecReqGen parses the answer")
+    await user.should_see("Parse")
     await user.should_not_see("checks each quote")
 
 
