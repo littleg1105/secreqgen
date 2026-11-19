@@ -1,1 +1,0 @@
-Document the work just completed in docs/log.md with: date, files, what, why, decisions, next.

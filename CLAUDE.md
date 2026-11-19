@@ -82,7 +82,3 @@ Fix 2: remove the flag. First look for `hidden` in the flags column:
 ls -lO .venv/lib/python3.13/site-packages/*.pth
 chflags -R nohidden .venv/lib/python3.13/site-packages/*.pth
 ```
-
-## Old slash commands
-
-The files `.claude/commands/log.md`, `status.md` and `step.md` still name `docs/log.md`. Do not follow them. Use the "Read first" list above.
